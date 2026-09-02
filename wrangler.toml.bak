@@ -1,0 +1,8 @@
+name = "arsenal-backend"
+main = "src/index.ts" # ou votre entrée principale
+compatibility_date = "2024-09-02"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "arsenal-db"
+database_id = "votre-id-de-db-après-création"
