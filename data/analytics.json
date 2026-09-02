@@ -1,0 +1,32 @@
+{
+  "visits": 1256,
+  "actionsTotal": 1114,
+  "clicksByProduct": {
+    "neuroform-ai": 89,
+    "pixelpeek": 153,
+    "clipforge": 67,
+    "termvault": 41,
+    "reposentinel": 29,
+    "hydrotrack": 206,
+    "fokusflow": 119,
+    "dev-independant": 96,
+    "prompt-alchemy": 77,
+    "megapack-prompts": 134,
+    "flowbridge-n8n": 58,
+    "zenpost": 45
+  },
+  "visitsByDay": {
+    "2026-09-01": 185,
+    "2026-08-31": 214,
+    "2026-08-30": 196,
+    "2026-08-29": 243,
+    "2026-08-28": 268,
+    "2026-08-27": 312,
+    "2026-08-26": 287,
+    "2026-09-02": 6
+  },
+  "recentVisits": [
+    1788361057973
+  ],
+  "updatedAt": 1788361057973
+}

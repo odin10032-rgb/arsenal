@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Bêta Arsenal — L'arsenal des créateurs digitaux</title>
+  <meta name="description" content="SaaS, apps desktop, Mobile/PWA, e-books et packs de prompts & automations. Le catalogue des outils des bâtisseurs du web — Bêta Arsenal v2.0." />
+  <meta name="theme-color" content="#0b0f17" />
+  <meta property="og:title" content="Bêta Arsenal — v2.0 Live" />
+  <meta property="og:description" content="L'arsenal des créateurs digitaux : SaaS, apps, e-books, prompts & automations." />
+  <meta property="og:type" content="website" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%238b5cf6'/%3E%3Cstop offset='1' stop-color='%2322d3ee'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='%230b0f17'/%3E%3Cpath d='M36 8 18 36h11l-3 20 20-30H34l2-18z' fill='url(%23g)'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+  <!-- ===================== DÉCORS DE FOND CYBER ===================== -->
+  <div class="bg-fx" aria-hidden="true">
+    <div class="bg-glow bg-glow-violet"></div>
+    <div class="bg-glow bg-glow-cyan"></div>
+    <div class="bg-grid"></div>
+    <div class="bg-scanline"></div>
+  </div>
+
+  <!-- ===================== VUE PUBLIQUE ===================== -->
+  <div id="view-public">
+
+    <!-- Header & Navigation -->
+    <header class="site-header">
+      <div class="container header-inner">
+        <a class="brand" href="#" id="brand-home" aria-label="Bêta Arsenal — retour à l'accueil">
+          <svg class="brand-logo" viewBox="0 0 64 64" width="34" height="34" aria-hidden="true">
+            <defs>
+              <linearGradient id="logo-grad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0" stop-color="#8b5cf6" />
+                <stop offset="1" stop-color="#22d3ee" />
+              </linearGradient>
+            </defs>
+            <path d="M36 8 18 36h11l-3 20 20-30H34l2-18z" fill="url(#logo-grad)" />
+          </svg>
+          <span class="brand-name">BÊTA<span class="brand-accent">ARSENAL</span></span>
+          <span class="badge-live" title="Catalogue v2.0 — synchronisation active">
+            <span class="live-dot"></span>v2.0 Live
+          </span>
+        </a>
+
+        <div class="search-box" role="search">
+          <svg class="icon" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <input id="search-input" type="search" placeholder="Rechercher un outil, un e-book, un prompt…" autocomplete="off" aria-label="Recherche globale instantanée" />
+          <button id="search-clear" class="search-clear" type="button" aria-label="Effacer la recherche" hidden>
+            <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          </button>
+          <kbd class="search-kbd" title="Raccourci clavier">Ctrl&nbsp;K</kbd>
+        </div>
+
+        <a href="#admin" class="admin-link" title="Accès discret au Dashboard Admin (#admin)" aria-label="Espace administrateur">
+          <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+        </a>
+      </div>
+    </header>
+
+    <!-- Hero -->
+    <section class="hero">
+      <div class="container hero-inner">
+        <p class="hero-eyebrow">
+          <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M13 2 4.5 14H11l-1 8 8.5-12H12l1-8z" fill="currentColor"/></svg>
+          Catalogue v2.0 — mis à jour en direct
+        </p>
+        <h1 class="hero-title">L'arsenal <span class="grad-text">des bâtisseurs</span> du web</h1>
+        <p class="hero-sub">SaaS, applications desktop, PWA mobiles, e-books et packs d'automations —
+          triés par popularité réelle, testés par la communauté.</p>
+        <div class="hero-stats">
+          <div class="stat-chip"><strong id="stat-total">—</strong><span>outils au catalogue</span></div>
+          <div class="stat-chip"><strong id="stat-free">—</strong><span>gratuits</span></div>
+          <div class="stat-chip"><strong id="stat-clicks">—</strong><span>clics cumulés</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Filtres & Tri -->
+    <section class="controls" aria-label="Filtres et tri des produits">
+      <div class="container">
+        <div class="filter-row filter-row-cats" role="group" aria-label="Filtrer par catégorie">
+          <button class="pill" data-category="all" aria-pressed="true">Tous</button>
+          <button class="pill" data-category="saas" aria-pressed="false">SaaS</button>
+          <button class="pill" data-category="desktop" aria-pressed="false">Desktop App</button>
+          <button class="pill" data-category="mobile" aria-pressed="false">Mobile App/PWA</button>
+          <button class="pill" data-category="ebook" aria-pressed="false">E-book</button>
+          <button class="pill" data-category="prompts" aria-pressed="false">Prompts &amp; Automations</button>
+        </div>
+
+        <div class="filter-row filter-row-meta">
+          <div class="badge-filters" role="group" aria-label="Filtrer par badge">
+            <span class="filter-label">Badges</span>
+            <button class="chip chip-gratuit" data-badge="gratuit" aria-pressed="false">Gratuit</button>
+            <button class="chip chip-premium" data-badge="premium" aria-pressed="false">Premium</button>
+            <button class="chip chip-beta" data-badge="beta" aria-pressed="false">Bêta</button>
+            <button class="chip chip-nouveau" data-badge="nouveau" aria-pressed="false">Nouveau</button>
+          </div>
+          <div class="sort-box">
+            <label class="filter-label" for="sort-select">Tri</label>
+            <div class="select-wrap">
+              <select id="sort-select" aria-label="Sélecteur de tri">
+                <option value="popular">Plus populaires</option>
+                <option value="recent">Plus récents</option>
+              </select>
+              <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="m6 9 6 6 6-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <div class="results-line">
+          <span id="results-count" class="results-count" aria-live="polite">Chargement du catalogue…</span>
+          <button id="reset-filters" class="reset-btn" type="button" hidden>
+            <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><path d="M3 12a9 9 0 1 0 2.6-6.3L3 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M3 3v5h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            Réinitialiser les filtres
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Grille de produits dynamique -->
+    <main id="main" class="container main-content">
+      <div id="grid-skeleton" class="product-grid" aria-hidden="true">
+        <div class="card-skeleton"><div class="sk-img"></div><div class="sk-line w60"></div><div class="sk-line"></div><div class="sk-line w80"></div></div>
+        <div class="card-skeleton"><div class="sk-img"></div><div class="sk-line w60"></div><div class="sk-line"></div><div class="sk-line w80"></div></div>
+        <div class="card-skeleton"><div class="sk-img"></div><div class="sk-line w60"></div><div class="sk-line"></div><div class="sk-line w80"></div></div>
+        <div class="card-skeleton"><div class="sk-img"></div><div class="sk-line w60"></div><div class="sk-line"></div><div class="sk-line w80"></div></div>
+      </div>
+      <div id="product-grid" class="product-grid" aria-live="polite"></div>
+      <div id="empty-state" class="empty-state" hidden>
+        <svg viewBox="0 0 24 24" width="46" height="46" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.6" opacity="0.5"/><path d="m20 20-3.5-3.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity="0.5"/></svg>
+        <h3>Aucun outil ne correspond</h3>
+        <p>Essayez un autre mot-clé ou modifiez les filtres actifs.</p>
+        <button class="btn btn-primary" type="button" data-action="reset-filters">Réinitialiser les filtres</button>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <p class="footer-copy">© 2025 <strong>Bêta Arsenal</strong> — Forge ouverte aux créateurs digitaux.</p>
+        <nav class="footer-nav" aria-label="Liens discrets">
+          <a href="#admin" class="footer-admin">
+            <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2"/></svg>
+            Espace administrateur
+          </a>
+        </nav>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ===================== VUE ADMIN (#admin) ===================== -->
+  <div id="view-admin" class="view-admin" hidden></div>
+
+  <!-- ===================== MODALES & TOASTS ===================== -->
+  <div id="modal-root"></div>
+  <div id="toast-root" class="toast-root" aria-live="assertive"></div>
+
+  <noscript>
+    <div style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0b0f17;color:#e2e8f0;font-family:sans-serif;text-align:center;padding:2rem;z-index:9999">
+      Bêta Arsenal nécessite JavaScript. Activez-le pour explorer le catalogue.
+    </div>
+  </noscript>
+
+  <script src="/app.js" defer></script>
+</body>
+</html>
