@@ -7,8 +7,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "arsenal-db",
-      "database_id": "85276859-8854-4767-aeef-44ac800184ea"
+      "database_name": "arsenal",
+      "database_id": "484b6903-bd1d-4e1d-8115-6a4dfc31d57f"
     }
   ],
   "observability": {
