@@ -4,7 +4,7 @@
  * POST : création d'un produit (admin, X-Admin-Auth)
  */
 import { NextRequest, NextResponse } from "next/server";
-import { getProducts, saveProducts, getAnalytics, catalogVersion, withLock, Product } from "@/lib/server/store";
+import { getProducts, addProduct, getAnalytics, catalogVersion, Product } from "@/lib/server/store";
 import { isAdmin, unauthorized } from "@/lib/server/auth";
 import { randomUUID } from "crypto";
 
@@ -90,9 +90,6 @@ export async function POST(request: NextRequest) {
     createdAt: now,
     updatedAt: now,
   };
-  await withLock(async () => {
-    const products = await getProducts();
-    await saveProducts([product, ...products]);
-  });
+  await addProduct(product);
   return NextResponse.json({ ok: true, product }, { status: 201 });
 }

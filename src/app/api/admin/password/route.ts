@@ -5,7 +5,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { isAdmin, unauthorized, sha256hex } from "@/lib/server/auth";
-import { saveConfig, getConfig, withLock } from "@/lib/server/store";
+import { saveConfig, getConfig } from "@/lib/server/store";
 
 export async function POST(request: NextRequest) {
   if (!(await isAdmin(request))) return unauthorized();
@@ -24,8 +24,6 @@ export async function POST(request: NextRequest) {
   }
   const config = await getConfig();
   const newToken = sha256hex(next);
-  await withLock(async () => {
-    await saveConfig({ ...config, adminToken: newToken });
-  });
+  await saveConfig({ ...config, adminToken: newToken });
   return NextResponse.json({ ok: true, token: newToken });
 }

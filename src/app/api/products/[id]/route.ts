@@ -4,7 +4,7 @@
  * DELETE : suppression d'un produit (admin)
  */
 import { NextRequest, NextResponse } from "next/server";
-import { getProducts, saveProducts, getAnalytics, withLock, Product } from "@/lib/server/store";
+import { getProducts, saveProducts, deleteProduct, Product } from "@/lib/server/store";
 import { isAdmin, unauthorized } from "@/lib/server/auth";
 
 const CATEGORIES = ["saas", "desktop", "mobile", "ebook", "prompts"];
@@ -40,39 +40,33 @@ export async function PUT(
   }
   const actionUrl = sanitizeUrl(body.actionUrl);
 
-  const result = await withLock(async () => {
-    const products = await getProducts();
-    const index = products.findIndex((p) => p.id === id);
-    if (index === -1) return null;
-    const previous = products[index];
-    const updated: Product = {
-      ...previous,
-      title,
-      shortDescription: String(body.shortDescription || "").trim().slice(0, 140),
-      description: String(body.description || "").trim(),
-      category: category as Product["category"],
-      actionType: actionType as Product["actionType"],
-      badges: Array.isArray(body.badges)
-        ? (body.badges as unknown[]).map(String).filter((b) => BADGES.includes(b))
-        : [],
-      price: String(body.price || "").trim().slice(0, 24),
-      actionUrl,
-      apkUrl: sanitizeUrl(body.apkUrl) || undefined,
-      pwaUrl: sanitizeUrl(body.pwaUrl) || undefined,
-      command: body.command ? String(body.command).trim().slice(0, 500) : null,
-      videoUrl: sanitizeUrl(body.videoUrl) || null,
-      imageUrl: sanitizeUrl(body.imageUrl) || previous.imageUrl,
-      updatedAt: Date.now(),
-    };
-    products[index] = updated;
-    await saveProducts(products);
-    return updated;
-  });
+  const products = await getProducts();
+  const index = products.findIndex((p) => p.id === id);
+  if (index === -1) return NextResponse.json({ ok: false, error: "Produit introuvable." }, { status: 404 });
 
-  if (!result) {
-    return NextResponse.json({ ok: false, error: "Produit introuvable." }, { status: 404 });
-  }
-  return NextResponse.json({ ok: true, product: result });
+  const updated: Product = {
+    ...products[index],
+    title,
+    shortDescription: String(body.shortDescription || "").trim().slice(0, 140),
+    description: String(body.description || "").trim(),
+    category: category as Product["category"],
+    actionType: actionType as Product["actionType"],
+    badges: Array.isArray(body.badges)
+      ? (body.badges as unknown[]).map(String).filter((b) => BADGES.includes(b))
+      : [],
+    price: String(body.price || "").trim().slice(0, 24),
+    actionUrl,
+    apkUrl: sanitizeUrl(body.apkUrl) || undefined,
+    pwaUrl: sanitizeUrl(body.pwaUrl) || undefined,
+    command: body.command ? String(body.command).trim().slice(0, 500) : null,
+    videoUrl: sanitizeUrl(body.videoUrl) || null,
+    imageUrl: sanitizeUrl(body.imageUrl) || products[index].imageUrl,
+    updatedAt: Date.now(),
+  };
+  
+  products[index] = updated;
+  await saveProducts(products);
+  return NextResponse.json({ ok: true, product: updated });
 }
 
 export async function DELETE(
@@ -81,14 +75,9 @@ export async function DELETE(
 ) {
   if (!(await isAdmin(request))) return unauthorized();
   const { id } = await params;
-  const found = await withLock(async () => {
-    const products = await getProducts();
-    const next = products.filter((p) => p.id !== id);
-    if (next.length === products.length) return false;
-    await saveProducts(next);
-    return true;
-  });
-  if (!found) {
+  const success = await deleteProduct(id);
+  
+  if (!success) {
     return NextResponse.json({ ok: false, error: "Produit introuvable." }, { status: 404 });
   }
   return NextResponse.json({ ok: true, deleted: id });

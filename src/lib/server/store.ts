@@ -74,7 +74,7 @@ export async function getMedia(): Promise<MediaItem[]> {
     name: m.name,
     url: m.url,
     kind: m.kind,
-    size: m.size,
+    size: Number(m.size),
     uploadedAt: Number(m.uploaded_at)
   }));
 }
@@ -83,6 +83,23 @@ export async function addMedia(item: MediaItem): Promise<void> {
   await getDB().prepare(`
     INSERT INTO media (name, url, kind, size, uploaded_at) VALUES (?, ?, ?, ?, ?)
   `).bind(item.name, item.url, item.kind, item.size, item.uploadedAt).run();
+}
+
+export async function getMediaItem(name: string): Promise<MediaItem | null> {
+  const row = await getDB().prepare("SELECT * FROM media WHERE name = ?").bind(name).first<any>();
+  if (!row) return null;
+  return {
+    name: row.name,
+    url: row.url,
+    kind: row.kind,
+    size: Number(row.size),
+    uploadedAt: Number(row.uploaded_at)
+  };
+}
+
+export async function deleteProduct(id: string): Promise<boolean> {
+  const res = await getDB().prepare("DELETE FROM products WHERE id = ?").bind(id).run();
+  return res.success;
 }
 
 export async function getConfig(): Promise<AppConfig> {
@@ -94,4 +111,35 @@ export async function saveConfig(c: AppConfig): Promise<void> {
   await getDB().prepare(`
     INSERT OR REPLACE INTO config (id, admin_token) VALUES (1, ?)
   `).bind(c.adminToken).run();
+}
+
+export async function incrementClick(productId: string): Promise<void> {
+  const db = getDB();
+  await db.prepare(`
+    UPDATE analytics 
+    SET actions_total = actions_total + 1,
+        clicks_by_product = json_set(clicks_by_product, '$.' || ?, ifnull(json_extract(clicks_by_product, '$.' || ?), 0) + 1),
+        updated_at = ?
+    WHERE id = 1
+  `).bind(productId, productId, Date.now()).run();
+
+  const current = await getAnalytics();
+  const newRecent = [Date.now(), ...current.recentVisits].slice(0, 500);
+  await db.prepare("UPDATE analytics SET recent_visits = ? WHERE id = 1").bind(JSON.stringify(newRecent)).run();
+}
+
+export async function incrementVisit(dayKey: string, timestamp: number): Promise<void> {
+  const db = getDB();
+  
+  await db.prepare(`
+    UPDATE analytics 
+    SET visits = visits + 1,
+        visits_by_day = json_set(visits_by_day, '$.' || ?, ifnull(json_extract(visits_by_day, '$.' || ?), 0) + 1),
+        updated_at = ?
+    WHERE id = 1
+  `).bind(dayKey, dayKey, timestamp).run();
+
+  const current = await getAnalytics();
+  const newRecent = [timestamp, ...current.recentVisits].slice(0, 500);
+  await db.prepare("UPDATE analytics SET recent_visits = ? WHERE id = 1").bind(JSON.stringify(newRecent)).run();
 }

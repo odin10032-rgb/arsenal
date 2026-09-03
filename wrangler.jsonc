@@ -1,14 +1,17 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "arsenal",
+  "main": ".vercel/output/static/_worker.js",
   "compatibility_date": "2026-08-31",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "arsenal-db",
+      "database_id": "85276859-8854-4767-aeef-44ac800184ea"
+    }
+  ],
   "observability": {
     "enabled": true
-  },
-  "services": [
-    {
-      "binding": "WORKER_SELF_REFERENCE",
-      "service": "arsenal"
-    }
-  ]
+  }
 }
