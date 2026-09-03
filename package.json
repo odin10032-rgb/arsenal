@@ -4,11 +4,11 @@
   "private": true,
   "packageManager": "npm@10.9.2",
   "scripts": {
-    "dev": "next dev -p 3001",
-    "build": "npm install --legacy-peer-deps && npx @cloudflare/next-on-pages",
-    "deploy": "npx wrangler pages deploy .vercel/output/static",
-    "lint": "eslint ."
-  },
+  "dev": "next dev -p 3001",
+  "build": "next build",
+  "deploy": "npx wrangler pages deploy .vercel/output/static",
+  "lint": "eslint ."
+},
   "overrides": {
     "@cloudflare/next-on-pages": {
       "next": "$next"
