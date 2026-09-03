@@ -79,10 +79,9 @@ export async function getMedia(): Promise<MediaItem[]> {
   }));
 }
 
-export async function addMedia(item: MediaItem): Promise<void> {
-  await getDB().prepare(`
-    INSERT INTO media (name, url, kind, size, uploaded_at) VALUES (?, ?, ?, ?, ?)
-  `).bind(item.name, item.url, item.kind, item.size, item.uploadedAt).run();
+export async function getConfig(): Promise<AppConfig> {
+  const row = await getDB().prepare("SELECT admin_token FROM config WHERE id = 1").first<any>();
+  return { adminToken: row?.admin_token };
 }
 
 export async function getMediaItem(name: string): Promise<MediaItem | null> {
@@ -102,9 +101,10 @@ export async function deleteProduct(id: string): Promise<boolean> {
   return res.success;
 }
 
-export async function getConfig(): Promise<AppConfig> {
-  const row = await getDB().prepare("SELECT admin_token FROM config WHERE id = 1").first<any>();
-  return { adminToken: row?.admin_token };
+export async function saveConfig(c: AppConfig): Promise<void> {
+  await getDB().prepare(`
+    INSERT OR REPLACE INTO config (id, admin_token) VALUES (1, ?)
+  `).bind(c.adminToken).run();
 }
 
 export async function catalogVersion(products: Product[], tracked: Record<string, number>): Promise<string> {
