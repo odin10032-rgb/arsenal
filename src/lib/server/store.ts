@@ -107,10 +107,17 @@ export async function getConfig(): Promise<AppConfig> {
   return { adminToken: row?.admin_token };
 }
 
-export async function saveConfig(c: AppConfig): Promise<void> {
-  await getDB().prepare(`
-    INSERT OR REPLACE INTO config (id, admin_token) VALUES (1, ?)
-  `).bind(c.adminToken).run();
+export async function catalogVersion(products: Product[], tracked: Record<string, number>): Promise<string> {
+  const view = products.map((p) => [p.id, p.updatedAt, p.clicks + (tracked[p.id] || 0)]);
+  return Buffer.from(JSON.stringify(view)).toString("base64").slice(0, 22);
+}
+
+// Pour compatibilité API (on utilise saveProducts qui fait le job)
+export const addProduct = saveProducts;
+
+// Pour compatibilité API (on ne fait plus d'écriture fichier, donc on ignore silencieusement)
+export async function writeUpload(filename: string, buf: Buffer): Promise<void> {
+  console.warn("writeUpload appelé en mode serverless (ignoré, upload via GitHub)");
 }
 
 export async function incrementClick(productId: string): Promise<void> {
