@@ -1,3 +1,4 @@
+export const runtime = 'edge';
 /**
  * Bêta Arsenal — /api/products/[id]
  * PUT    : modification d'un produit (admin)

@@ -1,3 +1,4 @@
+export const runtime = 'edge';
 /**
  * Bêta Arsenal — /api/analytics
  * GET (admin) : tableau de bord analytique — visites, clics par produit,

@@ -1,3 +1,4 @@
+export const runtime = 'edge';
 /**
  * Bêta Arsenal — /api/products
  * GET  : catalogue public (clics fusionnés avec l'analytics, version pour cache client)

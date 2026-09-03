@@ -1,3 +1,4 @@
+export const runtime = 'edge';
 /**
  * Bêta Arsenal — /api/auth/login
  * POST { password } → { ok, token } — le token est stocké côté client en

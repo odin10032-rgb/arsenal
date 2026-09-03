@@ -1,3 +1,4 @@
+export const runtime = 'edge';
 /**
  * Bêta Arsenal — /api/track
  * POST (public) : comptage des visites et des clics produits.

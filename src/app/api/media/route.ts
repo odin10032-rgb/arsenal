@@ -1,3 +1,4 @@
+export const runtime = 'edge';
 import { NextRequest, NextResponse } from "next/server";
 import { getMedia, addMedia, writeUpload, MediaItem } from "@/lib/server/store";
 import { isAdmin, unauthorized } from "@/lib/server/auth";

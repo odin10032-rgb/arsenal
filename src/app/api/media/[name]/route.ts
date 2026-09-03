@@ -1,3 +1,4 @@
+export const runtime = 'edge';
 /**
  * Arsenal — /api/media/[name]
  * GET (public) : récupère l'URL d'un média depuis D1.

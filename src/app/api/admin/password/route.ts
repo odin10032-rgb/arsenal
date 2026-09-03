@@ -1,3 +1,4 @@
+export const runtime = 'edge';
 /**
  * Bêta Arsenal — /api/admin/password
  * POST { current, next } (X-Admin-Auth = token courant)
