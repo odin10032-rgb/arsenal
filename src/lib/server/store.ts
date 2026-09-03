@@ -68,12 +68,6 @@ export async function saveAnalytics(a: Analytics): Promise<void> {
   ).run();
 }
 
-export async function addMedia(item: MediaItem): Promise<void> {
-  await getDB().prepare(`
-    INSERT INTO media (name, url, kind, size, uploaded_at) VALUES (?, ?, ?, ?, ?)
-  `).bind(item.name, item.url, item.kind, item.size, item.uploadedAt).run();
-}
-
 export async function getMedia(): Promise<MediaItem[]> {
   const { results } = await getDB().prepare("SELECT * FROM media ORDER BY uploaded_at DESC").all<any>();
   return results.map(m => ({
@@ -83,6 +77,12 @@ export async function getMedia(): Promise<MediaItem[]> {
     size: Number(m.size),
     uploadedAt: Number(m.uploaded_at)
   }));
+}
+
+export async function addMedia(item: MediaItem): Promise<void> {
+  await getDB().prepare(`
+    INSERT INTO media (name, url, kind, size, uploaded_at) VALUES (?, ?, ?, ?, ?)
+  `).bind(item.name, item.url, item.kind, item.size, item.uploadedAt).run();
 }
 
 export async function getMediaItem(name: string): Promise<MediaItem | null> {
@@ -102,6 +102,11 @@ export async function deleteProduct(id: string): Promise<boolean> {
   return res.success;
 }
 
+export async function getConfig(): Promise<AppConfig> {
+  const row = await getDB().prepare("SELECT admin_token FROM config WHERE id = 1").first<any>();
+  return { adminToken: row?.admin_token };
+}
+
 export async function saveConfig(c: AppConfig): Promise<void> {
   await getDB().prepare(`
     INSERT OR REPLACE INTO config (id, admin_token) VALUES (1, ?)
@@ -113,10 +118,8 @@ export async function catalogVersion(products: Product[], tracked: Record<string
   return Buffer.from(JSON.stringify(view)).toString("base64").slice(0, 22);
 }
 
-// Pour compatibilité API (on utilise saveProducts qui fait le job)
 export const addProduct = saveProducts;
 
-// Pour compatibilité API (on ne fait plus d'écriture fichier, donc on ignore silencieusement)
 export async function writeUpload(filename: string, buf: Buffer): Promise<void> {
   console.warn("writeUpload appelé en mode serverless (ignoré, upload via GitHub)");
 }
