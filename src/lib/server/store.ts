@@ -68,6 +68,12 @@ export async function saveAnalytics(a: Analytics): Promise<void> {
   ).run();
 }
 
+export async function addMedia(item: MediaItem): Promise<void> {
+  await getDB().prepare(`
+    INSERT INTO media (name, url, kind, size, uploaded_at) VALUES (?, ?, ?, ?, ?)
+  `).bind(item.name, item.url, item.kind, item.size, item.uploadedAt).run();
+}
+
 export async function getMedia(): Promise<MediaItem[]> {
   const { results } = await getDB().prepare("SELECT * FROM media ORDER BY uploaded_at DESC").all<any>();
   return results.map(m => ({
@@ -77,11 +83,6 @@ export async function getMedia(): Promise<MediaItem[]> {
     size: Number(m.size),
     uploadedAt: Number(m.uploaded_at)
   }));
-}
-
-export async function getConfig(): Promise<AppConfig> {
-  const row = await getDB().prepare("SELECT admin_token FROM config WHERE id = 1").first<any>();
-  return { adminToken: row?.admin_token };
 }
 
 export async function getMediaItem(name: string): Promise<MediaItem | null> {
