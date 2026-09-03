@@ -4,11 +4,11 @@
   "private": true,
   "packageManager": "npm@10.9.2",
   "scripts": {
-  "dev": "next dev -p 3001",
-  "build": "next build",
-  "deploy": "npx wrangler pages deploy .vercel/output/static",
-  "lint": "eslint ."
-},
+    "dev": "next dev -p 3001",
+    "build": "next build",
+    "deploy": "npx wrangler pages deploy .vercel/output/static",
+    "lint": "eslint ."
+  },
   "overrides": {
     "@cloudflare/next-on-pages": {
       "next": "$next"
@@ -83,6 +83,7 @@
   "devDependencies": {
     "@cloudflare/next-on-pages": "^1.13.7",
     "@tailwindcss/postcss": "^4.1.18",
+    "@types/node": "^22.0.0",
     "@types/react": "^19.2.8",
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.2",
