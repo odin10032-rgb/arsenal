@@ -1,10 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <rect width="64" height="64" rx="14" fill="#0b0f17"/>
   <!-- Manche -->
-  <rect x="15" y="38" width="35" height="8" fill="#22d3ee" rx="3" transform="rotate(-30 32 32)"/>
-  <!-- Tête (fourche) -->
-  <path d="M48 20 a10 10 0 1 0 0 15 a10 10 0 1 0 0 -15 z" fill="#22d3ee"/>
-  <path d="M48 20 L60 8 L36 8 L48 20 Z" fill="#0b0f17"/>
-  <!-- Trou dans le manche -->
-  <circle cx="20" cy="48" r="3" fill="#0b0f17" transform="rotate(-30 20 48)"/>
+  <rect x="16" y="28" width="28" height="8" fill="#22d3ee" rx="2"/>
+  <!-- Tête de clé -->
+  <path d="M44 24a6 6 0 0 1 6 6v4a6 6 0 0 1 -6 6h-4v-16h4z" fill="#22d3ee"/>
+  <!-- Trou dans la tête -->
+  <circle cx="44" cy="32" r="3" fill="#0b0f17"/>
 </svg>
