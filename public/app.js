@@ -389,7 +389,7 @@ async function apiFetch(path, { method = "GET", body, formData, headers = {}, ti
       h["Content-Type"] = "application/json";
       opts.body = JSON.stringify(body);
     }
-    const res = await fetch(path, opts);
+    const res = await fetch(path.startsWith('/') ? CONFIG.API_URL + path : path, opts);
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
       const err = new Error(json.error || `Erreur ${res.status}`);

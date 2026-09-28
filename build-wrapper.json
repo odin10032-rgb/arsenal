@@ -1,0 +1,5 @@
+{
+  "scripts": {
+    "build": "npx @cloudflare/next-on-pages --outdir .vercel/output/static"
+  }
+}

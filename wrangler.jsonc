@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "arsenal",
-  "main": ".vercel/output/static/_worker.js",
+  "pages_build_output_dir": ".vercel/output/static",
   "compatibility_date": "2026-08-31",
   "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [
