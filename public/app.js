@@ -408,7 +408,7 @@ async function detectApi() {
     await apiFetch("/api/health", { timeout: 2200 });
     state.api.available = true;
   } catch (e) {
-    state.api.available = false;
+    await detectApi();
   }
   return state.api.available;
 }
@@ -2091,7 +2091,7 @@ async function boot() {
   }
 
   /* 2) Détection du backend, puis rafraîchissement arrière-plan. */
-  state.api.available = false;
+  await detectApi();
   if (state.api.available) {
     await refreshCatalog({ silent: true });
     if (state.view === "admin") renderAdmin();
