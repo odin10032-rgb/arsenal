@@ -7,7 +7,7 @@
 "use strict";
 
 /* ============================== CONFIG ============================== */
-const CONFIG = {
+window.CONFIG = window.CONFIG || {
   APP_NAME: "Arsenal Tools",
   VERSION: "2.0.0",
   /* Mot de passe admin par défaut (mode local). 
