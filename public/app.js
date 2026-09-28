@@ -2091,7 +2091,7 @@ async function boot() {
   }
 
   /* 2) Détection du backend, puis rafraîchissement arrière-plan. */
-  await detectApi();
+  state.api.available = false;
   if (state.api.available) {
     await refreshCatalog({ silent: true });
     if (state.view === "admin") renderAdmin();
