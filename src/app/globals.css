@@ -1,53 +1,154 @@
 @import "tailwindcss";
-@import "tw-animate-css";
 
-/* --- Import du design system Cyber Néon --- */
 /* ============================================================
-   BÊTA ARSENAL — Design System « Cyber Néon »
-   Thème sombre #0b0f17 · glassmorphism · accents violet/cyan
-   Mobile-first · ultra-responsive
+   ARSENAL TOOLS — Design System "Clean Catalog"
+   Thème sombre minimaliste · typographie forte · hiérarchie claire
+   Mobile-first · haute performance
    ============================================================ */
 
 :root {
-  --bg: #0b0f17;
-  --bg-deep: #070a10;
-  --surface: rgba(255, 255, 255, 0.035);
-  --surface-2: rgba(255, 255, 255, 0.06);
-  --surface-3: rgba(255, 255, 255, 0.09);
-  --border: rgba(255, 255, 255, 0.09);
-  --border-strong: rgba(255, 255, 255, 0.17);
-  --text: #e2e8f0;
-  --text-2: #94a3b8;
-  --text-3: #64748b;
-  --violet: #8b5cf6;
-  --violet-soft: #a78bfa;
-  --violet-glow: rgba(139, 92, 246, 0.35);
-  --cyan: #22d3ee;
-  --cyan-soft: #67e8f9;
-  --cyan-glow: rgba(34, 211, 238, 0.3);
-  --grad: linear-gradient(135deg, #8b5cf6 0%, #22d3ee 100%);
-  --grad-soft: linear-gradient(135deg, rgba(139, 92, 246, 0.16), rgba(34, 211, 238, 0.16));
-  --success: #34d399;
-  --warning: #fbbf24;
-  --danger: #f43f5e;
-  --radius: 16px;
-  --radius-sm: 10px;
-  --radius-xs: 7px;
-  --font-display: "Space Grotesk", system-ui, -apple-system, sans-serif;
+  /* Palette de couleurs naturelle */
+  --bg: #0a0a0a;
+  --bg-surface: #141414;
+  --bg-surface-2: #1a1a1a;
+  --bg-surface-3: #222222;
+  --border: #333333;
+  --border-hover: #444444;
+
+  /* Couleurs neutres pour la hiérarchie */
+  --text-primary: #f0f0f0;
+  --text-secondary: #a0a0a0;
+  --text-tertiary: #666666;
+
+  /* Couleurs d'accent (minimalistes) */
+  --accent-primary: #e63946;
+  --accent-secondary: #2a9d8f;
+  --accent-tertiary: #f4a261;
+
+  /* Badges */
+  --badge-premium: #9b5de5;
+  --badge-beta: #fbbf24;
+  --badge-nouveau: #00b4d8;
+
+  /* États */
+  --success: #2a9d8f;
+  --warning: #f4a261;
+  --danger: #e63946;
+
+  /* Arrondis */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+
+  /* Typographie */
+  --font-display: "Inter", system-ui, -apple-system, sans-serif;
   --font-body: "Inter", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
-  --ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --shadow-card: 0 18px 44px rgba(0, 0, 0, 0.45);
-  --glow-violet: 0 0 22px rgba(139, 92, 246, 0.32);
-  --glow-cyan: 0 0 22px rgba(34, 211, 238, 0.28);
+
+  /* Espacements */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 24px;
+
+  /* Ombres subtiles (pas de glow) */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.5);
+
+  /* Header */
   --header-h: 64px;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   font-family: var(--font-body);
   background: var(--bg);
-  color: var(--text);
+  color: var(--text-primary);
   line-height: 1.6;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* ... (le reste des styles de style.css) ... */
+/* Selection */
+::selection {
+  background: var(--accent-primary);
+  color: #fff;
+}
+
+/* Focus visible */
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-hover);
+  border-radius: 4px;
+  border: 2px solid var(--bg);
+}
+
+/* Container */
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: var(--spacing-md);
+}
+
+/* Icon */
+.icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+}
+
+svg[viewBox]:not([width]) {
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+}
+
+/* Utility classes */
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+.text-primary {
+  color: var(--text-primary);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-tertiary {
+  color: var(--text-tertiary);
+}
+
+/* Glass effect removed - using solid backgrounds instead */
+/* All cards use solid backgrounds with subtle borders */
+
