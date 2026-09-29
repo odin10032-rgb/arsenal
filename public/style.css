@@ -123,6 +123,7 @@ svg[viewBox]:not([width]) { width: 1em; height: 1em; flex-shrink: 0; }
   gap: 0.55rem;
   flex-shrink: 0;
 }
+.brand-logo { border-radius: 9px; object-fit: cover; }
 .brand-name {
   font-family: var(--font-display);
   font-weight: 700;

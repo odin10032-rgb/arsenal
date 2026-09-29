@@ -751,7 +751,7 @@ function renderGrid() {
       <div class="pc-media">
         <img src="${esc(p.imageUrl)}" alt="Couverture de ${esc(p.title)}" loading="lazy" decoding="async"
              onerror="this.onerror=null;this.src='data:image/svg+xml;charset=utf-8,${encodeURIComponent(
-               "<svg xmlns='http://www.w3.org/2000/svg' width='640' height='400'><rect width='640' height='400' fill='%230d1220'/><path d='M36 8 18 36h11l-3 20 20-30H34l2-18z' fill='%238b5cf6' opacity='.6' transform='translate(240 150) scale(4)'/></svg>"
+               "<svg xmlns='http://www.w3.org/2000/svg' width='640' height='400'><rect width='640' height='400' fill='%23141414'/><path d='M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z' fill='%23666666' transform='translate(272 152) scale(4)'/></svg>"
              )}" />
         <div class="pc-badges">${badges}</div>
         <span class="pc-cat">${esc(CATEGORIES[p.category] || p.category)}</span>
@@ -1058,10 +1058,7 @@ function renderAdminLogin(root) {
   root.innerHTML = `
     <div class="admin-login-wrap">
       <form class="admin-login glass" id="admin-login-form" novalidate>
-        <svg class="brand-logo" viewBox="0 0 64 64" aria-hidden="true">
-          <defs><linearGradient id="lg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e63946"/><stop offset="1" stop-color="#d62839"/></linearGradient></defs>
-          <path d="M36 8 18 36h11l-3 20 20-30H34l2-18z" fill="url(#lg2)"/>
-        </svg>
+        <img class="brand-logo" src="/logo.jfif" alt="Logo Arsenal Tools" width="46" height="46" />
         <h2 class="al-title">Zone administrateur</h2>
         <p class="al-sub">Arsenal Tools — Dashboard &amp; médiathèque.</p>
         <div class="al-error" id="al-error" role="alert"></div>
@@ -1138,10 +1135,7 @@ function renderAdminDashboard(root) {
     <header class="admin-header">
       <div class="container admin-header-inner">
         <a class="brand" href="#" aria-label="Retour au site">
-          <svg class="brand-logo" viewBox="0 0 64 64" width="28" height="28" aria-hidden="true">
-            <defs><linearGradient id="lg3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e63946"/><stop offset="1" stop-color="#d62839"/></linearGradient></defs>
-            <path d="M36 8 18 36h11l-3 20 20-30H34l2-18z" fill="url(#lg3)"/>
-          </svg>
+          <img class="brand-logo" src="/logo.jfif" alt="Logo Arsenal Tools" width="28" height="28" />
           <span class="brand-name">Arsenal <span class="brand-accent">Tools</span></span>
         </a>
         <span class="admin-title-chip">Dashboard Admin</span>
