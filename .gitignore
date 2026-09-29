@@ -62,3 +62,5 @@ server.log
 3001
 *.log
 .DS_Store
+prod-base/
+TESTING_GUIDE.md
