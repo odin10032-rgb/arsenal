@@ -1,5 +1,5 @@
 /* ============================================================================
-   BÊTA ARSENAL — app.js (v2.1 — Cloudflare Pages + Workers)
+   ARSENAL TOOLS — app.js (v2.1 — Cloudflare Pages + Workers)
    SPA monopage : catalogue public + modales produits à mécaniques par type
    + dashboard admin /#admin (CRUD, upload GitHub, médiathèque, analytics).
    100 % vanilla — aucune dépendance.
@@ -15,7 +15,7 @@
 
 /* ============================== CONFIG ============================== */
 const CONFIG = {
-  APP_NAME: "Bêta Arsenal",
+  APP_NAME: "Arsenal Tools",
   VERSION: "2.0.0",
   /* Mot de passe admin par défaut (mode local & serveur). Modifiable dans
      Paramètres → Sécurité. Le token transmis en X-Admin-Auth = sha256(mdp). */
@@ -982,7 +982,7 @@ function openProductModal(id) {
     <div class="pm-head">
       <div class="pm-cover"><img src="${esc(p.imageUrl)}" alt="Couverture de ${esc(p.title)}" loading="lazy" decoding="async" /></div>
       <div class="pm-titles">
-        <div class="pm-badges">${badges}<span class="b" style="color:var(--cyan-soft);border-color:rgba(34,211,238,.45);background:rgba(34,211,238,.1)">${esc(CATEGORIES[p.category] || p.category)}</span></div>
+        <div class="pm-badges">${badges}<span class="b" style="color:var(--cyan-soft);border-color:rgba(42,157,143,.45);background:rgba(42,157,143,.1)">${esc(CATEGORIES[p.category] || p.category)}</span></div>
         <h2 class="pm-title">${esc(p.title)}</h2>
         <div class="pm-meta">
           <span class="heat">${I.fire} ${fmt(p.clicks || 0)} clics</span>
@@ -1059,11 +1059,11 @@ function renderAdminLogin(root) {
     <div class="admin-login-wrap">
       <form class="admin-login glass" id="admin-login-form" novalidate>
         <svg class="brand-logo" viewBox="0 0 64 64" aria-hidden="true">
-          <defs><linearGradient id="lg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b5cf6"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+          <defs><linearGradient id="lg2" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e63946"/><stop offset="1" stop-color="#d62839"/></linearGradient></defs>
           <path d="M36 8 18 36h11l-3 20 20-30H34l2-18z" fill="url(#lg2)"/>
         </svg>
         <h2 class="al-title">Zone administrateur</h2>
-        <p class="al-sub">Bêta Arsenal — Dashboard &amp; médiathèque.</p>
+        <p class="al-sub">Arsenal Tools — Dashboard &amp; médiathèque.</p>
         <div class="al-error" id="al-error" role="alert"></div>
         <div class="field" style="text-align:left">
           <label class="field-label" for="al-password">${I.lock} Mot de passe administrateur</label>
@@ -1139,10 +1139,10 @@ function renderAdminDashboard(root) {
       <div class="container admin-header-inner">
         <a class="brand" href="#" aria-label="Retour au site">
           <svg class="brand-logo" viewBox="0 0 64 64" width="28" height="28" aria-hidden="true">
-            <defs><linearGradient id="lg3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#8b5cf6"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs>
+            <defs><linearGradient id="lg3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e63946"/><stop offset="1" stop-color="#d62839"/></linearGradient></defs>
             <path d="M36 8 18 36h11l-3 20 20-30H34l2-18z" fill="url(#lg3)"/>
           </svg>
-          <span class="brand-name">BÊTA<span class="brand-accent">ARSENAL</span></span>
+          <span class="brand-name">Arsenal <span class="brand-accent">Tools</span></span>
         </a>
         <span class="admin-title-chip">Dashboard Admin</span>
         <span class="mode-pill ${state.api.available ? "api" : "local"}" id="admin-mode-pill" title="${state.api.available ? "Backend connecté — données partagées entre tous les visiteurs" : "Mode local — données persistées dans ce navigateur"}">
@@ -1597,7 +1597,7 @@ async function uploadImage(file) {
           Accept: "application/vnd.github+json",
           "X-GitHub-Api-Version": "2022-11-28",
         },
-        body: JSON.stringify({ message: `Bêta Arsenal — upload (${filename})`, content, branch }),
+        body: JSON.stringify({ message: `Arsenal Tools — upload (${filename})`, content, branch }),
       });
       if (resp.ok) {
         const json = await resp.json();
@@ -1968,7 +1968,7 @@ function renderSettingsTab(c = $("#admin-content")) {
 
       <div class="settings-card glass">
         <h3>${I.info} À propos</h3>
-        <p>Bêta Arsenal v${esc(CONFIG.VERSION)} — SPA monopage vanilla (index.html · app.js · style.css), backend Next.js optionnel.
+        <p>Arsenal Tools v${esc(CONFIG.VERSION)} — SPA monopage vanilla (index.html · app.js · style.css), backend Next.js optionnel.
         Mode actuel : <strong style="color:var(--cyan-soft)">${state.api.available ? "backend connecté (données partagées)" : "local (localStorage)"}</strong>.
         Cache catalogue : <strong style="color:var(--cyan-soft)">${store.get(CONFIG.LS.CATALOG, null) ? "actif" : "vierge"}</strong>.</p>
       </div>
