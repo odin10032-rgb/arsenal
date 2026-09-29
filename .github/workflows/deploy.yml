@@ -1,0 +1,50 @@
+name: Déploiement Cloudflare (front + API)
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-front:
+    name: Front — Cloudflare Pages (arsenal-tools)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Déployer public/ sur arsenal-tools.pages.dev
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          command: pages deploy public --project-name=arsenal-tools --branch=main --commit-dirty=true
+
+  deploy-api:
+    name: API — Worker (si worker/ modifié)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Détecter les changements du backend
+        id: changes
+        run: |
+          if git diff --name-only HEAD~1 HEAD | grep -qE '^(worker/|wrangler-api\.jsonc)'; then
+            echo "changed=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=no" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Déployer le Worker arsenal-api
+        if: steps.changes.outputs.changed == 'yes'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          command: deploy -c wrangler-api.jsonc
