@@ -9,8 +9,8 @@
 /* ============================== CONFIG ============================== */
 window.CONFIG = window.CONFIG || {
   APP_NAME: "Arsenal Tools",
-  VERSION: "2.0.0",
-  /* Mot de passe admin par défaut (mode local). 
+  VERSION: "3.0.0",
+  /* Mot de passe admin par défaut (mode local).
      Note : en production, le token est géré par l'API. */
   DEFAULT_ADMIN_PASSWORD: null,
   API_TIMEOUT: 2500,
