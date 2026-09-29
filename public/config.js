@@ -1,7 +1,9 @@
 /* ============================== CONFIG ============================== */
-const CONFIG = {
-  APP_NAME: "Bêta Arsenal",
-  VERSION: "2.0.0",
+/* Exposé sur window pour qu'app.js (window.CONFIG = window.CONFIG || {...})
+   conserve cette configuration, y compris API_URL. */
+window.CONFIG = {
+  APP_NAME: "Arsenal Tools",
+  VERSION: "3.0.0",
   API_URL: "https://arsenal-api.aimane-project-api.workers.dev",
   API_TIMEOUT: 2500,
   MAX_UPLOAD: 5 * 1024 * 1024,
