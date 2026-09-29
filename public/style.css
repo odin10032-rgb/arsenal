@@ -937,6 +937,7 @@ svg[viewBox]:not([width]) { width: 1em; height: 1em; flex-shrink: 0; }
    VUE ADMIN (#admin)
    ============================================================ */
 .view-admin { min-height: 100dvh; display: flex; flex-direction: column; }
+.view-admin[hidden] { display: none; }
 
 /* --- Porte de connexion --- */
 .admin-login-wrap {
