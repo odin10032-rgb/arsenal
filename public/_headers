@@ -1,2 +1,28 @@
+# En-têtes Cloudflare Pages — Arsenal (Next.js export statique)
+# HTML : toujours revalidé (déploiements visibles immédiatement)
+# Assets Next : hashés par le build → cache long immuable
+
 /*
-  Cache-Control: public, max-age=3600
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+
+/
+  Cache-Control: public, max-age=0, must-revalidate
+
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/produit/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/admin/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/produit.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/admin.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable

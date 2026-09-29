@@ -1,0 +1,3 @@
+# URLs propres pour les pages produits (export statique Next.js)
+# /produit/<id> sert /produit/ avec ?id=<id> sans redirection visible
+/produit/:id /produit/index.html?id=:id 200
