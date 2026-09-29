@@ -16,6 +16,8 @@ export interface Product {
   badges: Badge[];
   price: string;
   actionUrl: string;
+  apkUrl?: string;
+  pwaUrl?: string | null;
   command?: string | null;
   videoUrl?: string | null;
   imageUrl: string;
