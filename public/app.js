@@ -1,18 +1,25 @@
 /* ============================================================================
-   ARSENAL TOOLS — app.js (v2.0)
+   BÊTA ARSENAL — app.js (v2.1 — Cloudflare Pages + Workers)
    SPA monopage : catalogue public + modales produits à mécaniques par type
    + dashboard admin /#admin (CRUD, upload GitHub, médiathèque, analytics).
    100 % vanilla — aucune dépendance.
+
+   DÉPLOIEMENT CLOUDFLARE :
+   - Frontend statique sur Cloudflare Pages (ce dossier public/).
+   - API sur un Worker séparé (D1) : même domaine (route /api/*) ou domaine
+     dédié — configurable via window.BETA_ARS_CONFIG.apiUrl (config.js).
+   - Tous les appels réseau passent par apiFetch() qui préfixe le chemin
+     avec API_BASE (ci-dessous). Zéro autre point de contact avec l'API.
    ========================================================================== */
 "use strict";
 
 /* ============================== CONFIG ============================== */
-window.CONFIG = window.CONFIG || {
-  APP_NAME: "Arsenal Tools",
-  VERSION: "3.0.0",
-  /* Mot de passe admin par défaut (mode local).
-     Note : en production, le token est géré par l'API. */
-  DEFAULT_ADMIN_PASSWORD: null,
+const CONFIG = {
+  APP_NAME: "Bêta Arsenal",
+  VERSION: "2.0.0",
+  /* Mot de passe admin par défaut (mode local & serveur). Modifiable dans
+     Paramètres → Sécurité. Le token transmis en X-Admin-Auth = sha256(mdp). */
+  DEFAULT_ADMIN_PASSWORD: "BetaArsenal@2025",
   API_TIMEOUT: 2500,
   MAX_UPLOAD: 5 * 1024 * 1024,
   LS: {
@@ -25,6 +32,29 @@ window.CONFIG = window.CONFIG || {
   },
   SS: { TOKEN: "ba_admin_token" },
 };
+
+/* ====================== BASE DES APPELS API (CLOUDFLARE) ======================
+   Définie dans config.js (chargé avant ce script) :
+   - ""            → même origine : le Worker répond sur <votre-domaine>/api/*
+                     (route Workers sur la zone Cloudflare) OU en local via
+                     le harnais de test.
+   - "https://…"   → Worker sur un domaine dédié (workers.dev / api.sous-domaine).
+                     Le Worker gère le CORS (origine renvoyée à l'identique).
+   Les appels GitHub directs (upload de repli, test de connexion) utilisent
+   des URL absolues et ne passent pas par cette base. */
+const API_BASE = (() => {
+  try {
+    const u =
+      typeof window !== "undefined" &&
+      window.BETA_ARS_CONFIG &&
+      typeof window.BETA_ARS_CONFIG.apiUrl === "string"
+        ? window.BETA_ARS_CONFIG.apiUrl
+        : "";
+    return u.trim().replace(/\/+$/, "");
+  } catch (e) {
+    return "";
+  }
+})();
 
 const CATEGORIES = {
   saas: "SaaS",
@@ -389,7 +419,7 @@ async function apiFetch(path, { method = "GET", body, formData, headers = {}, ti
       h["Content-Type"] = "application/json";
       opts.body = JSON.stringify(body);
     }
-    const res = await fetch(path.startsWith('/') ? CONFIG.API_URL + path : path, opts);
+    const res = await fetch(API_BASE + path, opts);
     const json = await res.json().catch(() => ({}));
     if (!res.ok) {
       const err = new Error(json.error || `Erreur ${res.status}`);
@@ -408,7 +438,7 @@ async function detectApi() {
     await apiFetch("/api/health", { timeout: 2200 });
     state.api.available = true;
   } catch (e) {
-    await detectApi();
+    state.api.available = false;
   }
   return state.api.available;
 }
@@ -730,7 +760,7 @@ function renderGrid() {
       <div class="pc-body">
         <h3 class="pc-title">
           <span>${esc(p.title)}</span>
-          <span class="pc-heat" title="Nombre de clics">${fmt(p.clicks || 0)}</span>
+          <span class="pc-heat" title="Nombre de clics">${I.fire}${fmt(p.clicks || 0)}</span>
         </h3>
         <p class="pc-desc">${esc(p.shortDescription || "")}</p>
         <div class="pc-footer">
@@ -905,6 +935,10 @@ function openProductModal(id) {
       <section class="pm-section">
         <h4 class="pm-section-title">${I.monitor} Installation · Terminal</h4>
         <div class="terminal">
+          <div class="terminal-bar">
+            <div class="terminal-dots"><i></i><i></i><i></i></div>
+            <span class="terminal-title">terminal — bash · ${esc(p.title.toLowerCase().replace(/\s+/g, "-"))}</span>
+          </div>
           <div class="terminal-body">
             <div class="terminal-cmd"><span class="prompt">$&nbsp;</span><span class="cmd">${esc(cmd)}</span><span class="terminal-cursor"></span></div>
           </div>
@@ -934,7 +968,7 @@ function openProductModal(id) {
     const label = isFree ? "Accéder gratuitement" : `Obtenir l'accès${p.price ? " — " + esc(p.price) : ""}`;
     actionHtml = `
       <section class="pm-section">
-        <h4 class="pm-section-title">Accès · ${esc(CATEGORIES[p.category] || "")}</h4>
+        <h4 class="pm-section-title">${I.sparkles} Accès · ${esc(CATEGORIES[p.category] || "")}</h4>
         <div class="action-stack">
           <a class="btn btn-primary" href="${esc(safeUrl(p.actionUrl) || "#")}" target="_blank" rel="noopener noreferrer" data-track="${esc(p.id)}" data-track-action="chariow">
             ${I.external} ${label}
@@ -951,9 +985,9 @@ function openProductModal(id) {
         <div class="pm-badges">${badges}<span class="b" style="color:var(--cyan-soft);border-color:rgba(34,211,238,.45);background:rgba(34,211,238,.1)">${esc(CATEGORIES[p.category] || p.category)}</span></div>
         <h2 class="pm-title">${esc(p.title)}</h2>
         <div class="pm-meta">
-          <span class="heat"> ${fmt(p.clicks || 0)} clics</span>
+          <span class="heat">${I.fire} ${fmt(p.clicks || 0)} clics</span>
           <span>${I.calendar} ${p.createdAt ? timeAgo(p.createdAt) : ""}</span>
-          ${p.price ? `<span>${esc(p.price)}</span>` : ""}
+          ${p.price ? `<span>${I.sparkles} ${esc(p.price)}</span>` : ""}
         </div>
       </div>
     </div>
@@ -1029,7 +1063,7 @@ function renderAdminLogin(root) {
           <path d="M36 8 18 36h11l-3 20 20-30H34l2-18z" fill="url(#lg2)"/>
         </svg>
         <h2 class="al-title">Zone administrateur</h2>
-        <p class="al-sub">Arsenal Tools — Dashboard &amp; médiathèque.<br>Accès protégé par clé (transmise via <code style="font-family:var(--font-mono);font-size:0.72em">X-Admin-Auth</code>).</p>
+        <p class="al-sub">Bêta Arsenal — Dashboard &amp; médiathèque.</p>
         <div class="al-error" id="al-error" role="alert"></div>
         <div class="field" style="text-align:left">
           <label class="field-label" for="al-password">${I.lock} Mot de passe administrateur</label>
@@ -1040,7 +1074,6 @@ function renderAdminLogin(root) {
         </div>
         <button class="btn btn-primary btn-block" type="submit" id="al-submit">${I.zap} Déverrouiller le dashboard</button>
         <p class="al-hint">
-          Mot de passe par défaut : <code>${esc(CONFIG.DEFAULT_ADMIN_PASSWORD)}</code><br>
           Modifiable dans <em>Paramètres → Sécurité</em> une fois connecté.
         </p>
         <a class="btn btn-ghost btn-sm btn-block" href="#">← Retour au catalogue</a>
@@ -1282,7 +1315,7 @@ function openProductForm(product) {
           <input class="input" id="f-title" value="${v(product && product.title)}" placeholder="Ex : NeuroForm AI" required maxlength="90" />
         </div>
         <div class="field">
-          <label class="field-label" for="f-short">Description courte <span class="req">*</span></label>
+          <label class="field-label" for="f-short">${I.sparkles} Description courte <span class="req">*</span></label>
           <input class="input" id="f-short" value="${v(product && product.shortDescription)}" placeholder="1 phrase percutante affichée sur la carte" maxlength="140" required />
           <p class="field-hint">Affichée sur les cartes du catalogue. <span id="f-short-count"></span></p>
         </div>
@@ -1303,7 +1336,7 @@ function openProductForm(product) {
           </div>
         </div>
         <div class="field">
-          <label class="field-label">Badges</label>
+          <label class="field-label">${I.sparkles} Badges</label>
           <div class="checks" id="f-badges">${badgesChecks}</div>
         </div>
         <div class="field">
@@ -1533,11 +1566,10 @@ async function uploadImage(file) {
     try {
       const fd = new FormData();
       fd.append("file", file, file.name);
-      /* Modification : appel vers /api/media au lieu de /api/upload */
-      const res = await apiFetch("/api/media", { method: "POST", formData: fd, headers: ghHeaders, auth: true, timeout: 9000 });
-      if (res && res.ok && res.item) {
-        addLocalUpload({ name: res.item.name, url: res.item.url, kind: "image", size: file.size, uploadedAt: Date.now() });
-        return res.item.url;
+      const res = await apiFetch("/api/upload", { method: "POST", formData: fd, headers: ghHeaders, auth: true, timeout: 9000 });
+      if (res && res.url) {
+        addLocalUpload({ name: res.filename || file.name, url: res.url, kind: "image", size: file.size, uploadedAt: Date.now(), hosted: res.hosted });
+        return res.url;
       }
     } catch (e) {
       if (e.status === 401) throw e;
@@ -1565,7 +1597,7 @@ async function uploadImage(file) {
           Accept: "application/vnd.github+json",
           "X-GitHub-Api-Version": "2022-11-28",
         },
-        body: JSON.stringify({ message: `Arsenal Tools — upload (${filename})`, content, branch }),
+        body: JSON.stringify({ message: `Bêta Arsenal — upload (${filename})`, content, branch }),
       });
       if (resp.ok) {
         const json = await resp.json();
@@ -1826,7 +1858,7 @@ async function refreshAnalytics(silent) {
 
     /* Top produits */
     $("#top-products").innerHTML = `
-      <h3> Top produits par clics</h3>
+      <h3>${I.fire} Top produits par clics</h3>
       <div class="rank-list">
         ${top.slice(0, 6).map((t, i) => `
           <div class="rank-item">
@@ -1936,7 +1968,7 @@ function renderSettingsTab(c = $("#admin-content")) {
 
       <div class="settings-card glass">
         <h3>${I.info} À propos</h3>
-        <p>Arsenal Tools v${esc(CONFIG.VERSION)} — SPA monopage vanilla (index.html · app.js · style.css), backend Next.js optionnel.
+        <p>Bêta Arsenal v${esc(CONFIG.VERSION)} — SPA monopage vanilla (index.html · app.js · style.css), backend Next.js optionnel.
         Mode actuel : <strong style="color:var(--cyan-soft)">${state.api.available ? "backend connecté (données partagées)" : "local (localStorage)"}</strong>.
         Cache catalogue : <strong style="color:var(--cyan-soft)">${store.get(CONFIG.LS.CATALOG, null) ? "actif" : "vierge"}</strong>.</p>
       </div>
