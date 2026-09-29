@@ -1,64 +1,86 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 /* ============================================================
-   ARSENAL TOOLS — Design System "Clean Catalog"
-   Thème sombre minimaliste · typographie forte · hiérarchie claire
-   Mobile-first · haute performance
+   ARSENAL TOOLS — Design System « Catalogue sobre » (v3.0)
+   Thème sombre #0a0a0a · accents rouge/vert · sans effets gratuits
+   Mobile-first · Next.js App Router
    ============================================================ */
 
 :root {
-  /* Palette de couleurs naturelle */
+  /* Palette validée */
   --bg: #0a0a0a;
   --bg-surface: #141414;
   --bg-surface-2: #1a1a1a;
   --bg-surface-3: #222222;
-  --border: #333333;
+  --border-base: #333333;
   --border-hover: #444444;
 
-  /* Couleurs neutres pour la hiérarchie */
   --text-primary: #f0f0f0;
   --text-secondary: #a0a0a0;
   --text-tertiary: #666666;
 
-  /* Couleurs d'accent (minimalistes) */
-  --accent-primary: #e63946;
-  --accent-secondary: #2a9d8f;
-  --accent-tertiary: #f4a261;
+  --accent-red: #e63946;
+  --accent-red-hover: #d62839;
+  --accent-green: #2a9d8f;
+  --accent-orange: #f4a261;
 
-  /* Badges */
   --badge-premium: #9b5de5;
-  --badge-beta: #fbbf24;
+  --badge-beta: #f4a261;
   --badge-nouveau: #00b4d8;
 
-  /* États */
-  --success: #2a9d8f;
-  --warning: #f4a261;
-  --danger: #e63946;
+  /* Tokens shadcn/ui (mappés sur la palette) */
+  --background: #0a0a0a;
+  --foreground: #f0f0f0;
+  --card: #141414;
+  --card-foreground: #f0f0f0;
+  --popover: #141414;
+  --popover-foreground: #f0f0f0;
+  --primary: #e63946;
+  --primary-foreground: #ffffff;
+  --secondary: #1a1a1a;
+  --secondary-foreground: #f0f0f0;
+  --muted: #1a1a1a;
+  --muted-foreground: #a0a0a0;
+  --accent: #1a1a1a;
+  --accent-foreground: #f0f0f0;
+  --destructive: #e63946;
+  --destructive-foreground: #ffffff;
+  --border: #333333;
+  --input: #333333;
+  --ring: #e63946;
+  --radius: 10px;
+}
 
-  /* Arrondis */
+/* Mapping Tailwind v4 → classes utilitaires (bg-background, text-muted-foreground…) */
+@theme inline {
+  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, "SF Mono", monospace;
+  --font-display: var(--font-space), var(--font-inter), system-ui, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
-
-  /* Typographie */
-  --font-display: "Inter", system-ui, -apple-system, sans-serif;
-  --font-body: "Inter", system-ui, -apple-system, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
-
-  /* Espacements */
-  --spacing-xs: 4px;
-  --spacing-sm: 8px;
-  --spacing-md: 12px;
-  --spacing-lg: 16px;
-  --spacing-xl: 24px;
-
-  /* Ombres subtiles (pas de glow) */
-  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.5);
-
-  /* Header */
-  --header-h: 64px;
 }
 
 html {
@@ -67,10 +89,8 @@ html {
 }
 
 body {
-  font-family: var(--font-body);
-  background: var(--bg);
-  color: var(--text-primary);
-  line-height: 1.6;
+  background: var(--background);
+  color: var(--foreground);
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -78,77 +98,124 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Selection */
 ::selection {
-  background: var(--accent-primary);
+  background: rgba(230, 57, 70, 0.45);
   color: #fff;
 }
 
-/* Focus visible */
 :focus-visible {
-  outline: 2px solid var(--accent-primary);
+  outline: 2px solid var(--accent-red);
   outline-offset: 2px;
   border-radius: 4px;
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
-
 ::-webkit-scrollbar-track {
   background: var(--bg);
 }
-
 ::-webkit-scrollbar-thumb {
   background: var(--border-hover);
   border-radius: 4px;
   border: 2px solid var(--bg);
 }
 
-/* Container */
-.container {
+/* ---------- Classes partagées du design ---------- */
+.container-arsenal {
   width: 100%;
   max-width: 1200px;
   margin-inline: auto;
-  padding-inline: var(--spacing-md);
+  padding-inline: 1rem;
+}
+@media (min-width: 960px) {
+  .container-arsenal {
+    padding-inline: 1.5rem;
+  }
 }
 
-/* Icon */
-.icon {
-  flex-shrink: 0;
-  width: 18px;
-  height: 18px;
+/* Boutons */
+.btn-arsenal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 10px 20px;
+  border-radius: 10px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  transition: all 0.2s;
+  cursor: pointer;
 }
-
-svg[viewBox]:not([width]) {
-  width: 1em;
-  height: 1em;
-  flex-shrink: 0;
+.btn-arsenal:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
-
-/* Utility classes */
-.font-display {
-  font-family: var(--font-display);
+.btn-primary {
+  background: var(--accent-red);
+  color: #fff;
+  border: none;
 }
-
-.font-mono {
-  font-family: var(--font-mono);
+.btn-primary:hover {
+  background: var(--accent-red-hover);
 }
-
-.text-primary {
+.btn-ghost {
+  background: var(--bg-surface);
   color: var(--text-primary);
+  border: 1px solid var(--border-base);
+}
+.btn-ghost:hover {
+  background: var(--bg-surface-2);
+  border-color: var(--border-hover);
+}
+.btn-danger {
+  background: rgba(230, 57, 70, 0.1);
+  color: var(--accent-red);
+  border: 1px solid rgba(230, 57, 70, 0.45);
+}
+.btn-danger:hover {
+  background: rgba(230, 57, 70, 0.2);
+}
+.btn-sm {
+  min-height: 34px;
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  border-radius: 6px;
 }
 
-.text-secondary {
-  color: var(--text-secondary);
+/* Pastille de statut de chargement */
+.spin {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
-.text-tertiary {
+/* Champ de saisie (style admin + recherche) */
+.input-arsenal {
+  width: 100%;
+  padding: 0.62rem 0.85rem;
+  border-radius: 10px;
+  border: 1px solid var(--border-base);
+  background: rgba(20, 20, 20, 0.85);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  transition: border-color 0.2s;
+}
+.input-arsenal::placeholder {
   color: var(--text-tertiary);
 }
-
-/* Glass effect removed - using solid backgrounds instead */
-/* All cards use solid backgrounds with subtle borders */
-
+.input-arsenal:focus {
+  outline: none;
+  border-color: rgba(230, 57, 70, 0.6);
+}
