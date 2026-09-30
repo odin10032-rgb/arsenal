@@ -5,6 +5,7 @@
  */
 
 import { useState } from "react";
+import { BrandLogo } from "@/components/brand-logo";
 import { adminLogin } from "@/lib/admin";
 import { writeAdminToken } from "@/lib/products";
 
@@ -36,14 +37,9 @@ export function AdminLogin({ onLogin }: { onLogin: (token: string) => void }) {
         onSubmit={submit}
         className="flex w-full max-w-[400px] flex-col gap-4 rounded-2xl border border-[#333] bg-[#141414] p-8 text-center"
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/logo.jfif"
-          alt="Logo Arsenal Tools"
-          width={46}
-          height={46}
-          className="mx-auto h-[46px] w-[46px] rounded-xl object-cover"
-        />
+        <div className="flex justify-center">
+          <BrandLogo size={46} />
+        </div>
         <div>
           <h1 className="font-display text-[1.35rem] font-bold">Zone administrateur</h1>
           <p className="mt-1 text-[0.84rem] text-[#a0a0a0]">

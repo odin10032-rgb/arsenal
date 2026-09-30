@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandLogo } from "./brand-logo";
 
 /**
  * En-tête commun — logo clé + marque + accès admin discret
@@ -8,14 +9,7 @@ export function SiteHeader() {
     <header className="sticky top-0 z-50 border-b border-[#333] bg-[rgba(10,10,10,0.92)]">
       <div className="container-arsenal flex items-center justify-between gap-3 py-2">
         <Link href="/" className="flex flex-shrink-0 items-center gap-2" aria-label="Arsenal Tools — retour à l'accueil">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/logo.jfif"
-            alt="Logo Arsenal Tools"
-            width={34}
-            height={34}
-            className="h-[34px] w-[34px] rounded-[9px] object-cover"
-          />
+          <BrandLogo size={34} />
           <span className="whitespace-nowrap text-[1.06rem] font-bold tracking-wide">
             Arsenal <span className="text-[#e63946]">Tools</span>
           </span>

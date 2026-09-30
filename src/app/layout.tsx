@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import { BRAND_FAVICON } from "@/components/brand-logo";
 import "./globals.css";
 
 const inter = Inter({
@@ -24,7 +25,7 @@ export const metadata: Metadata = {
   title: "Arsenal Tools — L'arsenal des créateurs digitaux",
   description:
     "SaaS, apps desktop, Mobile/PWA, e-books et packs de prompts & automations. Le catalogue des outils des bâtisseurs du web — Arsenal Tools.",
-  icons: { icon: "/logo.jfif" },
+  icons: { icon: BRAND_FAVICON },
 };
 
 export const viewport: Viewport = {

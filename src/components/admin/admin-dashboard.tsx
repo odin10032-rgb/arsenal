@@ -10,6 +10,7 @@ import { AnalyticsTab } from "./analytics-tab";
 import { MediaTab } from "./media-tab";
 import { ProductsTab } from "./products-tab";
 import { SettingsTab } from "./settings-tab";
+import { BrandLogo } from "@/components/brand-logo";
 import { clearAdminToken } from "@/lib/products";
 import { Product } from "@/lib/products";
 import { ToastHost } from "@/lib/toast";
@@ -83,8 +84,7 @@ export function AdminDashboard({
       <header className="sticky top-0 z-50 border-b border-[#333] bg-[rgba(10,10,10,0.95)]">
         <div className="container-arsenal flex flex-wrap items-center gap-3 py-2.5">
           <Link href="/admin" className="flex items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.jfif" alt="" width={28} height={28} className="h-7 w-7 rounded-lg object-cover" />
+            <BrandLogo size={28} />
             <span className="text-[0.95rem] font-bold tracking-wide">
               Arsenal <span className="text-[#e63946]">Tools</span>
             </span>

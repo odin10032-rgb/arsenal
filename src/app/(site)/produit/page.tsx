@@ -8,7 +8,7 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { ActionBlock } from "@/components/action-block";
 import { MediaEmbed } from "@/components/media-embed";
 import { BadgePill } from "@/components/product-card";
@@ -19,7 +19,16 @@ import { trackClick } from "@/lib/track";
 import { parseVideoUrl } from "@/lib/video";
 
 function ProductBody() {
-  const id = useSearchParams().get("id") || "";
+  const searchId = useSearchParams().get("id") || "";
+  // URL propre /produit/<id> : le rewrite Pages transmet le query quand il le peut,
+  // sinon on décode l'id depuis le pathname (robuste dans tous les cas).
+  const [pathId, setPathId] = useState("");
+  useEffect(() => {
+    const m = window.location.pathname.match(/^\/produit\/([^/?#]+)/);
+    if (m) setPathId(decodeURIComponent(m[1]));
+  }, []);
+  const id = searchId || pathId;
+
   const { products, initialLoaded } = useCatalog();
   const product = products.find((p) => p.id === id) || null;
   const video = parseVideoUrl(product?.videoUrl);
