@@ -1,4 +1,4 @@
-name: Déploiement Cloudflare (front + API)
+name: Déploiement Cloudflare (front Next.js + API)
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
 
 jobs:
   deploy-front:
-    name: Front — Cloudflare Pages (arsenal-tools)
+    name: Front Next.js — Cloudflare Pages (arsenal-tools)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -15,11 +15,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Déployer public/ sur arsenal-tools.pages.dev
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installer les dépendances
+        run: npm ci
+
+      - name: Build (export statique)
+        run: npm run build
+
+      - name: Déployer out/ sur arsenal-tools.pages.dev
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          command: pages deploy public --project-name=arsenal-tools --branch=main --commit-dirty=true
+          command: pages deploy out --project-name=arsenal-tools --branch=main --commit-dirty=true
 
   deploy-api:
     name: API — Worker (si worker/ modifié)
@@ -32,6 +44,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
+
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
 
       - name: Détecter les changements du backend
         id: changes
