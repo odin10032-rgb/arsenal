@@ -27,7 +27,7 @@ import {
 } from "./affiliation";
 import type { AffiliateProductRow } from "./affiliation";
 import { changesOf, computeCommissionAmount, getActiveCampaign, resolveCommissionRule } from "./commissions";
-import { createFulfillmentStatement, normalizeFulfillmentMethod } from "./fulfillment";
+import { createFulfillmentStatement, fulfillmentProviderForMethod, isChariowFulfillmentMethod, normalizeFulfillmentMethod } from "./fulfillment";
 import type { FulfillmentMethod } from "./fulfillment";
 
 /* -------------------------------- Constantes -------------------------------- */
@@ -491,7 +491,9 @@ export function purchaseStatements(db: D1Database, input: NewPurchaseInput): Pur
   const fulfillmentId = crypto.randomUUID();
   const amountA = productPriceA(input.product);
   const method: FulfillmentMethod = normalizeFulfillmentMethod(input.product.fulfillment_method);
-  const provider = method === "chariow_free_checkout" ? "chariow" : "manual";
+  // Les DEUX méthodes Chariow (produit « Gratuit » et code promo) sont livrées
+  // par le fournisseur `chariow` — source unique : fulfillmentProviderForMethod.
+  const provider = fulfillmentProviderForMethod(method);
   const attribution = input.attribution ?? null;
 
   const purchase: PurchaseRow = {
@@ -854,8 +856,9 @@ function manualInstructions(row: PurchaseJoinRow): string {
  * pour la méthode manuelle.
  */
 export function purchaseAccess(row: PurchaseJoinRow, email: string): PurchaseAccess | null {
-  const method = normalizeFulfillmentMethod(row.product_fulfillment_method);
-  if (method === "chariow_free_checkout") {
+  // Les deux méthodes Chariow donnent le même accès (portail app.ateliat.com,
+  // clé par l'email de l'acheteur) ; seule la méthode `manual` diffère.
+  if (isChariowFulfillmentMethod(row.product_fulfillment_method)) {
     return row.status === "fulfilled" ? { mode: "chariow_portal", email } : null;
   }
   return { mode: "manual", instructions: manualInstructions(row) };

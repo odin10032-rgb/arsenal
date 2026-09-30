@@ -16,6 +16,7 @@ import { chariowWebhookRoutes } from "./routes/chariow-webhook";
 import { adminAffiliationRoutes } from "./routes/admin-affiliation";
 import { purchaseRoutes } from "./routes/purchases";
 import { adminPurchaseRoutes } from "./routes/admin-purchases";
+import { adminChariowRoutes } from "./routes/admin-chariow";
 import { PURCHASE_MAX_PER_MIN_DEFAULT, readPurchaseMaxPerMin } from "../src/lib/server/purchases";
 import { rateLimit } from "./middleware/rate-limit";
 
@@ -83,6 +84,18 @@ app.use(
   rateLimit({ limit: 3, windowMs: 60_000, label: "purchase-retry" })
 );
 
+// Onglet admin « Chariow » : lectures de la boutique Chariow (30/min/IP, la clé
+// API Chariow autorisant 100 req/min côté prestataire) et liaison d'un produit
+// (10/min/IP — mutation + appel réseau de vérification).
+app.use(
+  "/api/admin/chariow/*",
+  rateLimit({ limit: 30, windowMs: 60_000, label: "admin-chariow" })
+);
+app.use(
+  "/api/admin/products/:id/chariow-link",
+  rateLimit({ limit: 10, windowMs: 60_000, label: "admin-chariow-link" })
+);
+
 app.route("/", healthRoutes);
 app.route("/", productRoutes);
 app.route("/", trackRoutes);
@@ -98,6 +111,7 @@ app.route("/", chariowWebhookRoutes);
 app.route("/", adminAffiliationRoutes);
 app.route("/", purchaseRoutes);
 app.route("/", adminPurchaseRoutes);
+app.route("/", adminChariowRoutes);
 
 app.notFound((c) => c.json({ ok: false, error: "Route introuvable." }, 404));
 

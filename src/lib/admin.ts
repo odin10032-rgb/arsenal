@@ -357,6 +357,139 @@ export async function saveAdminSetting(key: string, value: string): Promise<void
   });
 }
 
+/* ============================================================
+   Onglet « Chariow » — pilotage de la boutique (API Chariow en LECTURE SEULE
+   sur les produits : lister, vérifier, lier — jamais créer ni éditer).
+   ============================================================ */
+
+/** Montant Chariow (`{value, formatted, currency}`) — null si non fourni */
+export interface ChariowAmount {
+  value: number | null;
+  formatted: string | null;
+  currency: string | null;
+}
+
+/** Ligne de GET /api/admin/chariow/products — un produit de la boutique Chariow */
+export interface ChariowProduct {
+  id: string;
+  name: string;
+  /** Modèle de tarification « Gratuit » côté Chariow (null si non communiqué) */
+  isFree: boolean | null;
+  price: ChariowAmount | null;
+  /** Statut brut renvoyé par Chariow (chaîne libre) */
+  status: string | null;
+  /** downloadable | course | license | service | bundle | coaching */
+  type: string | null;
+  /** Produit Arsenal lié (via products.chariow_product_id), sinon null */
+  linkedArsenalProductId: string | null;
+}
+
+/** Réponse de GET /api/admin/chariow/status */
+export interface ChariowStatus {
+  /** Intégration opérationnelle : clé enregistrée ET boutique joignable */
+  configured: boolean;
+  /** Boutique connectée à la clé API (null si absente ou illisible) */
+  store: { name: string | null; domain: string | null } | null;
+  /** Une clé API Chariow est enregistrée (la valeur n'est jamais renvoyée) */
+  apiKeyConfigured: boolean;
+  /** Le secret du webhook Chariow est enregistré */
+  webhookSecretConfigured: boolean;
+  /** Motif d'échec de la lecture de la boutique (réseau, clé refusée…) */
+  error?: string;
+}
+
+/** Diagnostic de POST /api/admin/products/:id/chariow-link (succès) */
+export interface ChariowLinkDiagnostic {
+  ok: boolean;
+  product: {
+    id: string;
+    name: string;
+    slug: string | null;
+    type: string | null;
+    status: string | null;
+    isFree: boolean | null;
+    price: ChariowAmount | null;
+    hasVariantPricing: boolean | null;
+  } | null;
+  /** `null` = non déterminable (statut absent) — jamais deviné */
+  checks: { exists: boolean; isFree: boolean | null; isPublished: boolean | null };
+  warnings: string[];
+}
+
+/** GET /api/admin/chariow/status — état de la connexion Chariow (jamais d'exception) */
+export async function fetchChariowStatus(): Promise<ChariowStatus> {
+  const res = await apiFetch<Partial<ChariowStatus> & { ok?: boolean }>("/api/admin/chariow/status", {
+    auth: true,
+    timeoutMs: 9000,
+  });
+  const store = res.store as ChariowStatus["store"];
+  return {
+    configured: res.configured === true,
+    store: store && typeof store === "object" ? { name: store.name ?? null, domain: store.domain ?? null } : null,
+    apiKeyConfigured: res.apiKeyConfigured === true,
+    webhookSecretConfigured: res.webhookSecretConfigured === true,
+    ...(typeof res.error === "string" && res.error ? { error: res.error } : {}),
+  };
+}
+
+/**
+ * GET /api/admin/chariow/products — produits de la boutique Chariow.
+ * `hasMore` : la page est plafonnée à 100 produits par l'API Chariow.
+ */
+export async function fetchChariowProducts(): Promise<{
+  products: ChariowProduct[];
+  hasMore: boolean;
+}> {
+  const res = await apiFetch<{ ok: boolean; products?: unknown[]; hasMore?: boolean }>(
+    "/api/admin/chariow/products",
+    { auth: true, timeoutMs: 9000 },
+  );
+  const products = (res.products || []).map((raw) => {
+    const item = (raw || {}) as Record<string, unknown>;
+    const price = item.price as Record<string, unknown> | null | undefined;
+    return {
+      id: affiliateStr(item.id),
+      name: affiliateStr(item.name),
+      isFree: typeof item.isFree === "boolean" ? item.isFree : null,
+      price:
+        price && typeof price === "object"
+          ? {
+              value: typeof price.value === "number" ? price.value : null,
+              formatted: affiliateStr(price.formatted) || null,
+              currency: affiliateStr(price.currency) || null,
+            }
+          : null,
+      status: affiliateStr(item.status) || null,
+      type: affiliateStr(item.type) || null,
+      linkedArsenalProductId: affiliateStr(item.linkedArsenalProductId) || null,
+    } satisfies ChariowProduct;
+  });
+  return { products, hasMore: res.hasMore === true };
+}
+
+/**
+ * POST /api/admin/products/:id/chariow-link — lie un produit Arsenal à un produit
+ * Chariow, APRÈS vérification réelle côté Chariow.
+ *
+ * En cas d'échec (produit inexistant → 400, vérification impossible → 502/503),
+ * l'erreur `ApiError` porte le diagnostic dans `err.data` (mêmes clés
+ * `checks` / `warnings` que le succès) : à lire pour afficher le détail.
+ */
+export async function linkChariowProduct(
+  arsenalProductId: string,
+  chariowProductId: string,
+): Promise<ChariowLinkDiagnostic> {
+  return apiFetch<ChariowLinkDiagnostic>(
+    `/api/admin/products/${encodeURIComponent(arsenalProductId)}/chariow-link`,
+    {
+      method: "POST",
+      body: { chariowProductId: chariowProductId.trim() },
+      auth: true,
+      timeoutMs: 12000,
+    },
+  );
+}
+
 /** Repli local : canvas max 1100px, JPEG q 0.82 → data URL */
 function compressImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {

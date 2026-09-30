@@ -345,9 +345,11 @@ export function PurchasesTab({ apiAvailable }: { apiAvailable: boolean }) {
             tentative réseau n&apos;est faite et la commande passe en échec avec ce motif.
           </p>
           <p>
-            • Le produit Chariow associé doit être en modèle de tarification « Gratuit » et son id
-            renseigné dans le formulaire produit ; le masquer de la boutique est la seule
-            atténuation documentée (il reste accessible à qui possède l&apos;URL).
+            • Méthode « code promo » (recommandée) : le produit Chariow d&apos;origine reste payant,
+            le code renseigné dans le formulaire produit doit valoir 100 % ou le montant exact du
+            prix. Méthode « checkout produit gratuit » : le produit Chariow associé doit être en
+            modèle de tarification « Gratuit » et son id renseigné ; le masquer de la boutique est
+            la seule atténuation documentée (il reste accessible à qui possède l&apos;URL).
           </p>
           <p>
             • Les types Chariow Service / Coaching et le prix libre ne sont pas acceptés par

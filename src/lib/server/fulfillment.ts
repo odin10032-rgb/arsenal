@@ -7,9 +7,10 @@
  *
  * Garde de 5 tentatives (FULFILLMENT_MAX_ATTEMPTS) : au-delà, plus aucune
  * relance automatique (ni utilisateur, ni admin). Les erreurs de CONFIGURATION
- * (clé API absente, `chariow_product_id` manquant, email introuvable)
- * échouent immédiatement SANS consommer de tentative — contractuellement
- * « aucune tentative réseau ».
+ * (clé API absente, `chariow_product_id` manquant, `chariow_discount_code`
+ * manquant pour la méthode « code promo », email introuvable) échouent
+ * immédiatement SANS consommer de tentative — contractuellement « aucune
+ * tentative réseau ».
  *
  * Résultats (audit du module « Paiement en A + Fulfillment ») :
  * - `step: completed` → succès ;
@@ -38,8 +39,12 @@ import type { PurchaseRow } from "./purchases";
 /** Nombre maximal de tentatives automatiques (contrat : « limite : 5 tentatives »). */
 export const FULFILLMENT_MAX_ATTEMPTS = 5;
 
-export type FulfillmentMethod = "manual" | "chariow_free_checkout";
-export const FULFILLMENT_METHODS: readonly FulfillmentMethod[] = ["manual", "chariow_free_checkout"];
+export type FulfillmentMethod = "manual" | "chariow_free_checkout" | "chariow_discount_checkout";
+export const FULFILLMENT_METHODS: readonly FulfillmentMethod[] = [
+  "manual",
+  "chariow_free_checkout",
+  "chariow_discount_checkout",
+];
 export const DEFAULT_FULFILLMENT_METHOD: FulfillmentMethod = "manual";
 
 export type FulfillmentProvider = "chariow" | "manual" | "arsenal_link";
@@ -80,6 +85,7 @@ interface FulfillmentProductRow {
   id: string;
   title: string;
   chariow_product_id: string | null;
+  chariow_discount_code: string | null;
   fulfillment_method: string | null;
 }
 
@@ -105,15 +111,26 @@ export interface FulfillmentOutcome {
 
 /* ------------------------------- Normalisation ------------------------------- */
 
-/** `manual` | `chariow_free_checkout` — toute valeur inconnue retombe sur `manual`. */
+/**
+ * `manual` | `chariow_free_checkout` | `chariow_discount_checkout` — toute
+ * valeur inconnue retombe sur `manual` (jamais de méthode devinée).
+ */
 export function normalizeFulfillmentMethod(raw: unknown): FulfillmentMethod {
   const value = typeof raw === "string" ? raw.trim() : "";
-  return value === "chariow_free_checkout" ? "chariow_free_checkout" : "manual";
+  if (value === "chariow_free_checkout") return "chariow_free_checkout";
+  if (value === "chariow_discount_checkout") return "chariow_discount_checkout";
+  return "manual";
+}
+
+/** Méthodes livrées par Chariow (checkout API) — les autres sont manuelles. */
+export function isChariowFulfillmentMethod(method: unknown): boolean {
+  const normalized = normalizeFulfillmentMethod(method);
+  return normalized === "chariow_free_checkout" || normalized === "chariow_discount_checkout";
 }
 
 /** Fournisseur posé sur la ligne `fulfillments` selon la méthode produit. */
 export function fulfillmentProviderForMethod(method: string): FulfillmentProvider {
-  return normalizeFulfillmentMethod(method) === "chariow_free_checkout" ? "chariow" : "manual";
+  return isChariowFulfillmentMethod(method) ? "chariow" : "manual";
 }
 
 /* --------------------------------- Lecture --------------------------------- */
@@ -135,7 +152,10 @@ async function readFulfillmentProduct(
   productId: string
 ): Promise<FulfillmentProductRow | null> {
   const row = await db
-    .prepare("SELECT id, title, chariow_product_id, fulfillment_method FROM products WHERE id = ?")
+    .prepare(
+      `SELECT id, title, chariow_product_id, chariow_discount_code, fulfillment_method
+         FROM products WHERE id = ?`
+    )
     .bind(productId)
     .first<FulfillmentProductRow>();
   return row ?? null;
@@ -313,12 +333,21 @@ export function markPurchaseFulfilledStatement(
  * Route le fulfillment d'une purchase selon `products.fulfillment_method` :
  * - `manual` : rien d'automatique — la ligne reste `pending`, l'admin livre puis
  *   marque la commande (`POST /api/admin/purchases/:id/fulfill`) ;
- * - `chariow_free_checkout` : appel `POST /v1/checkout` (produit « Gratuit »),
- *   `step: completed` ou `already_purchased` → fulfillment `completed` +
- *   purchase `fulfilled` (l'accès existe) ;
- *   issue incertaine (délai dépassé, réseau, 5xx) → tentative comptée, message
- *   conservé, fulfillment remis `pending` (RELANÇABLE, jamais `failed`) ;
- *   `step: payment` et erreurs HTTP définitives → échec motivé (`failed`).
+ * - `chariow_free_checkout` : appel `POST /v1/checkout` sur un produit Chariow
+ *   DUPLIQUÉ en modèle « Gratuit » (`chariow_product_id`) ;
+ * - `chariow_discount_checkout` (méthode recommandée) : appel `POST /v1/checkout`
+ *   sur le produit d'ORIGINE payant, rendu gratuit par le code promo Arsenal
+ *   (`discount_code` officiel, `products.chariow_discount_code`).
+ *
+ * Pour les deux méthodes Chariow : `step: completed` ou `already_purchased` →
+ * fulfillment `completed` + purchase `fulfilled` (l'accès existe) ;
+ * issue incertaine (délai dépassé, réseau, 5xx) → tentative comptée, message
+ * conservé, fulfillment remis `pending` (RELANÇABLE, jamais `failed`) ;
+ * `step: payment` et erreurs HTTP définitives → échec motivé (`failed`).
+ *
+ * Gardes de CONFIGURATION (aucun appel réseau émis, tentative non comptée) :
+ * clé API absente · `chariow_product_id` manquant · `chariow_discount_code`
+ * manquant pour la méthode « code promo » · email de l'acheteur introuvable.
  *
  * Ne lève jamais : toute anomalie devient un FulfillmentOutcome.
  */
@@ -400,9 +429,22 @@ export async function fulfillPurchase(
   const apiKey = await readChariowApiKey(db);
   if (!apiKey) return configFailure("Clé API Chariow non configurée.");
 
+  // Les DEUX méthodes Chariow passent par `POST /v1/checkout` : `product_id` est
+  // un champ obligatoire du CheckoutRequest — sans lui, échec de configuration
+  // immédiat (aucun appel réseau, tentative non comptée).
   const chariowProductId = (product?.chariow_product_id ?? "").trim();
   if (!chariowProductId) {
     return configFailure("Produit Chariow non configuré (chariow_product_id manquant).");
+  }
+
+  // Méthode « code promo » : le code est la clé de la gratuité du produit
+  // d'origine — sans lui, l'appel aboutirait à un `step: payment` (le client
+  // serait invité à payer). Échec de configuration explicite, sans réseau.
+  const chariowDiscountCode = (product?.chariow_discount_code ?? "").trim();
+  if (method === "chariow_discount_checkout" && !chariowDiscountCode) {
+    return configFailure(
+      "Code promo Chariow non configuré (chariow_discount_code manquant)."
+    );
   }
 
   const { email, pseudo } = await readUserIdentity(db, purchase.user_id);
@@ -420,6 +462,10 @@ export async function fulfillPurchase(
   const result = await createChariowCheckout({
     apiKey,
     productId: chariowProductId,
+    // `discount_code` (champ officiel du CheckoutRequest) : envoyé uniquement par
+    // la méthode « code promo » — le produit d'origine reste payant pour le
+    // public, seul ce code ouvre l'accès gratuit aux achats réglés en A.
+    discountCode: method === "chariow_discount_checkout" ? chariowDiscountCode : null,
     email,
     // `first_name`/`last_name` sont exigés par Chariow : le pseudo fait office
     // de prénom, le nom reste neutre (Arsenal ne collecte pas l'état civil).
@@ -478,12 +524,16 @@ export async function fulfillPurchase(
     };
   }
 
-  // `step: payment` = produit Chariow payant (le contrat exige le modèle « Gratuit ») :
-  // les A restent débités, la commande est relançable/remboursable par l'admin.
-  const error =
-    result.status === "payment"
-      ? "Le produit Chariow n'est pas en modèle de tarification « Gratuit » (step « payment »)."
-      : result.error;
+  // `step: payment` = Chariow a calculé un reste à payer : soit le produit n'est
+  // pas en modèle « Gratuit » (méthode chariow_free_checkout), soit le code promo
+  // n'a pas rendu la commande gratuite (inexistant, expiré, plafonné, ou valeur
+  // < prix du produit — méthode chariow_discount_checkout). Les A restent
+  // débités, la commande est relançable/remboursable par l'admin.
+  const paymentMessage =
+    method === "chariow_discount_checkout"
+      ? "Le code promo Chariow n'a pas rendu la commande gratuite (step « payment ») : vérifiez qu'il existe, qu'il cible ce produit, qu'il est actif et qu'il vaut 100 % ou le montant exact du prix."
+      : "Le produit Chariow n'est pas en modèle de tarification « Gratuit » (step « payment »).";
+  const error = result.status === "payment" ? paymentMessage : result.error;
 
   await failFulfillmentStatement(db, fulfillment, {
     provider,

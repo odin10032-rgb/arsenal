@@ -7,9 +7,22 @@
  * quatre tables (analytics_counters / clicks_by_product / visits_by_day /
  * recent_visits) et `settings` (clé/valeur) au lieu de `config`.
  */
-import { Product, Analytics, MediaItem } from "./types";
+import { Product, Analytics, MediaItem, FulfillmentMethod } from "./types";
 
 const RECENT_VISITS_MAX = 500;
+
+/**
+ * Méthode de fulfillment EFFECTIVEMENT stockée : toute valeur inconnue retombe
+ * sur `manual` (défaut du contrat) — même règle que
+ * `normalizeFulfillmentMethod` de `fulfillment.ts`, dupliquée ici pour éviter un
+ * cycle d'imports (`fulfillment.ts` importe déjà `store.ts`).
+ */
+function normalizeFulfillmentMethod(raw: unknown): FulfillmentMethod {
+  const value = typeof raw === "string" ? raw.trim() : "";
+  if (value === "chariow_free_checkout") return "chariow_free_checkout";
+  if (value === "chariow_discount_checkout") return "chariow_discount_checkout";
+  return "manual";
+}
 
 /* ------------------------------- Products ------------------------------- */
 
@@ -38,7 +51,9 @@ export async function getProducts(db: D1Database): Promise<Product[]> {
     purchasable: Number(p.purchasable) === 1,
     priceA: Number(p.price_a || 0),
     chariowProductId: p.chariow_product_id || null,
-    fulfillmentMethod: p.fulfillment_method === "chariow_free_checkout" ? "chariow_free_checkout" : "manual",
+    fulfillmentMethod: normalizeFulfillmentMethod(p.fulfillment_method),
+    /* --- Fulfillment par code promo (migration 0005) --- */
+    chariowDiscountCode: p.chariow_discount_code || null,
   }));
 }
 
@@ -46,8 +61,8 @@ export async function saveProducts(db: D1Database, products: Product[]): Promise
   const batch = products.map(p =>
     db.prepare(`
       INSERT OR REPLACE INTO products
-      (id, title, short_description, description, category, action_type, badges, price, action_url, apk_url, pwa_url, command, video_url, image_url, clicks, created_at, updated_at, affiliate_enabled, commission_type, commission_value, reward_a, purchasable, price_a, chariow_product_id, fulfillment_method)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, title, short_description, description, category, action_type, badges, price, action_url, apk_url, pwa_url, command, video_url, image_url, clicks, created_at, updated_at, affiliate_enabled, commission_type, commission_value, reward_a, purchasable, price_a, chariow_product_id, fulfillment_method, chariow_discount_code)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       p.id, p.title, p.shortDescription, p.description, p.category,
       p.actionType, JSON.stringify(p.badges), p.price, p.actionUrl,
@@ -57,7 +72,8 @@ export async function saveProducts(db: D1Database, products: Product[]): Promise
       p.commissionValue ?? null, p.rewardA ?? 0,
       p.purchasable ? 1 : 0, Math.trunc(Number(p.priceA ?? 0)) || 0,
       p.chariowProductId || null,
-      p.fulfillmentMethod === "chariow_free_checkout" ? "chariow_free_checkout" : "manual"
+      normalizeFulfillmentMethod(p.fulfillmentMethod),
+      p.chariowDiscountCode || null
     )
   );
   await db.batch(batch);

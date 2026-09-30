@@ -45,8 +45,17 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
   const [purchasable, setPurchasable] = useState(product?.purchasable ?? false);
   const [priceA, setPriceA] = useState(product?.priceA != null ? String(product.priceA) : "");
   const [chariowProductId, setChariowProductId] = useState(product?.chariowProductId ?? "");
-  const [fulfillmentMethod, setFulfillmentMethod] = useState<"manual" | "chariow_free_checkout">(
-    product?.fulfillmentMethod === "chariow_free_checkout" ? "chariow_free_checkout" : "manual",
+  const [fulfillmentMethod, setFulfillmentMethod] = useState<
+    "manual" | "chariow_free_checkout" | "chariow_discount_checkout"
+  >(
+    product?.fulfillmentMethod === "chariow_free_checkout"
+      ? "chariow_free_checkout"
+      : product?.fulfillmentMethod === "chariow_discount_checkout"
+        ? "chariow_discount_checkout"
+        : "manual",
+  );
+  const [chariowDiscountCode, setChariowDiscountCode] = useState(
+    product?.chariowDiscountCode ?? "",
   );
 
   const [busy, setBusy] = useState(false);
@@ -88,11 +97,13 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
     if (!short.trim()) errors.push("description courte");
     if (!safeUrl(actionUrl)) errors.push(actionType === "chariow" ? "URL du tunnel Chariow" : "URL d'action");
     if (!safeUrl(imageUrl)) errors.push("image de couverture");
-    // Vente en A : prix > 0 requis, et id produit Chariow pour le fulfillment automatique
+    // Vente en A : prix > 0 requis, et identifiants Chariow pour le fulfillment automatique
     const priceANum = Math.trunc(Number(priceA));
     if (purchasable && (!Number.isFinite(priceANum) || priceANum <= 0)) errors.push("prix en A (> 0)");
-    if (purchasable && fulfillmentMethod === "chariow_free_checkout" && !chariowProductId.trim())
+    if (purchasable && fulfillmentMethod !== "manual" && !chariowProductId.trim())
       errors.push("id produit Chariow");
+    if (purchasable && fulfillmentMethod === "chariow_discount_checkout" && !chariowDiscountCode.trim())
+      errors.push("code promo Chariow");
     if (errors.length) {
       toast("Champs manquants ou invalides : " + errors.join(", "), "error");
       return;
@@ -122,6 +133,7 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
       purchasable,
       priceA: purchasable ? Math.trunc(Number(priceA)) || 0 : 0,
       chariowProductId: chariowProductId.trim() || null,
+      chariowDiscountCode: chariowDiscountCode.trim().toUpperCase() || null,
       fulfillmentMethod,
     };
     try {
@@ -474,12 +486,21 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
                       value={fulfillmentMethod}
                       onChange={(e) =>
                         setFulfillmentMethod(
-                          e.target.value === "chariow_free_checkout" ? "chariow_free_checkout" : "manual",
+                          e.target.value === "chariow_free_checkout"
+                            ? "chariow_free_checkout"
+                            : e.target.value === "chariow_discount_checkout"
+                              ? "chariow_discount_checkout"
+                              : "manual",
                         )
                       }
                     >
                       <option value="manual">Manuelle (vous livrez)</option>
-                      <option value="chariow_free_checkout">Chariow — checkout produit gratuit</option>
+                      <option value="chariow_discount_checkout">
+                        Chariow — code promo (recommandé)
+                      </option>
+                      <option value="chariow_free_checkout">
+                        Chariow — checkout produit gratuit
+                      </option>
                     </select>
                   </label>
                 </div>
@@ -488,16 +509,41 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
                   <span className="mb-1.5 block text-[0.8rem] text-[#a0a0a0]">
                     Id produit Chariow{" "}
                     <span className="text-[#666]">
-                      {fulfillmentMethod === "chariow_free_checkout" ? "(requis)" : "(facultatif)"}
+                      {fulfillmentMethod === "manual" ? "(facultatif)" : "(requis)"}
                     </span>
                   </span>
                   <input
                     className="input-arsenal font-mono text-[0.8rem]"
                     value={chariowProductId}
                     onChange={(e) => setChariowProductId(e.target.value)}
-                    placeholder="id du produit Chariow « Gratuit » associé"
+                    placeholder={
+                      fulfillmentMethod === "chariow_discount_checkout"
+                        ? "id du produit Chariow d'origine (payant)"
+                        : fulfillmentMethod === "chariow_free_checkout"
+                          ? "id du produit Chariow dupliqué « Gratuit »"
+                          : "id d'un produit Chariow (facultatif)"
+                    }
                   />
                 </label>
+
+                {fulfillmentMethod === "chariow_discount_checkout" && (
+                  <label>
+                    <span className="mb-1.5 block text-[0.8rem] text-[#a0a0a0]">
+                      Code promo Chariow <span className="text-[#e63946]">*</span>
+                    </span>
+                    <input
+                      className="input-arsenal font-mono text-[0.8rem] uppercase"
+                      value={chariowDiscountCode}
+                      onChange={(e) => setChariowDiscountCode(e.target.value.slice(0, 60))}
+                      placeholder="ARSENAL-A-2026"
+                      autoComplete="off"
+                    />
+                    <span className="mt-1 block text-[0.68rem] leading-relaxed text-[#666]">
+                      60 caractères maximum, majuscules/chiffres/tirets. Ce code n&apos;est jamais
+                      exposé par le catalogue public.
+                    </span>
+                  </label>
+                )}
 
                 {fulfillmentMethod === "manual" ? (
                   <p className="text-[0.72rem] leading-relaxed text-[#666]">
@@ -505,6 +551,40 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
                     vous la marquez livrée (référence + note) après avoir transmis l&apos;accès.
                     Aucun prérequis Chariow n&apos;est nécessaire.
                   </p>
+                ) : fulfillmentMethod === "chariow_discount_checkout" ? (
+                  <div className="rounded-[10px] border border-[rgba(42,157,143,0.4)] bg-[rgba(42,157,143,0.07)] px-3.5 py-3">
+                    <p className="text-[0.78rem] font-semibold text-[#56b8a8]">
+                      Méthode recommandée — produit d&apos;origine + code promo
+                    </p>
+                    <div className="mt-1.5 flex flex-col gap-1.5 text-[0.72rem] leading-relaxed text-[#a0a0a0]">
+                      <p>
+                        • Le produit Chariow reste <b className="text-[#f0f0f0]">payant au prix plein</b>{" "}
+                        pour les clients normaux : aucun produit dupliqué, aucun re-téléversement de
+                        fichier. Les achats réglés en A passent par ce code promo.
+                      </p>
+                      <p>
+                        • Créez le coupon dans Chariow → <b className="text-[#a0a0a0]">Marketing →
+                        Réductions</b> (l&apos;API Chariow ne permet pas de le créer), ciblé sur ce
+                        produit, actif, puis renseignez son code ci-dessus.
+                      </p>
+                      <p>
+                        • Il doit valoir <b className="text-[#f0f0f0]">100 %</b> (type « percentage »)
+                        ou un <b className="text-[#f0f0f0]">montant égal au prix</b> (type « fixed »),
+                        sinon Chariow renvoie une commande à payer (« step payment ») et la livraison
+                        échoue avec ce motif — les A restant remboursables depuis l&apos;onglet
+                        Commandes.
+                      </p>
+                      <p>
+                        • La valeur d&apos;un coupon à 100 % doit être confirmée par un test réel
+                        côté Chariow (aucune source officielle ne garantit ce plafond) — à vérifier
+                        avant d&apos;activer la vente en A.
+                      </p>
+                      <p>
+                        • La clé API Chariow (onglet Paramètres) est obligatoire ; sans elle, la
+                        commande échoue avec ce motif, sans tentative réseau.
+                      </p>
+                    </div>
+                  </div>
                 ) : (
                   <div className="rounded-[10px] border border-[rgba(244,162,97,0.4)] bg-[rgba(244,162,97,0.07)] px-3.5 py-3">
                     <p className="text-[0.78rem] font-semibold text-[#f4c886]">
@@ -519,6 +599,11 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
                         • Un produit gratuit l&apos;est pour quiconque possède l&apos;URL ; la seule
                         atténuation documentée est de le masquer de la boutique. Recommandation :
                         un produit Chariow dédié « Arsenal (A) », masqué, distinct du produit payant.
+                      </p>
+                      <p>
+                        • Cette méthode impose de <b className="text-[#f0f0f0]">téléverser à nouveau
+                        le fichier</b> sur le produit dupliqué — préférez la méthode « code promo »
+                        pour livrer depuis le produit d&apos;origine.
                       </p>
                       <p>
                         • Types Service / Coaching et prix libre : refusés par l&apos;API (422) —

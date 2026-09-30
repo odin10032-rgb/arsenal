@@ -4,10 +4,11 @@
  * audit des capacités réelles : docs/chantier/06-audit-chariow-fulfillment.md.
  *
  * Règle absolue : AUCUN champ inventé. Le corps envoyé contient EXACTEMENT
- * `product_id`, `email`, `first_name?`, `last_name?` et
- * `custom_metadata.{arsenal_purchase, arsenal_user}` — rien d'autre (aucun
- * montant : le prix vient du produit Chariow, qui doit être en modèle de
- * tarification « Gratuit » ; aucun coupon, non vérifiable côté API).
+ * `product_id`, `email`, `first_name?`, `last_name?`, `phone?`, `discount_code?`
+ * et `custom_metadata.{arsenal_purchase, arsenal_user}` — rien d'autre (aucun
+ * montant : le prix vient du produit Chariow ; `discount_code` est un champ
+ * OFFICIEL du `CheckoutRequest` de l'OpenAPI, il porte le code promo réservé à
+ * Arsenal sur le produit d'origine — cf. migration 0005).
  *
  * Lecture DÉFENSIVE de la réponse (`step` : completed | payment |
  * already_purchased) et AUCUNE exception qui remonte : toute anomalie (réseau,
@@ -32,8 +33,19 @@ export const CHARIOW_TIMEOUT_MS = 10_000;
 export interface ChariowCheckoutInput {
   /** Clé API (`sk_live_…`). Absente/vide → `not_configured`, AUCUN appel réseau. */
   apiKey: string | null | undefined;
-  /** `product_id` : identifiant du produit Chariow « Gratuit » (≠ id Arsenal). */
+  /**
+   * `product_id` : identifiant (ou slug) du produit Chariow.
+   * - méthode `chariow_free_checkout` : produit DUPLIQUÉ en modèle « Gratuit » ;
+   * - méthode `chariow_discount_checkout` : produit d'ORIGINE payant, rendu
+   *   gratuit par `discountCode`.
+   */
   productId: string;
+  /**
+   * `discount_code` — champ OFFICIEL du `CheckoutRequest` (OpenAPI, maxLength
+   * 100) : code promo créé manuellement dans Chariow → Marketing → Réductions.
+   * Envoyé UNIQUEMENT s'il est non vide (aucun champ vide dans le corps).
+   */
+  discountCode?: string | null;
   /** Email de l'acheteur : c'est lui qui porte l'accès sur app.ateliat.com. */
   email: string;
   firstName?: string | null;
@@ -114,7 +126,9 @@ function messageForHttp(status: number, data: unknown): string {
   if (status === 401 || status === 403) return `Clé API Chariow refusée (HTTP ${status}).${suffix}`;
   if (status === 404) return `Produit Chariow introuvable ou non publié (HTTP 404).${suffix}`;
   if (status === 422) {
-    return `Chariow a refusé la commande (HTTP 422 : produit non éligible au checkout API).${suffix}`;
+    // 422 n'est pas détaillé par l'API : produit non éligible au checkout API
+    // (Service/Coaching/prix libre) OU code promo refusé par Chariow.
+    return `Chariow a refusé la commande (HTTP 422 : produit non éligible au checkout API ou code promo refusé).${suffix}`;
   }
   if (status === 429) return `Limite de requêtes Chariow atteinte (HTTP 429).${suffix}`;
   return `Chariow a répondu HTTP ${status}.${suffix}`;
@@ -154,6 +168,12 @@ export async function createChariowCheckout(
   const lastName = (input.lastName ?? "").trim();
   if (firstName) payload.first_name = firstName;
   if (lastName) payload.last_name = lastName;
+
+  // `discount_code` : champ officiel du CheckoutRequest, envoyé seulement s'il
+  // est renseigné (méthode `chariow_discount_checkout`). Sans lui, la requête
+  // est identique à celle de la méthode « produit gratuit ».
+  const discountCode = (input.discountCode ?? "").trim();
+  if (discountCode) payload.discount_code = discountCode;
 
   // Le téléphone est OBLIGATOIRE côté Chariow (contrainte du prestataire vérifiée
   // en conditions réelles) ; sans lui la requête échoue en 422.

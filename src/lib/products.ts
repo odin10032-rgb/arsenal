@@ -34,10 +34,12 @@ export interface Product {
   purchasable?: boolean;
   /** Prix en A (> 0 requis si purchasable) — montant lu de l'API, jamais recalculé */
   priceA?: number;
-  /** Id du produit Chariow « Gratuit » utilisé par le fulfillment automatique */
+  /** Id du produit Chariow utilisé par le fulfillment automatique (produit « Gratuit » ou produit d'origine) */
   chariowProductId?: string | null;
-  /** manual | chariow_free_checkout */
+  /** manual | chariow_free_checkout | chariow_discount_checkout */
   fulfillmentMethod?: string | null;
+  /** Code promo Chariow réservé aux achats en A (méthode chariow_discount_checkout) */
+  chariowDiscountCode?: string | null;
 }
 
 export const CATEGORIES: Record<Category, string> = {

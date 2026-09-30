@@ -1,13 +1,14 @@
 "use client";
 
 /**
- * Shell du dashboard admin — header + 6 onglets + déconnexion
+ * Shell du dashboard admin — header + 7 onglets + déconnexion
  */
 
 import Link from "next/link";
 import { useState } from "react";
 import { AffiliatesTab } from "./affiliates-tab";
 import { AnalyticsTab } from "./analytics-tab";
+import { ChariowTab } from "./chariow-tab";
 import { MediaTab } from "./media-tab";
 import { ProductsTab } from "./products-tab";
 import { PurchasesTab } from "./purchases-tab";
@@ -17,7 +18,7 @@ import { clearAdminToken } from "@/lib/products";
 import { Product } from "@/lib/products";
 import { ToastHost } from "@/lib/toast";
 
-type Tab = "products" | "media" | "analytics" | "affiliates" | "purchases" | "settings";
+type Tab = "products" | "media" | "analytics" | "affiliates" | "purchases" | "chariow" | "settings";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   {
@@ -69,6 +70,17 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
         <path d="M4 4h2l2.4 10.5a2 2 0 0 0 2 1.5h7.4a2 2 0 0 0 2-1.6L21 8H6" />
         <circle cx="10" cy="20" r="1.3" />
         <circle cx="17.5" cy="20" r="1.3" />
+      </svg>
+    ),
+  },
+  {
+    id: "chariow",
+    label: "Chariow",
+    icon: (
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 9h18l-1.5 11.5a1 1 0 0 1-1 .9H5.5a1 1 0 0 1-1-.9z" />
+        <path d="M8 9V6.5a4 4 0 0 1 8 0V9" />
+        <path d="M9.5 13.5h5" />
       </svg>
     ),
   },
@@ -179,6 +191,7 @@ export function AdminDashboard({
             <AffiliatesTab apiAvailable={apiAvailable} products={products} />
           )}
           {tab === "purchases" && <PurchasesTab apiAvailable={apiAvailable} />}
+          {tab === "chariow" && <ChariowTab apiAvailable={apiAvailable} products={products} />}
           {tab === "settings" && <SettingsTab apiAvailable={apiAvailable} onLogout={logout} />}
         </div>
       </main>

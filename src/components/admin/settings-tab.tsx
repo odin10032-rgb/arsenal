@@ -123,7 +123,8 @@ function GithubCard() {
 /* ---------------- Clé API Chariow (Phase 2.6) ---------------- */
 
 /**
- * Clé API Chariow — indispensable au fulfillment automatique (`chariow_free_checkout`).
+ * Clé API Chariow — indispensable au fulfillment automatique (méthodes
+ * `chariow_discount_checkout` et `chariow_free_checkout`).
  * La valeur n'est jamais renvoyée par l'API : on n'affiche qu'un état « configurée » quand le
  * backend l'indique (drapeau `chariow_api_key_configured` ou champ masqué), sinon « inconnu ».
  */
@@ -181,7 +182,7 @@ function ChariowCard({ apiAvailable }: { apiAvailable: boolean }) {
         </svg>
       }
       title="Clé API Chariow"
-      subtitle="Nécessaire au fulfillment automatique des achats en A (méthode « checkout produit gratuit »). La clé n'est jamais renvoyée en clair par l'API ; enregistrer une nouvelle valeur remplace l'ancienne."
+      subtitle="Nécessaire à la livraison automatique des achats en A — méthode « code promo » (produit Chariow d'origine) comme méthode « checkout produit gratuit ». La clé n'est jamais renvoyée en clair par l'API ; enregistrer une nouvelle valeur remplace l'ancienne."
     >
       <div className="flex flex-wrap items-center gap-2">
         <span
@@ -229,10 +230,10 @@ function ChariowCard({ apiAvailable }: { apiAvailable: boolean }) {
       </div>
 
       <p className="text-[0.72rem] leading-relaxed text-[#666]">
-        Le fulfillment automatique exige aussi un produit Chariow en modèle de tarification
-        « Gratuit » et l&apos;id renseigné dans le formulaire produit. Sans clé, les commandes
-        passent en échec avec le motif « Clé API Chariow non configurée » et l&apos;équipe peut
-        toujours livrer manuellement depuis l&apos;onglet Commandes.
+        Le fulfillment automatique exige aussi, par produit, un id de produit Chariow (et un code
+        promo pour la méthode « code promo »), renseignés dans le formulaire produit. Sans clé, les
+        commandes passent en échec avec le motif « Clé API Chariow non configurée » et l&apos;équipe
+        peut toujours livrer manuellement depuis l&apos;onglet Commandes.
       </p>
     </SettingsCard>
   );

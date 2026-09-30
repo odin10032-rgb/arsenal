@@ -26,14 +26,21 @@ export interface Product {
   purchasable?: boolean;
   /** Prix en A (entier ≥ 0) — le prix affiché en FCFA reste `price`. */
   priceA?: number;
-  /** Id du produit Chariow « Gratuit » utilisé par le fulfillment. */
+  /** Id du produit Chariow utilisé par le fulfillment (produit « Gratuit » dupliqué ou produit d'origine payant). */
   chariowProductId?: string | null;
-  /** manual | chariow_free_checkout */
+  /** manual | chariow_free_checkout | chariow_discount_checkout */
   fulfillmentMethod?: FulfillmentMethod;
+  /** Code promo Chariow réservé aux achats en A (méthode `chariow_discount_checkout`). */
+  chariowDiscountCode?: string | null;
 }
 
-/** Méthodes de livraison d'un produit (contrat § Fulfillment). */
-export type FulfillmentMethod = "manual" | "chariow_free_checkout";
+/**
+ * Méthodes de livraison d'un produit (contrat § Fulfillment) :
+ * `manual` (livraison humaine), `chariow_free_checkout` (produit Chariow dupliqué
+ * en « Gratuit ») et `chariow_discount_checkout` (produit d'origine + code promo
+ * `discount_code` — méthode recommandée).
+ */
+export type FulfillmentMethod = "manual" | "chariow_free_checkout" | "chariow_discount_checkout";
 
 export interface Analytics {
   visits: number;

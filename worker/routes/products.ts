@@ -78,6 +78,9 @@ function normalizeAffiliation(body: Record<string, unknown>): Partial<Product> {
 /** Bornes du contrat (docs/chantier/07-contrat-paiement-a.md) pour la vente en A. */
 const PRICE_A_MAX = 1_000_000;
 const CHARIOW_PRODUCT_ID_MAX = 120;
+const CHARIOW_DISCOUNT_CODE_MAX = 60;
+/** Code promo Chariow : majuscules, chiffres et tirets uniquement (bornes du backend). */
+const CHARIOW_DISCOUNT_CODE_PATTERN = /^[A-Z0-9-]+$/;
 
 /* Champs de vente en A : chacun est lu séparément — ABSENT du corps ⇒ valeur
  * existante PRÉSERVÉE en modification (PUT), défaut du contrat en création. */
@@ -98,24 +101,49 @@ function chariowProductIdOf(body: Record<string, unknown>, existing?: Partial<Pr
   return raw && raw.length <= CHARIOW_PRODUCT_ID_MAX ? raw : null;
 }
 
+/**
+ * Code promo Chariow (méthode `chariow_discount_checkout`) : chaîne ≤ 60
+ * caractères, MAJUSCULES/chiffres/tirets, ou `null`. Une valeur hors bornes est
+ * ramenée à `null` (jamais stockée telle quelle) ; l'invariant ci-dessous refuse
+ * alors l'enregistrement si la méthode choisie en a besoin.
+ */
+function chariowDiscountCodeOf(
+  body: Record<string, unknown>,
+  existing?: Partial<Product>
+): string | null {
+  if (body.chariowDiscountCode === undefined) return existing?.chariowDiscountCode ?? null;
+  if (body.chariowDiscountCode === null) return null; // effacement explicite
+  const raw = typeof body.chariowDiscountCode === "string" ? body.chariowDiscountCode.trim() : "";
+  if (!raw) return null;
+  const normalized = raw.toUpperCase();
+  if (normalized.length > CHARIOW_DISCOUNT_CODE_MAX) return null;
+  return CHARIOW_DISCOUNT_CODE_PATTERN.test(normalized) ? normalized : null;
+}
+
 function fulfillmentMethodOf(
   body: Record<string, unknown>,
   existing?: Partial<Product>
 ): Product["fulfillmentMethod"] {
   if (body.fulfillmentMethod === undefined) return existing?.fulfillmentMethod ?? "manual";
-  return body.fulfillmentMethod === "chariow_free_checkout" ? "chariow_free_checkout" : "manual";
+  if (body.fulfillmentMethod === "chariow_free_checkout") return "chariow_free_checkout";
+  if (body.fulfillmentMethod === "chariow_discount_checkout") return "chariow_discount_checkout";
+  return "manual";
 }
 
 /**
  * Champs de vente en A (Phase 2.6) — validés dans les bornes du contrat :
  * `priceA` entier 0…1 000 000, `purchasable` booléen, `chariowProductId`
- * chaîne ≤ 120 caractères, `fulfillmentMethod` ∈ manual | chariow_free_checkout.
+ * chaîne ≤ 120 caractères, `chariowDiscountCode` chaîne ≤ 60 (majuscules/
+ * chiffres/tirets), `fulfillmentMethod` ∈ manual | chariow_free_checkout |
+ * chariow_discount_checkout.
  *
  * INVARIANTS :
  * - `purchasable` exige `priceA > 0` (sinon ramené à false — contrat
  *   « price_a > 0 si purchasable ») ;
  * - `chariow_free_checkout` exige un `chariowProductId` non vide (constat C7 :
  *   sans lui, chaque achat échouerait en configuration… en débitant les A) ;
+ * - `chariow_discount_checkout` exige un `chariowProductId` ET un
+ *   `chariowDiscountCode` (le code porte la gratuité du produit d'origine) ;
  * - en MODIFICATION, tout champ de vente en A absent du corps est PRÉSERVÉ
  *   (au lieu d'être silencieusement réinitialisé — constat C7).
  */
@@ -126,6 +154,7 @@ function normalizePurchaseFields(
 ): Partial<Product> {
   const priceA = priceAOf(body, existing);
   const chariowProductId = chariowProductIdOf(body, existing);
+  const chariowDiscountCode = chariowDiscountCodeOf(body, existing);
   const fulfillmentMethod = fulfillmentMethodOf(body, existing);
   const purchasable = purchasableOf(body, existing) && priceA > 0;
   if (purchasable && fulfillmentMethod === "chariow_free_checkout" && !chariowProductId) {
@@ -134,24 +163,46 @@ function normalizePurchaseFields(
         "(fulfillmentMethod « chariow_free_checkout ») doit avoir un chariowProductId."
     );
   }
-  return { purchasable, priceA, chariowProductId, fulfillmentMethod };
+  if (purchasable && fulfillmentMethod === "chariow_discount_checkout") {
+    if (!chariowProductId) {
+      errors.push(
+        "Identifiant produit Chariow requis : la livraison automatique par code promo " +
+          "(fulfillmentMethod « chariow_discount_checkout ») doit viser le produit Chariow d'origine " +
+          "(chariowProductId)."
+      );
+    }
+    if (!chariowDiscountCode) {
+      errors.push(
+        "Code promo Chariow requis : la livraison automatique par code promo " +
+          "(fulfillmentMethod « chariow_discount_checkout ») doit avoir un chariowDiscountCode " +
+          "(≤ 60 caractères, majuscules/chiffres/tirets)."
+      );
+    }
+  }
+  return { purchasable, priceA, chariowProductId, chariowDiscountCode, fulfillmentMethod };
 }
 
 /**
- * Catalogue PUBLIC : `chariowProductId` est un identifiant d'intégration
- * interne (constat C9 de l'audit) — il n'est renvoyé qu'aux requêtes admin
- * authentifiées (X-Admin-Auth), dont le formulaire produit a besoin pour
- * éditer un produit `chariow_free_checkout`.
+ * Catalogue PUBLIC : `chariowProductId` et `chariowDiscountCode` sont des
+ * identifiants d'intégration internes (constat C9 de l'audit) — ils ne sont
+ * renvoyés qu'aux requêtes admin authentifiées (X-Admin-Auth), dont le
+ * formulaire produit a besoin pour éditer un produit à fulfillment Chariow.
+ * Le code promo est en outre un SECRET opérationnel : sa fuite offrirait le
+ * produit gratuitement à quiconque lit le catalogue.
  *
- * DEUX clés à retirer : `getProducts()` étale la ligne SQL brute puis ajoute
- * les alias camelCase, donc la valeur existe aussi en `chariow_product_id`
- * (fuite constatée en test).
+ * DEUX clés à retirer par champ : `getProducts()` étale la ligne SQL brute puis
+ * ajoute les alias camelCase, donc la valeur existe aussi en `chariow_product_id`
+ * / `chariow_discount_code` (fuite constatée en test).
  */
-function withoutIntegrationId(product: Product): Omit<Product, "chariowProductId"> {
+function withoutIntegrationFields(
+  product: Product
+): Omit<Product, "chariowProductId" | "chariowDiscountCode"> {
   const copy: Record<string, unknown> = { ...product };
   delete copy.chariowProductId;
   delete copy.chariow_product_id;
-  return copy as Omit<Product, "chariowProductId">;
+  delete copy.chariowDiscountCode;
+  delete copy.chariow_discount_code;
+  return copy as Omit<Product, "chariowProductId" | "chariowDiscountCode">;
 }
 
 export const productRoutes: App = new Hono<{ Bindings: Env }>()
@@ -166,7 +217,7 @@ export const productRoutes: App = new Hono<{ Bindings: Env }>()
       ...p,
       clicks: p.clicks + (analytics.clicksByProduct[p.id] || 0),
     }));
-    const visible = isAdminRequest ? merged : merged.map(withoutIntegrationId);
+    const visible = isAdminRequest ? merged : merged.map(withoutIntegrationFields);
     return c.json({
       ok: true,
       version: catalogVersion(products, analytics.clicksByProduct),
