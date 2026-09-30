@@ -26,6 +26,26 @@ function detailMissing(): Response {
 }
 
 /**
+ * 402 du contrat : solde A insuffisant, avec les valeurs RECALCULÉES côté
+ * serveur (`missingA` ne peut pas être négatif même si le solde a changé entre
+ * la lecture et le batch — constat C1 de l'audit).
+ */
+function insufficientA(balanceA: number, priceA: number): Response {
+  const balance = Math.trunc(Number(balanceA) || 0);
+  const price = Math.trunc(Number(priceA) || 0);
+  return Response.json(
+    {
+      ok: false,
+      error: "Solde A insuffisant.",
+      balanceA: balance,
+      priceA: price,
+      missingA: Math.max(0, price - balance),
+    },
+    { status: 402 }
+  );
+}
+
+/**
  * Phase 2.6 — achats en A (Bearer requis, `requireAuth` de me.ts).
  * Contrat FIGÉ : docs/chantier/07-contrat-paiement-a.md.
  *
@@ -63,28 +83,24 @@ export const purchaseRoutes: AuthedApp = new Hono<AuthedEnv>()
     }
 
     const priceA = productPriceA(product);
+    // Lecture d'optimisation (réponse 402 immédiate dans le cas courant) : la
+    // garde FAISANT AUTORITÉ est le débit conditionnel exécuté dans le batch.
     const balanceA = await aBalance(db, user.id);
     if (balanceA < priceA) {
-      return c.json(
-        {
-          ok: false,
-          error: "Solde A insuffisant.",
-          balanceA,
-          priceA,
-          missingA: priceA - balanceA,
-        },
-        402
-      );
+      return insufficientA(balanceA, priceA);
     }
 
-    // Attribution affiliation : code de parrainage < 30 j, ignoré silencieusement s'il est invalide.
+    // Attribution affiliation : code de parrainage < 30 j, ignoré silencieusement
+    // s'il est invalide — et refusée si l'acheteur est l'affilié lui-même (C5).
     const affiliateCode = typeof body?.affiliateCode === "string" ? body.affiliateCode : "";
-    const attribution = await resolvePurchaseAttribution(db, affiliateCode, product.id);
+    const attribution = await resolvePurchaseAttribution(db, affiliateCode, product.id, {
+      buyerUserId: user.id,
+    });
     const commission = attribution ? await computePurchaseCommission(db, product) : null;
 
-    let created;
+    let attempt: Awaited<ReturnType<typeof createPurchase>>;
     try {
-      created = await createPurchase(db, {
+      attempt = await createPurchase(db, {
         userId: user.id,
         product,
         attribution,
@@ -98,6 +114,14 @@ export const purchaseRoutes: AuthedApp = new Hono<AuthedEnv>()
       }
       throw err;
     }
+
+    // Solde insuffisant détecté DANS le SQL (deux achats concurrents) : rien n'a
+    // été écrit (ni purchase, ni fulfillment, ni vente) — réponse 402 du contrat,
+    // avec le solde relu APRÈS le batch.
+    if (!attempt.debited) {
+      return insufficientA(await aBalance(db, user.id), priceA);
+    }
+    const created = attempt.creation;
 
     // Fulfillment immédiat : le statut renvoyé reflète le résultat RÉEL
     // (aucune erreur de livraison ne doit faire perdre la réponse d'achat).

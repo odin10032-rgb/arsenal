@@ -11,6 +11,16 @@
  * échouent immédiatement SANS consommer de tentative — contractuellement
  * « aucune tentative réseau ».
  *
+ * Résultats (audit du module « Paiement en A + Fulfillment ») :
+ * - `step: completed` → succès ;
+ * - `step: already_purchased` → SUCCÈS aussi (l'accès existe déjà côté Chariow
+ *   pour cet email : l'acheteur a le produit) — constat C3 ;
+ * - issue incertaine (délai dépassé, réseau, 5xx) → tentative comptée, message
+ *   conservé, fulfillment remis `pending` : la commande reste relançable, elle
+ *   n'est JAMAIS marquée `failed` sur un résultat incertain — constat C3 ;
+ * - `step: payment` (produit Chariow payant) et erreurs HTTP définitives
+ *   (4xx) → `failed` avec message explicite, les A restent débités.
+ *
  * Les A ne sont JAMAIS perdus : un échec laisse la purchase
  * `fulfillment_pending` (relançable via retry, remboursable par l'admin) — et
  * surtout jamais `failed`, sinon l'index unique partiel autoriserait un second
@@ -43,6 +53,13 @@ export const FULFILLMENT_STATUSES: readonly FulfillmentStatus[] = [
 /** Message d'échec conservé dans `last_error` (jamais de perte d'information). */
 const MAX_ERROR_LENGTH = 500;
 
+/**
+ * Message d'un résultat INCERTAIN (délai dépassé / réseau / 5xx) : l'accès a
+ * peut-être été accordé côté Chariow, la commande reste relançable.
+ */
+export const UNCERTAIN_FULFILLMENT_MESSAGE =
+  "Délai dépassé côté Chariow — l'accès a peut-être été accordé : relancez la livraison ou vérifiez le portail Chariow.";
+
 /* ---------------------------------- Types ---------------------------------- */
 
 export interface FulfillmentRow {
@@ -71,6 +88,12 @@ export interface FulfillmentOutcome {
   attempted: boolean;
   /** true si la garde de 5 tentatives a bloqué la tentative. */
   exhausted: boolean;
+  /**
+   * true si l'issue est INCERTAINE (délai dépassé/réseau/5xx) : la tentative est
+   * comptée, l'erreur conservée, mais la commande reste `pending`/relançable —
+   * jamais marquée `failed` définitivement.
+   */
+  uncertain?: boolean;
   /** État du fulfillment après l'opération. */
   status: FulfillmentStatus;
   provider: string;
@@ -139,19 +162,41 @@ export function canAttemptFulfillment(
 
 /* -------------------------------- Statements -------------------------------- */
 
-/** INSERT d'un fulfillment `pending` prêt pour un db.batch (idempotent par `id`). */
+/**
+ * INSERT d'un fulfillment `pending` prêt pour un db.batch (idempotent par `id`).
+ * `requiresDebitKey` : clé d'idempotence du débit d'achat — la ligne de
+ * livraison n'est alors créée QUE si ce débit existe (achat payé), pour que le
+ * batch d'achat reste annulable sans second aller-retour (constat C1 de l'audit).
+ */
 export function createFulfillmentStatement(
   db: D1Database,
-  input: { purchaseId: string; provider: string; now?: number; id?: string }
+  input: {
+    purchaseId: string;
+    provider: string;
+    now?: number;
+    id?: string;
+    requiresDebitKey?: string | null;
+  }
 ): D1PreparedStatement {
   const now = input.now ?? Date.now();
+  const id = input.id ?? crypto.randomUUID();
+  if (input.requiresDebitKey) {
+    return db
+      .prepare(
+        `INSERT INTO fulfillments
+           (id, purchase_id, provider, status, provider_reference, attempts, last_error, created_at, completed_at)
+         SELECT ?, ?, ?, 'pending', NULL, 0, NULL, ?, NULL
+          WHERE EXISTS (SELECT 1 FROM a_transactions WHERE idempotency_key = ?)`
+      )
+      .bind(id, input.purchaseId, input.provider, now, input.requiresDebitKey);
+  }
   return db
     .prepare(
       `INSERT INTO fulfillments
          (id, purchase_id, provider, status, provider_reference, attempts, last_error, created_at, completed_at)
        VALUES (?, ?, ?, 'pending', NULL, 0, NULL, ?, NULL)`
     )
-    .bind(input.id ?? crypto.randomUUID(), input.purchaseId, input.provider, now);
+    .bind(id, input.purchaseId, input.provider, now);
 }
 
 /**
@@ -213,6 +258,31 @@ export function failFulfillmentStatement(
     .bind(opts.provider ?? null, error, opts.countAttempt ? 1 : 0, fulfillment.id);
 }
 
+/**
+ * Résultat INCERTAIN (délai dépassé, réseau, 5xx) : l'appel a peut-être abouti
+ * côté Chariow. La relance est donc laissée possible — l'état passe à
+ * `pending` (jamais `failed`), la tentative est comptée et le message conservé
+ * (constat C3 de l'audit : ne jamais conclure à un échec définitif sur un
+ * résultat incertain).
+ */
+export function failUncertainFulfillmentStatement(
+  db: D1Database,
+  fulfillment: Pick<FulfillmentRow, "id">,
+  opts: { provider?: string | null; error: string; now?: number }
+): D1PreparedStatement {
+  const error = (opts.error || UNCERTAIN_FULFILLMENT_MESSAGE).slice(0, MAX_ERROR_LENGTH);
+  return db
+    .prepare(
+      `UPDATE fulfillments
+          SET status = 'pending',
+              provider = COALESCE(?, provider),
+              last_error = ?,
+              attempts = attempts + 1
+        WHERE id = ? AND status != 'completed'`
+    )
+    .bind(opts.provider ?? null, error, fulfillment.id);
+}
+
 /** Passage de la purchase à `fulfilled` — idempotent, jamais depuis un état terminal. */
 export function markPurchaseFulfilledStatement(
   db: D1Database,
@@ -235,8 +305,11 @@ export function markPurchaseFulfilledStatement(
  * - `manual` : rien d'automatique — la ligne reste `pending`, l'admin livre puis
  *   marque la commande (`POST /api/admin/purchases/:id/fulfill`) ;
  * - `chariow_free_checkout` : appel `POST /v1/checkout` (produit « Gratuit »),
- *   `step: completed` → fulfillment `completed` + purchase `fulfilled` ;
- *   tout le reste → échec motivé (`payment`, `already_purchased`, HTTP, réseau).
+ *   `step: completed` ou `already_purchased` → fulfillment `completed` +
+ *   purchase `fulfilled` (l'accès existe) ;
+ *   issue incertaine (délai dépassé, réseau, 5xx) → tentative comptée, message
+ *   conservé, fulfillment remis `pending` (RELANÇABLE, jamais `failed`) ;
+ *   `step: payment` et erreurs HTTP définitives → échec motivé (`failed`).
  *
  * Ne lève jamais : toute anomalie devient un FulfillmentOutcome.
  */
@@ -334,8 +407,8 @@ export async function fulfillPurchase(
     arsenalUser: purchase.user_id,
   });
 
-  if (result.status === "completed") {
-    const reference = result.purchaseId ?? result.transactionId ?? null;
+  /** Succès : livraison effective → fulfillment `completed`, purchase `fulfilled`. */
+  const succeed = async (reference: string | null): Promise<FulfillmentOutcome> => {
     await db.batch([
       completeFulfillmentStatement(db, fulfillment, {
         provider,
@@ -353,6 +426,32 @@ export async function fulfillPurchase(
       purchaseStatus: "fulfilled",
       error: null,
     };
+  };
+
+  if (result.status === "completed") {
+    return succeed(result.purchaseId ?? result.transactionId ?? null);
+  }
+
+  // `already_purchased` = l'accès existe DÉJÀ côté Chariow pour cet email :
+  // l'acheteur a bien le produit, ce n'est PAS un échec (constat C3 de l'audit).
+  // Aucune référence fournisseur dans ce cas (rien n'a été créé par l'appel).
+  if (result.status === "already_purchased") return succeed(null);
+
+  // Issue INCERTAINE (aucune réponse HTTP exploitable : délai dépassé, réseau ou
+  // 5xx) : l'appel a peut-être abouti. On compte la tentative et on conserve le
+  // message, mais la commande reste relançable — jamais `failed` définitivement.
+  if (result.status === "error" && (result.httpStatus === null || result.httpStatus >= 500)) {
+    const error = `${UNCERTAIN_FULFILLMENT_MESSAGE} (${result.error})`;
+    await failUncertainFulfillmentStatement(db, fulfillment, { provider, error, now }).run();
+    return {
+      attempted: true,
+      exhausted: false,
+      uncertain: true,
+      status: "pending",
+      provider,
+      purchaseStatus: purchase.status,
+      error,
+    };
   }
 
   // `step: payment` = produit Chariow payant (le contrat exige le modèle « Gratuit ») :
@@ -360,9 +459,7 @@ export async function fulfillPurchase(
   const error =
     result.status === "payment"
       ? "Le produit Chariow n'est pas en modèle de tarification « Gratuit » (step « payment »)."
-      : result.status === "already_purchased"
-        ? "L'email possède déjà ce produit sur Chariow (already_purchased)."
-        : result.error;
+      : result.error;
 
   await failFulfillmentStatement(db, fulfillment, {
     provider,

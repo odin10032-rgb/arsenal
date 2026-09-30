@@ -2,6 +2,13 @@
 
 > CONTRAT FIGÉ — s'appuie sur l'audit `06-audit-chariow-fulfillment.md` (capacités réelles uniquement, aucune invention).
 > Règle : le serveur est seul maître du solde, du prix, du statut d'achat et du fulfillment.
+>
+> **Mise à jour post-audit (30/09)** — le contrat a évolué sur cinq points après l'audit indépendant :
+> 1. **Atomicité** : le débit A est désormais **conditionnel au solde dans la requête SQL** (`INSERT … SELECT … WHERE (SELECT SUM(delta)) >= montant`) et toutes les écritures de l'achat sont gardées par l'existence de ce débit — plus de lecture de solde suivie d'une écriture (faille de concurrence corrigée).
+> 2. **`already_purchased`** (Chariow) est un **succès** (l'accès existe déjà → commande livrée), et un **timeout réseau** laisse la commande relançable (jamais un échec définitif).
+> 3. **Remboursement** : rejette la vente liée, annule la commission tant qu'elle n'est pas `paid`, et reprend la récompense A réellement versée — le tout dans le même lot idempotent.
+> 4. **Auto-affiliation interdite** : un affilié qui achète avec son propre code n'est pas attribué (journalisé `self_affiliation_blocked`).
+> 5. **Validation serveur** : `chariow_free_checkout` exige un `chariow_product_id` (400 sinon) ; `chariowProductId` n'est plus exposé dans le catalogue public (réservé aux requêtes admin).
 
 ## Séparation stricte des concepts
 

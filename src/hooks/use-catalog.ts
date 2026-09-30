@@ -32,7 +32,9 @@ export function useCatalog() {
   const versionRef = useRef<string>("");
 
   const refresh = useCallback(async (silent = true) => {
-    const data = await apiFetch<CatalogResponse>("/api/products", { timeoutMs: 4000 });
+    // `auth` : le header X-Admin-Auth n'est joint que si un token admin existe
+    // (le backend réserve chariowProductId aux requêtes admin).
+    const data = await apiFetch<CatalogResponse>("/api/products", { timeoutMs: 4000, auth: true });
     if (data.version === versionRef.current) return;
     versionRef.current = data.version;
     setProducts(data.products || []);
@@ -43,7 +45,7 @@ export function useCatalog() {
   const reload = useCallback(async () => {
     // Rechargement explicite (après un CRUD admin) — sans garde de version
     try {
-      const data = await apiFetch<CatalogResponse>("/api/products", { timeoutMs: 4000 });
+      const data = await apiFetch<CatalogResponse>("/api/products", { timeoutMs: 4000, auth: true });
       versionRef.current = data.version;
       setProducts(data.products || []);
       writeCatalogCache(data.products || [], data.version);

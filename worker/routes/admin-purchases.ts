@@ -14,6 +14,7 @@ import {
 } from "../../src/lib/server/fulfillment";
 import {
   PURCHASE_STATUSES,
+  REFUND_STATEMENT_INDEX,
   getAdminPurchaseDetail,
   getPurchaseById,
   isRetryablePurchaseStatus,
@@ -190,6 +191,8 @@ export const adminPurchaseRoutes: App = new Hono<{ Bindings: Env }>()
         purchaseId: purchase.id,
         attempted: outcome.attempted,
         status: outcome.status,
+        // Issue incertaine (délai dépassé/réseau) : relançable, jamais `failed`.
+        uncertain: outcome.uncertain === true,
         error: outcome.error,
       },
     }).run();
@@ -197,7 +200,12 @@ export const adminPurchaseRoutes: App = new Hono<{ Bindings: Env }>()
     const detail = await getAdminPurchaseDetail(db, purchase.id);
     return c.json({ ok: true, purchase: detail ? purchaseToAdminJson(detail) : null });
   })
-  /** Remboursement en A : transaction `adjustment` (clé `refund:<id>`), purchase `refunded`. */
+  /**
+   * Remboursement en A (un seul batch, clé `refund:<id>` — idempotent) :
+   * crédit A + purchase `refunded` + fulfillment `failed`, ET (constat C2)
+   * vente affiliée liée `rejected`, commission non payée `cancelled`, reprise
+   * de la récompense A effectivement versée.
+   */
   .post("/api/admin/purchases/:id/refund", async (c) => {
     const denied = await requireAdmin(c);
     if (denied) return denied;
@@ -225,8 +233,10 @@ export const adminPurchaseRoutes: App = new Hono<{ Bindings: Env }>()
       }),
     ]);
 
-    // results[1] = UPDATE de la purchase : 0 ligne = statut terminal posé entre-temps.
-    if (changesOf(results[1]) === 0) {
+    // UPDATE de la purchase : 0 ligne = statut terminal posé entre-temps.
+    // Le batch contient aussi le rejet de la vente, l'annulation de la
+    // commission non payée et la reprise de la récompense (constat C2).
+    if (changesOf(results[REFUND_STATEMENT_INDEX.purchase]) === 0) {
       return conflict("Statut de l'achat modifié entre-temps.");
     }
 

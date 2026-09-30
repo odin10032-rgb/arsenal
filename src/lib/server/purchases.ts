@@ -16,7 +16,7 @@
  * Style store.ts : fonctions pures recevant D1Database en paramètre.
  */
 
-import { aTransactionStatement } from "./ledger";
+import { aTransactionStatement, guardedDebitStatement, transactionExistsSql } from "./ledger";
 import { getSetting, setSetting } from "./store";
 import { CHARIOW_API_KEY_SETTING } from "./chariow-checkout";
 import {
@@ -26,7 +26,7 @@ import {
   round2,
 } from "./affiliation";
 import type { AffiliateProductRow } from "./affiliation";
-import { computeCommissionAmount, getActiveCampaign, resolveCommissionRule } from "./commissions";
+import { changesOf, computeCommissionAmount, getActiveCampaign, resolveCommissionRule } from "./commissions";
 import { createFulfillmentStatement, normalizeFulfillmentMethod } from "./fulfillment";
 import type { FulfillmentMethod } from "./fulfillment";
 
@@ -324,12 +324,61 @@ export async function getAdminPurchaseDetail(
 }
 
 /* --------------------------- Attribution affiliation --------------------------- */
+/* Le code de parrainage vient du client ; l'attribution est toujours RÉSOLUE
+ * côté serveur (affilié `active`, lien du produit, fenêtre ≤ 30 j) et refusée
+ * si l'acheteur est l'affilié lui-même (auto-affiliation — constat C5). */
+
+/**
+ * Journalise une tentative d'auto-affiliation (constat C5). La traçabilité ne
+ * doit JAMAIS faire échouer l'achat : toute erreur d'écriture est avalée
+ * (log console) et l'achat suit son cours, non attribué.
+ *
+ * INSERT écrit ici volontairement : `securityEventStatement` de user-auth.ts
+ * n'accepte qu'une union FERMÉE d'actions (`SecurityEventAction`) et ce module
+ * est hors du périmètre de la correction — la table, elle, est en texte libre.
+ */
+async function recordSelfAffiliationBlocked(
+  db: D1Database,
+  input: { buyerUserId: string; affiliateId: string; productId: string; linkCode: string }
+): Promise<void> {
+  try {
+    await db
+      .prepare(
+        `INSERT INTO security_events (id, at, actor, action, ip_hash, meta)
+         VALUES (?, ?, ?, 'self_affiliation_blocked', NULL, ?)`
+      )
+      .bind(
+        crypto.randomUUID(),
+        Date.now(),
+        input.buyerUserId,
+        JSON.stringify({
+          affiliateId: input.affiliateId,
+          productId: input.productId,
+          linkCode: input.linkCode,
+        })
+      )
+      .run();
+  } catch (err) {
+    console.error("security_events (self_affiliation_blocked):", err);
+  }
+}
+
+/** Contexte d'attribution : acheteur (contrôle d'auto-affiliation) et instant. */
+export interface PurchaseAttributionContext {
+  /** Utilisateur qui achète (session) — bloque l'auto-affiliation (constat C5). */
+  buyerUserId?: string | null;
+  now?: number;
+}
 
 /**
  * Résout le code de parrainage transmis à l'achat (code de lien `/r/<code>`).
  * Vérifications du contrat : affilié `active`, lien existant, produit
  * correspondant, fenêtre ≤ 30 j. Tout code invalide est IGNORÉ silencieusement
  * (achat non attribué) — aucun message d'erreur, comme pour Chariow.
+ *
+ * AUTO-AFFILIATION REFUSÉE (constat C5) : si l'affilié du code est l'acheteur
+ * lui-même, l'achat reste non attribué (aucune commission, aucune récompense)
+ * et un `security_events` (`self_affiliation_blocked`) est journalisé.
  *
  * La fenêtre de 30 j est matérialisée sur les données serveur disponibles :
  * le lien doit être récent OU avoir reçu un clic récent (le client, lui, ne
@@ -339,16 +388,30 @@ export async function resolvePurchaseAttribution(
   db: D1Database,
   code: string | null | undefined,
   productId: string,
-  now: number = Date.now()
+  context: PurchaseAttributionContext = {}
 ): Promise<PurchaseAttribution | null> {
   const trimmed = (code ?? "").trim();
   if (!trimmed) return null;
+  const now = context.now ?? Date.now();
+  const buyerUserId = context.buyerUserId ?? null;
 
   const link = await getAffiliateLinkByCode(db, trimmed);
   if (!link || link.product_id !== productId) return null;
 
   const affiliate = await getAffiliateById(db, link.affiliate_id);
   if (!affiliate || affiliate.status !== "active") return null;
+
+  // C5 — l'acheteur ne peut pas s'attribuer sa propre commission : même
+  // traitement qu'un code invalide (silencieux), mais TRACÉ.
+  if (buyerUserId && affiliate.user_id === buyerUserId) {
+    await recordSelfAffiliationBlocked(db, {
+      buyerUserId,
+      affiliateId: affiliate.id,
+      productId,
+      linkCode: link.code,
+    });
+    return null;
+  }
 
   if (Number(link.created_at) < now - AFFILIATE_REF_WINDOW_MS) {
     const click = await db
@@ -403,15 +466,24 @@ export interface PurchaseCreation {
   /** Id de la vente affiliée créée (null si achat non attribué). */
   saleId: string | null;
   statements: D1PreparedStatement[];
+  /** Clé d'idempotence du débit conditionnel (`purchase:<id>`). */
+  debitKey: string;
 }
 
 /**
  * Statements d'un achat en A — à exécuter en UN SEUL db.batch :
- * 1. débit A (type `spend`, clé `purchase:<id>`, INSERT OR IGNORE → idempotent) ;
+ * 1. débit A CONDITIONNEL AU SOLDE (type `spend`, clé `purchase:<id>`,
+ *    `INSERT OR IGNORE … SELECT … WHERE SUM(delta) >= prix` → idempotent ET
+ *    impossible à dépasser, même sous concurrence) ;
  * 2. INSERT purchase (`fulfillment_pending`, index unique propriétaire) ;
  * 3. INSERT fulfillment (`pending`) ;
  * 4. si attribué : vente (`source='wallet_purchase'`, `sale_ref='purchase:<id>'`,
  *    devise `A`) + commission `pending` + récompense A (`sale:purchase:<id>`).
+ *
+ * Les statements 2 à 4 sont gardés par `EXISTS(idempotency_key = <clé du débit>)` :
+ * si le débit conditionnel n'a rien écrit (solde insuffisant), RIEN n'est créé
+ * dans le même batch — c'est ce qui rend l'annulation atomique sans second
+ * aller-retour (constat C1 de l'audit).
  */
 export function purchaseStatements(db: D1Database, input: NewPurchaseInput): PurchaseCreation {
   const now = input.now ?? Date.now();
@@ -436,24 +508,30 @@ export function purchaseStatements(db: D1Database, input: NewPurchaseInput): Pur
     refunded_at: null,
   };
 
+  // 1. Débit en A — montant calculé serveur, idempotent par `purchase:<id>` et
+  //    conditionné au solde DANS le SQL (aucun dépassement possible en concurrence).
+  const debit = guardedDebitStatement(db, {
+    userId: input.userId,
+    amount: amountA,
+    type: "spend",
+    label: `Achat — ${String(input.product.title || "").slice(0, 80)}`,
+    refType: "purchase",
+    refId: purchaseId,
+    idempotencyKey: `purchase:${purchaseId}`,
+    now,
+  });
+
   const statements: D1PreparedStatement[] = [
-    // 1. Débit en A — montant calculé serveur, idempotent par `purchase:<id>`.
-    aTransactionStatement(db, {
-      userId: input.userId,
-      delta: -amountA,
-      type: "spend",
-      label: `Achat — ${String(input.product.title || "").slice(0, 80)}`,
-      refType: "purchase",
-      refId: purchaseId,
-      idempotencyKey: `purchase:${purchaseId}`,
-    }),
-    // 2. Purchase (l'index unique partiel fait échouer tout doublon → rollback).
+    debit.statement,
+    // 2. Purchase — écrite SEULEMENT si le débit a eu lieu (sinon rien n'est créé) ;
+    //    l'index unique partiel fait par ailleurs échouer tout doublon → rollback.
     db
       .prepare(
         `INSERT INTO purchases
            (id, user_id, product_id, amount_a, status, affiliate_id, link_code,
             created_at, updated_at, fulfilled_at, refunded_at)
-         VALUES (?, ?, ?, ?, 'fulfillment_pending', ?, ?, ?, ?, NULL, NULL)`
+         SELECT ?, ?, ?, ?, 'fulfillment_pending', ?, ?, ?, ?, NULL, NULL
+          WHERE ${transactionExistsSql()}`
       )
       .bind(
         purchase.id,
@@ -463,10 +541,18 @@ export function purchaseStatements(db: D1Database, input: NewPurchaseInput): Pur
         purchase.affiliate_id,
         purchase.link_code,
         purchase.created_at,
-        purchase.updated_at
+        purchase.updated_at,
+        debit.idempotencyKey
       ),
-    // 3. Fulfillment (une ligne par purchase, relancée sur place).
-    createFulfillmentStatement(db, { id: fulfillmentId, purchaseId, provider, now }),
+    // 3. Fulfillment (une ligne par purchase, relancée sur place) — même garde :
+    //    jamais de ligne de livraison pour un achat non payé.
+    createFulfillmentStatement(db, {
+      id: fulfillmentId,
+      purchaseId,
+      provider,
+      now,
+      requiresDebitKey: debit.idempotencyKey,
+    }),
   ];
 
   const commission = attribution ? (input.commission ?? null) : null;
@@ -475,14 +561,16 @@ export function purchaseStatements(db: D1Database, input: NewPurchaseInput): Pur
     saleId = crypto.randomUUID();
     const saleRef = `purchase:${purchaseId}`;
     // Vente attribuée : même table que le canal Chariow, source `wallet_purchase`,
-    // devise `A` — `sale_ref` unique = idempotence.
+    // devise `A` — `sale_ref` unique = idempotence. Gardée par le débit : jamais
+    // de vente (ni commission, ni récompense) pour un achat non payé.
     statements.push(
       db
         .prepare(
           `INSERT INTO sales
              (id, affiliate_id, product_id, link_id, source, sale_ref, amount, currency,
               state, occurred_at, created_at, confirmed_by, confirmed_at)
-           VALUES (?, ?, ?, ?, 'wallet_purchase', ?, ?, 'A', 'confirmed', ?, ?, 'wallet_purchase', ?)`
+           SELECT ?, ?, ?, ?, 'wallet_purchase', ?, ?, 'A', 'confirmed', ?, ?, 'wallet_purchase', ?
+            WHERE ${transactionExistsSql()}`
         )
         .bind(
           saleId,
@@ -493,7 +581,8 @@ export function purchaseStatements(db: D1Database, input: NewPurchaseInput): Pur
           round2(amountA),
           now,
           now,
-          now
+          now,
+          debit.idempotencyKey
         )
     );
     statements.push(
@@ -502,7 +591,8 @@ export function purchaseStatements(db: D1Database, input: NewPurchaseInput): Pur
           `INSERT OR IGNORE INTO commissions
              (id, sale_id, affiliate_id, amount, currency, rate_percent, state, reward_a,
               created_at, updated_at, payment_id)
-           VALUES (?, ?, ?, ?, 'A', ?, 'pending', ?, ?, ?, NULL)`
+           SELECT ?, ?, ?, ?, 'A', ?, 'pending', ?, ?, ?, NULL
+            WHERE ${transactionExistsSql()}`
         )
         .bind(
           crypto.randomUUID(),
@@ -512,7 +602,8 @@ export function purchaseStatements(db: D1Database, input: NewPurchaseInput): Pur
           commission.ratePercent,
           Math.trunc(commission.rewardA || 0),
           now,
-          now
+          now,
+          debit.idempotencyKey
         )
     );
     if (commission.rewardA > 0) {
@@ -525,25 +616,46 @@ export function purchaseStatements(db: D1Database, input: NewPurchaseInput): Pur
           refType: "sale",
           refId: saleId,
           idempotencyKey: `sale:purchase:${purchaseId}`,
+          requiresTransaction: debit.idempotencyKey,
         })
       );
     }
   }
 
-  return { purchase, fulfillmentId, saleId, statements };
+  return { purchase, fulfillmentId, saleId, statements, debitKey: debit.idempotencyKey };
+}
+
+/** Résultat d'une tentative d'achat : le débit conditionnel a-t-il été écrit ? */
+export interface PurchaseAttempt {
+  creation: PurchaseCreation;
+  /** true = achat créé ; false = solde A insuffisant, RIEN n'a été écrit. */
+  debited: boolean;
 }
 
 /**
  * Exécute l'achat en un seul batch atomique. Toute violation d'unicité
  * (achat déjà actif) fait échouer le batch ENTIER : le débit A est annulé.
+ * Si le débit conditionnel n'a rien écrit (solde insuffisant, y compris face à
+ * deux achats concurrents), `debited` vaut false et l'achat n'existe pas.
+ *
+ * Détection : `meta.changes` du statement 0 (débit conditionnel) — 0 ligne
+ * écrite = solde insuffisant. Repli INDÉPENDANT des métadonnées D1 : on relit
+ * l'existence de la purchase (elle est gardée par `EXISTS` sur ce même débit),
+ * pour ne jamais renvoyer 402 à un acheteur réellement débité.
  */
 export async function createPurchase(
   db: D1Database,
   input: NewPurchaseInput
-): Promise<PurchaseCreation> {
-  const built = purchaseStatements(db, input);
-  await db.batch(built.statements);
-  return built;
+): Promise<PurchaseAttempt> {
+  const creation = purchaseStatements(db, input);
+  const results = await db.batch(creation.statements);
+  if (changesOf(results[0]) === 1) return { creation, debited: true };
+
+  const created = await db
+    .prepare("SELECT id FROM purchases WHERE id = ?")
+    .bind(creation.purchase.id)
+    .first<{ id: string }>();
+  return { creation, debited: Boolean(created) };
 }
 
 /* -------------------------------- Remboursement -------------------------------- */
@@ -555,10 +667,40 @@ export interface RefundOptions {
 }
 
 /**
- * Statements d'un remboursement en A :
+ * Positions des statements de `refundStatements` — l'appelant lit les
+ * `meta.changes` de l'UPDATE de la purchase (`statementIndex.purchase` : 0 ligne
+ * = statut terminal posé entre-temps).
+ */
+export const REFUND_STATEMENT_INDEX = {
+  /** Crédit A (`adjustment` positif, clé `refund:<id>`). */
+  credit: 0,
+  /** purchase → `refunded` (garde : statut non terminal). */
+  purchase: 1,
+  /** fulfillment → `failed`. */
+  fulfillment: 2,
+  /** vente affiliée liée → `rejected`. */
+  sale: 3,
+  /** commission non payée → `cancelled`. */
+  commission: 4,
+  /** reprise de la récompense A effectivement versée. */
+  reward: 5,
+} as const;
+
+/**
+ * Statements d'un remboursement en A (un seul db.batch) :
  * 1. transaction `adjustment` POSITIVE, clé `refund:<id>` (idempotente) ;
  * 2. purchase → `refunded` (garde `status NOT IN ('refunded','cancelled')`) ;
- * 3. fulfillment → `failed` (le message d'erreur d'origine est conservé).
+ * 3. fulfillment → `failed` (le message d'erreur d'origine est conservé) ;
+ * 4. vente liée (`sale_ref='purchase:<id>'`) → `rejected` — un achat remboursé
+ *    n'est plus une vente confirmée (constat C2 de l'audit) ;
+ * 5. commission de cette vente → `cancelled` SI elle n'est pas déjà payée
+ *    (`pending`/`validated`/`payable` — jamais `paid`) ;
+ * 6. reprise de la récompense A effectivement versée à l'affilié
+ *    (`adjustment` négative, clé `refund-reward:<id>`) : sans cela, un cycle
+ *    achat → remboursement → réachat recréerait commission + récompense à volonté.
+ *    Le montant repris est celui RÉELLEMENT crédité (relu dans le ledger), pas
+ *    le montant théorique de la règle de commission.
+ * Toutes les écritures sont idempotentes (gardes d'état + clés d'idempotence).
  */
 export function refundStatements(
   db: D1Database,
@@ -567,6 +709,7 @@ export function refundStatements(
 ): D1PreparedStatement[] {
   const now = options.now ?? Date.now();
   const amountA = Math.trunc(Number(purchase.amount_a) || 0);
+  const saleRef = `purchase:${purchase.id}`;
   const reason =
     typeof options.reason === "string" && options.reason.trim()
       ? options.reason.trim().slice(0, 300)
@@ -594,13 +737,53 @@ export function refundStatements(
         "UPDATE fulfillments SET status = 'failed', last_error = COALESCE(last_error, ?) WHERE purchase_id = ?"
       )
       .bind(reason ? `Achat remboursé — ${reason}` : "Achat remboursé.", purchase.id),
+    // 4. Vente liée : plus jamais « confirmed » après remboursement.
+    db
+      .prepare(
+        "UPDATE sales SET state = 'rejected' WHERE sale_ref = ? AND state IN ('pending','confirmed')"
+      )
+      .bind(saleRef),
+    // 5. Commission de la vente : annulée tant qu'elle n'est pas payée. `payable`
+    //    est inclus — c'est l'état juste avant paiement, donc le cas de risque
+    //    principal du constat C2 — et la machine à états l'autorise
+    //    (`payable → cancelled`). Une commission `paid` n'est JAMAIS touchée :
+    //    l'argent est déjà sorti (l'audit l'interdit explicitement).
+    db
+      .prepare(
+        `UPDATE commissions
+            SET state = 'cancelled', updated_at = ?
+          WHERE sale_id IN (SELECT id FROM sales WHERE sale_ref = ?)
+            AND state IN ('pending','validated','payable')`
+      )
+      .bind(now, saleRef),
+    // 6. Reprise de la récompense A : montant = delta RÉELLEMENT crédité
+    //    (transaction `reward` de la clé `sale:purchase:<id>`), rien si absente.
+    db
+      .prepare(
+        `INSERT OR IGNORE INTO a_transactions
+           (id, user_id, delta, type, label, ref_type, ref_id, idempotency_key, created_at)
+         SELECT ?, reward.user_id, -reward.delta, 'adjustment', ?, 'purchase', ?, ?, ?
+           FROM a_transactions AS reward
+          WHERE reward.idempotency_key = ?
+            AND reward.type = 'reward'
+            AND reward.delta > 0`
+      )
+      .bind(
+        crypto.randomUUID(),
+        "Ajustement — achat remboursé",
+        purchase.id,
+        `refund-reward:${purchase.id}`,
+        now,
+        `sale:purchase:${purchase.id}`
+      ),
   ];
 }
 
 /**
  * Rembourse un achat (le solde A de l'utilisateur remonte de `amount_a`).
- * Retourne les résultats du batch : l'index 1 est l'UPDATE de la purchase
- * (0 ligne = statut déjà terminal, course détectée par l'appelant).
+ * Retourne les résultats du batch : `REFUND_STATEMENT_INDEX.purchase` est
+ * l'UPDATE de la purchase (0 ligne = statut déjà terminal, course détectée par
+ * l'appelant).
  */
 export async function refundPurchase(
   db: D1Database,

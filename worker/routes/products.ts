@@ -55,7 +55,8 @@ function normalize(body: Record<string, unknown>): { errors: string[]; data: Par
     videoUrl: sanitizeUrl(body.videoUrl) || null,
     imageUrl: sanitizeUrl(body.imageUrl) || "",
     ...normalizeAffiliation(body),
-    ...normalizePurchaseFields(body),
+    // Création : aucun champ de vente en A préexistant (défauts du contrat).
+    ...normalizePurchaseFields(body, errors),
   };
   if (!data.imageUrl) errors.push("Une image de couverture est requise.");
   return { errors, data };
@@ -78,25 +79,79 @@ function normalizeAffiliation(body: Record<string, unknown>): Partial<Product> {
 const PRICE_A_MAX = 1_000_000;
 const CHARIOW_PRODUCT_ID_MAX = 120;
 
+/* Champs de vente en A : chacun est lu séparément — ABSENT du corps ⇒ valeur
+ * existante PRÉSERVÉE en modification (PUT), défaut du contrat en création. */
+
+function priceAOf(body: Record<string, unknown>, existing?: Partial<Product>): number {
+  const raw = body.priceA === undefined ? Number(existing?.priceA ?? 0) : Number(body.priceA);
+  return Number.isFinite(raw) && raw >= 0 && raw <= PRICE_A_MAX ? Math.trunc(raw) : 0;
+}
+
+function purchasableOf(body: Record<string, unknown>, existing?: Partial<Product>): boolean {
+  if (body.purchasable === undefined) return existing?.purchasable === true;
+  return body.purchasable === true || body.purchasable === 1 || body.purchasable === "1";
+}
+
+function chariowProductIdOf(body: Record<string, unknown>, existing?: Partial<Product>): string | null {
+  if (body.chariowProductId === undefined) return existing?.chariowProductId ?? null;
+  const raw = typeof body.chariowProductId === "string" ? body.chariowProductId.trim() : "";
+  return raw && raw.length <= CHARIOW_PRODUCT_ID_MAX ? raw : null;
+}
+
+function fulfillmentMethodOf(
+  body: Record<string, unknown>,
+  existing?: Partial<Product>
+): Product["fulfillmentMethod"] {
+  if (body.fulfillmentMethod === undefined) return existing?.fulfillmentMethod ?? "manual";
+  return body.fulfillmentMethod === "chariow_free_checkout" ? "chariow_free_checkout" : "manual";
+}
+
 /**
  * Champs de vente en A (Phase 2.6) — validés dans les bornes du contrat :
  * `priceA` entier 0…1 000 000, `purchasable` booléen, `chariowProductId`
  * chaîne ≤ 120 caractères, `fulfillmentMethod` ∈ manual | chariow_free_checkout.
- * INVARIANT : un produit achetable a un prix en A strictement positif (sinon
- * `purchasable` est ramené à false — le contrat exige « price_a > 0 si purchasable »).
+ *
+ * INVARIANTS :
+ * - `purchasable` exige `priceA > 0` (sinon ramené à false — contrat
+ *   « price_a > 0 si purchasable ») ;
+ * - `chariow_free_checkout` exige un `chariowProductId` non vide (constat C7 :
+ *   sans lui, chaque achat échouerait en configuration… en débitant les A) ;
+ * - en MODIFICATION, tout champ de vente en A absent du corps est PRÉSERVÉ
+ *   (au lieu d'être silencieusement réinitialisé — constat C7).
  */
-function normalizePurchaseFields(body: Record<string, unknown>): Partial<Product> {
-  const rawPrice = Number(body.priceA);
-  const priceA =
-    Number.isFinite(rawPrice) && rawPrice >= 0 && rawPrice <= PRICE_A_MAX ? Math.trunc(rawPrice) : 0;
-  const requested =
-    body.purchasable === true || body.purchasable === 1 || body.purchasable === "1";
-  const rawProductId = typeof body.chariowProductId === "string" ? body.chariowProductId.trim() : "";
-  const chariowProductId =
-    rawProductId && rawProductId.length <= CHARIOW_PRODUCT_ID_MAX ? rawProductId : null;
-  const fulfillmentMethod: Product["fulfillmentMethod"] =
-    body.fulfillmentMethod === "chariow_free_checkout" ? "chariow_free_checkout" : "manual";
-  return { purchasable: requested && priceA > 0, priceA, chariowProductId, fulfillmentMethod };
+function normalizePurchaseFields(
+  body: Record<string, unknown>,
+  errors: string[],
+  existing?: Partial<Product>
+): Partial<Product> {
+  const priceA = priceAOf(body, existing);
+  const chariowProductId = chariowProductIdOf(body, existing);
+  const fulfillmentMethod = fulfillmentMethodOf(body, existing);
+  const purchasable = purchasableOf(body, existing) && priceA > 0;
+  if (purchasable && fulfillmentMethod === "chariow_free_checkout" && !chariowProductId) {
+    errors.push(
+      "Identifiant produit Chariow requis : un produit achetable avec livraison automatique " +
+        "(fulfillmentMethod « chariow_free_checkout ») doit avoir un chariowProductId."
+    );
+  }
+  return { purchasable, priceA, chariowProductId, fulfillmentMethod };
+}
+
+/**
+ * Catalogue PUBLIC : `chariowProductId` est un identifiant d'intégration
+ * interne (constat C9 de l'audit) — il n'est renvoyé qu'aux requêtes admin
+ * authentifiées (X-Admin-Auth), dont le formulaire produit a besoin pour
+ * éditer un produit `chariow_free_checkout`.
+ *
+ * DEUX clés à retirer : `getProducts()` étale la ligne SQL brute puis ajoute
+ * les alias camelCase, donc la valeur existe aussi en `chariow_product_id`
+ * (fuite constatée en test).
+ */
+function withoutIntegrationId(product: Product): Omit<Product, "chariowProductId"> {
+  const copy: Record<string, unknown> = { ...product };
+  delete copy.chariowProductId;
+  delete copy.chariow_product_id;
+  return copy as Omit<Product, "chariowProductId">;
 }
 
 export const productRoutes: App = new Hono<{ Bindings: Env }>()
@@ -106,15 +161,17 @@ export const productRoutes: App = new Hono<{ Bindings: Env }>()
       getProducts(c.env.DB),
       getAnalytics(c.env.DB),
     ]);
+    const isAdminRequest = await isAdmin(c.req.raw, c.env);
     const merged = products.map((p) => ({
       ...p,
       clicks: p.clicks + (analytics.clicksByProduct[p.id] || 0),
     }));
+    const visible = isAdminRequest ? merged : merged.map(withoutIntegrationId);
     return c.json({
       ok: true,
       version: catalogVersion(products, analytics.clicksByProduct),
-      count: merged.length,
-      products: merged,
+      count: visible.length,
+      products: visible,
     });
   })
 
@@ -167,6 +224,14 @@ export const productRoutes: App = new Hono<{ Bindings: Env }>()
     const index = products.findIndex((p) => p.id === id);
     if (index === -1) return c.json({ ok: false, error: "Produit introuvable." }, 404);
 
+    // Champs de vente en A : validés dans les bornes du contrat, PRÉSERVÉS quand
+    // le corps ne les contient pas (constat C7), et invariants vérifiés.
+    const purchaseErrors: string[] = [];
+    const purchaseFields = normalizePurchaseFields(body, purchaseErrors, products[index]);
+    if (purchaseErrors.length) {
+      return c.json({ ok: false, error: purchaseErrors.join(" ") }, 400);
+    }
+
     const updated: Product = {
       ...products[index],
       title,
@@ -185,7 +250,7 @@ export const productRoutes: App = new Hono<{ Bindings: Env }>()
       videoUrl: sanitizeUrl(body.videoUrl) || null,
       imageUrl: sanitizeUrl(body.imageUrl) || products[index].imageUrl,
       ...normalizeAffiliation(body),
-      ...normalizePurchaseFields(body),
+      ...purchaseFields,
       updatedAt: Date.now(),
     };
 
