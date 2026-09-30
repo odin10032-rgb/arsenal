@@ -10,6 +10,10 @@ import { userAuthRoutes } from "./routes/user-auth";
 import { meRoutes } from "./routes/me";
 import { adminRoutes } from "./routes/admin";
 import { mediaRoutes } from "./routes/media";
+import { affiliateRoutes } from "./routes/affiliate";
+import { affiliateTrackRoutes } from "./routes/affiliate-track";
+import { chariowWebhookRoutes } from "./routes/chariow-webhook";
+import { adminAffiliationRoutes } from "./routes/admin-affiliation";
 import { rateLimit } from "./middleware/rate-limit";
 
 const DEFAULT_FRONT_ORIGINS = [
@@ -50,6 +54,12 @@ app.use("/api/auth/login", rateLimit({ limit: 10, windowMs: 60_000, label: "logi
 app.use("/api/auth/register", rateLimit({ limit: 3, windowMs: 60_000, label: "register" }));
 app.use("/api/auth/session", rateLimit({ limit: 10, windowMs: 60_000, label: "user-session" }));
 app.use("/api/track", rateLimit({ limit: 120, windowMs: 60_000, label: "track" }));
+// Phase 2 — affiliation : clic public 60/min/IP, candidature 5/min/IP (contrat).
+app.use(
+  "/api/track/affiliate-click",
+  rateLimit({ limit: 60, windowMs: 60_000, label: "affiliate-click" })
+);
+app.use("/api/affiliate/apply", rateLimit({ limit: 5, windowMs: 60_000, label: "affiliate-apply" }));
 
 app.route("/", healthRoutes);
 app.route("/", productRoutes);
@@ -60,6 +70,10 @@ app.route("/", userAuthRoutes);
 app.route("/", meRoutes);
 app.route("/", adminRoutes);
 app.route("/", mediaRoutes);
+app.route("/", affiliateRoutes);
+app.route("/", affiliateTrackRoutes);
+app.route("/", chariowWebhookRoutes);
+app.route("/", adminAffiliationRoutes);
 
 app.notFound((c) => c.json({ ok: false, error: "Route introuvable." }, 404));
 

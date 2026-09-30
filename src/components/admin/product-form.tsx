@@ -32,6 +32,15 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
   const [command, setCommand] = useState(product?.command ?? "");
   const [videoUrl, setVideoUrl] = useState(product?.videoUrl ?? "");
   const [imageUrl, setImageUrl] = useState(product?.imageUrl ?? "");
+  // Affiliation (Phase 2)
+  const [affiliateEnabled, setAffiliateEnabled] = useState(product?.affiliateEnabled ?? false);
+  const [commissionType, setCommissionType] = useState<"percent" | "fixed">(
+    product?.commissionType === "fixed" ? "fixed" : "percent",
+  );
+  const [commissionValue, setCommissionValue] = useState(
+    product?.commissionValue != null ? String(product.commissionValue) : "",
+  );
+  const [rewardA, setRewardA] = useState(product?.rewardA != null ? String(product.rewardA) : "");
 
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -90,6 +99,13 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
       command: actionType === "terminal" ? command.trim() || null : null,
       videoUrl: safeUrl(videoUrl) || null,
       imageUrl: safeUrl(imageUrl),
+      affiliateEnabled,
+      commissionType: affiliateEnabled ? commissionType : null,
+      commissionValue:
+        affiliateEnabled && commissionValue.trim() !== "" && Number.isFinite(Number(commissionValue))
+          ? Number(commissionValue)
+          : null,
+      rewardA: affiliateEnabled && rewardA.trim() !== "" ? Math.trunc(Number(rewardA)) || 0 : 0,
     };
     try {
       if (product) {
@@ -341,6 +357,67 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
               )}
             </div>
           </Field>
+
+          {/* Affiliation (Phase 2) — commission et récompense A du produit */}
+          <div className="rounded-xl border border-[#333] bg-[rgba(255,255,255,0.02)] p-4">
+            <label className="flex cursor-pointer items-center justify-between gap-3">
+              <span className="text-[0.84rem] font-semibold">Produit éligible à l'affiliation</span>
+              <input
+                type="checkbox"
+                checked={affiliateEnabled}
+                onChange={(e) => setAffiliateEnabled(e.target.checked)}
+                className="h-5 w-5 accent-[#e63946]"
+              />
+            </label>
+            <p className="mt-1 text-[0.72rem] text-[#666]">
+              Les affiliés actifs pourront créer un lien de suivi vers ce produit.
+            </p>
+
+            {affiliateEnabled && (
+              <div className="mt-4 flex flex-col gap-3 border-t border-dashed border-[#333] pt-4">
+                <div className="flex gap-3">
+                  <label className="flex-1">
+                    <span className="mb-1.5 block text-[0.8rem] text-[#a0a0a0]">Type de commission</span>
+                    <select
+                      className="input-arsenal cursor-pointer"
+                      value={commissionType}
+                      onChange={(e) => setCommissionType(e.target.value as "percent" | "fixed")}
+                    >
+                      <option value="percent">Pourcentage du prix</option>
+                      <option value="fixed">Montant fixe</option>
+                    </select>
+                  </label>
+                  <label className="flex-1">
+                    <span className="mb-1.5 block text-[0.8rem] text-[#a0a0a0]">
+                      {commissionType === "percent" ? "Commission (%)" : "Commission (FCFA)"}
+                    </span>
+                    <input
+                      className="input-arsenal font-mono"
+                      inputMode="decimal"
+                      value={commissionValue}
+                      onChange={(e) => setCommissionValue(e.target.value)}
+                      placeholder={commissionType === "percent" ? "30" : "5000"}
+                    />
+                  </label>
+                </div>
+                <label>
+                  <span className="mb-1.5 block text-[0.8rem] text-[#a0a0a0]">
+                    Récompense en A par vente <span className="text-[#666]">(optionnel)</span>
+                  </span>
+                  <input
+                    className="input-arsenal font-mono"
+                    inputMode="numeric"
+                    value={rewardA}
+                    onChange={(e) => setRewardA(e.target.value)}
+                    placeholder="50"
+                  />
+                </label>
+                <p className="text-[0.72rem] text-[#666]">
+                  Laissez vide pour utiliser les valeurs par défaut d'Arsenal (définies dans les réglages).
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Pied */}

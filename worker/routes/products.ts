@@ -54,9 +54,23 @@ function normalize(body: Record<string, unknown>): { errors: string[]; data: Par
     command: body.command ? String(body.command).trim().slice(0, 500) : null,
     videoUrl: sanitizeUrl(body.videoUrl) || null,
     imageUrl: sanitizeUrl(body.imageUrl) || "",
+    ...normalizeAffiliation(body),
   };
   if (!data.imageUrl) errors.push("Une image de couverture est requise.");
   return { errors, data };
+}
+
+/** Champs d'affiliation (Phase 2) — validés, jamais imposés par le client au-delà de ces bornes. */
+function normalizeAffiliation(body: Record<string, unknown>): Partial<Product> {
+  const enabled = body.affiliateEnabled === true || body.affiliateEnabled === 1 || body.affiliateEnabled === "1";
+  const rawType = String(body.commissionType || "");
+  const commissionType = rawType === "percent" || rawType === "fixed" ? rawType : null;
+  const rawValue = Number(body.commissionValue);
+  const commissionValue =
+    Number.isFinite(rawValue) && rawValue >= 0 && rawValue <= 1_000_000 ? rawValue : null;
+  const rawReward = Number(body.rewardA);
+  const rewardA = Number.isFinite(rawReward) && rawReward >= 0 && rawReward <= 100_000 ? Math.trunc(rawReward) : 0;
+  return { affiliateEnabled: enabled, commissionType, commissionValue, rewardA };
 }
 
 export const productRoutes: App = new Hono<{ Bindings: Env }>()
@@ -144,6 +158,7 @@ export const productRoutes: App = new Hono<{ Bindings: Env }>()
       command: body.command ? String(body.command).trim().slice(0, 500) : null,
       videoUrl: sanitizeUrl(body.videoUrl) || null,
       imageUrl: sanitizeUrl(body.imageUrl) || products[index].imageUrl,
+      ...normalizeAffiliation(body),
       updatedAt: Date.now(),
     };
 

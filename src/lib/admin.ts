@@ -4,6 +4,7 @@
  */
 
 import { apiFetch, ApiError } from "./api";
+import type { AffiliateStatus } from "./affiliate";
 import { Product } from "./products";
 
 /** sha256 hex (crypto.subtle) — le token admin est le hash du mot de passe */
@@ -108,6 +109,105 @@ export async function uploadImage(file: File): Promise<string> {
     if (e instanceof ApiError && e.status === 401) throw e; // session expirée : bloquant
   }
   return compressImage(file);
+}
+
+/* ============================================================
+   Phase 2 — affiliation (contrat : docs/chantier/05-contrat-api-phase2.md)
+   ============================================================ */
+
+/** Filtre de la liste admin des affiliés */
+export type AffiliateStatusFilter = "all" | "pending" | "active" | "suspended";
+
+/** Ligne de GET /api/admin/affiliates (user pseudo/email + stats + dates) */
+export interface AdminAffiliate {
+  id: string;
+  code: string;
+  status: AffiliateStatus;
+  pseudo: string;
+  email: string;
+  clicks: number;
+  sales: number;
+  payable: number;
+  paid: number;
+  appliedAt: number | null;
+  activatedAt: number | null;
+}
+
+const affiliateNum = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+const affiliateStr = (v: unknown): string => (typeof v === "string" ? v : "");
+const affiliateTs = (v: unknown): number | null => (typeof v === "number" ? v : null);
+
+/**
+ * GET /api/admin/affiliates?status= — liste avec user (pseudo/email), code, statut,
+ * clics, ventes, commissions (payable/payé) et dates.
+ * Tolérant sur la forme du pseudo/email (plat ou nested `user`) : seule la mise en
+ * forme est normalisée, aucune valeur n'est inventée.
+ */
+export async function fetchAdminAffiliates(
+  status: AffiliateStatusFilter = "all",
+): Promise<AdminAffiliate[]> {
+  const query = status === "all" ? "" : `?status=${encodeURIComponent(status)}`;
+  const res = await apiFetch<{ ok: boolean; affiliates?: unknown[] }>(
+    `/api/admin/affiliates${query}`,
+    { auth: true, timeoutMs: 6000 },
+  );
+  return (res.affiliates || []).map((raw) => {
+    const item = (raw || {}) as Record<string, unknown> & {
+      user?: { pseudo?: unknown; email?: unknown } | null;
+    };
+    return {
+      id: affiliateStr(item.id),
+      code: affiliateStr(item.code),
+      status:
+        item.status === "active" || item.status === "suspended"
+          ? (item.status as AdminAffiliate["status"])
+          : "pending",
+      pseudo: affiliateStr(item.pseudo) || affiliateStr(item.user?.pseudo),
+      email: affiliateStr(item.email) || affiliateStr(item.user?.email),
+      clicks: affiliateNum(item.clicks),
+      sales: affiliateNum(item.sales),
+      payable: affiliateNum(item.payable ?? item.commissionsPayable),
+      paid: affiliateNum(item.paid ?? item.commissionsPaid),
+      appliedAt: affiliateTs(item.appliedAt),
+      activatedAt: affiliateTs(item.activatedAt),
+    };
+  });
+}
+
+/**
+ * POST /api/admin/affiliates/:id/status — `pending→active` (pose le rôle affilié),
+ * `active→suspended`, `suspended→active`.
+ */
+export async function setAffiliateStatus(
+  id: string,
+  status: "active" | "suspended",
+  reason?: string,
+): Promise<void> {
+  await apiFetch(`/api/admin/affiliates/${encodeURIComponent(id)}/status`, {
+    method: "POST",
+    body: reason ? { status, reason } : { status },
+    auth: true,
+    timeoutMs: 8000,
+  });
+}
+
+/**
+ * POST /api/admin/sales — repli admin : enregistre une vente confirmée + commission
+ * en attente (409 si la référence existe déjà). `affiliateCode` est le code public.
+ */
+export async function createManualSale(data: {
+  affiliateCode: string;
+  productId: string;
+  saleRef: string;
+  amount: number;
+  currency?: string;
+}): Promise<void> {
+  await apiFetch("/api/admin/sales", {
+    method: "POST",
+    body: data,
+    auth: true,
+    timeoutMs: 8000,
+  });
 }
 
 /** Repli local : canvas max 1100px, JPEG q 0.82 → data URL */

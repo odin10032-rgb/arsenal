@@ -61,7 +61,13 @@ export interface PublicUser {
   createdAt: number;
 }
 
-export type SecurityEventAction = "register" | "user_login_ok" | "user_login_fail" | "logout";
+export type SecurityEventAction =
+  | "register"
+  | "user_login_ok"
+  | "user_login_fail"
+  | "logout"
+  /** Phase 2 : mutations administrateur (`admin_affiliate_status`, `admin_sale_create`, …). */
+  | `admin_${string}`;
 
 export interface SecurityEventInput {
   /** user_id, "admin" ou null. */

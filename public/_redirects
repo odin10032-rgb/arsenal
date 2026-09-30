@@ -2,3 +2,7 @@
 # /produit/<id> sert la page produit ; l'id est lu depuis le hash (#<id>)
 # par la page elle-même (les rewrites Pages ne transmettent pas les query).
 /produit/* /produit/index.html 200
+
+# Liens affiliés (contrat Phase 2) : /r/<linkCode> → page de redirection,
+# le code est transmis en query (le rewrite ne conserve pas le chemin).
+/r/*  /r/index.html?code=:splat  200

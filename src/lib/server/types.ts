@@ -16,6 +16,11 @@ export interface Product {
   clicks: number;
   createdAt: number;
   updatedAt: number;
+  /* --- Affiliation (Phase 2) --- */
+  affiliateEnabled?: boolean;
+  commissionType?: "percent" | "fixed" | null;
+  commissionValue?: number | null;
+  rewardA?: number;
 }
 
 export interface Analytics {

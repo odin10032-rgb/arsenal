@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { AffiliateLink } from "./account/affiliate-link";
 import { BalancePill } from "./account/balance-pill";
 import { BrandLogo } from "./brand-logo";
 
 /**
- * En-tête commun — logo clé + marque + pill de solde A + accès admin discret
+ * En-tête commun — logo clé + marque + pill de solde A
+ * (+ lien discret « Affilié » pour les sessions affilié/super affilié) + accès admin discret
  */
 export function SiteHeader() {
   return (
@@ -17,6 +19,7 @@ export function SiteHeader() {
         </Link>
 
         <div className="flex flex-shrink-0 items-center gap-1.5">
+          <AffiliateLink />
           <BalancePill />
           <Link
             href="/admin"

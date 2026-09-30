@@ -29,7 +29,11 @@ export async function getProducts(db: D1Database): Promise<Product[]> {
     videoUrl: p.video_url || null,
     imageUrl: p.image_url,
     createdAt: Number(p.created_at),
-    updatedAt: Number(p.updated_at)
+    updatedAt: Number(p.updated_at),
+    affiliateEnabled: Number(p.affiliate_enabled) === 1,
+    commissionType: p.commission_type || null,
+    commissionValue: p.commission_value === null || p.commission_value === undefined ? null : Number(p.commission_value),
+    rewardA: Number(p.reward_a || 0),
   }));
 }
 
@@ -37,13 +41,15 @@ export async function saveProducts(db: D1Database, products: Product[]): Promise
   const batch = products.map(p =>
     db.prepare(`
       INSERT OR REPLACE INTO products
-      (id, title, short_description, description, category, action_type, badges, price, action_url, apk_url, pwa_url, command, video_url, image_url, clicks, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, title, short_description, description, category, action_type, badges, price, action_url, apk_url, pwa_url, command, video_url, image_url, clicks, created_at, updated_at, affiliate_enabled, commission_type, commission_value, reward_a)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       p.id, p.title, p.shortDescription, p.description, p.category,
       p.actionType, JSON.stringify(p.badges), p.price, p.actionUrl,
       p.apkUrl || null, p.pwaUrl || null, p.command || null,
-      p.videoUrl || null, p.imageUrl, p.clicks, p.createdAt, p.updatedAt
+      p.videoUrl || null, p.imageUrl, p.clicks, p.createdAt, p.updatedAt,
+      p.affiliateEnabled ? 1 : 0, p.commissionType || null,
+      p.commissionValue ?? null, p.rewardA ?? 0
     )
   );
   await db.batch(batch);
