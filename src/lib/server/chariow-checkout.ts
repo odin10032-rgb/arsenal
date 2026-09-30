@@ -38,6 +38,12 @@ export interface ChariowCheckoutInput {
   email: string;
   firstName?: string | null;
   lastName?: string | null;
+  /**
+   * Téléphone — **exigé par l'API Chariow** (vérifié le 30/09 : 422 sans lui).
+   * `country_code` doit être un code ISO à 2 lettres (« CI »), pas « +225 ».
+   */
+  phoneNumber?: string | null;
+  phoneCountry?: string | null;
   /** `custom_metadata.arsenal_purchase` = id de la purchase Arsenal. */
   arsenalPurchase: string;
   /** `custom_metadata.arsenal_user` = id de l'utilisateur Arsenal. */
@@ -148,6 +154,14 @@ export async function createChariowCheckout(
   const lastName = (input.lastName ?? "").trim();
   if (firstName) payload.first_name = firstName;
   if (lastName) payload.last_name = lastName;
+
+  // Le téléphone est OBLIGATOIRE côté Chariow (contrainte du prestataire vérifiée
+  // en conditions réelles) ; sans lui la requête échoue en 422.
+  const phoneNumber = (input.phoneNumber ?? "").trim();
+  const phoneCountry = (input.phoneCountry ?? "").trim().toUpperCase();
+  if (phoneNumber && phoneCountry) {
+    payload.phone = { number: phoneNumber, country_code: phoneCountry };
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), CHARIOW_TIMEOUT_MS);

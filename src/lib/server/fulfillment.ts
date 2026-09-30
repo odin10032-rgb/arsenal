@@ -30,6 +30,7 @@
  */
 
 import { createChariowCheckout, readChariowApiKey } from "./chariow-checkout";
+import { getSetting } from "./store";
 import type { PurchaseRow } from "./purchases";
 
 /* -------------------------------- Constantes -------------------------------- */
@@ -140,12 +141,20 @@ async function readFulfillmentProduct(
   return row ?? null;
 }
 
-async function readUserEmail(db: D1Database, userId: string): Promise<string> {
+/**
+ * Identité transmise au prestataire : email (porte l'accès) et pseudo (Arsenal
+ * ne collecte ni nom ni prénom — le pseudo sert de prénom côté Chariow, qui
+ * exige `first_name`/`last_name`, et un libellé neutre complète le nom).
+ */
+async function readUserIdentity(
+  db: D1Database,
+  userId: string
+): Promise<{ email: string; pseudo: string }> {
   const row = await db
-    .prepare("SELECT email FROM users WHERE id = ?")
+    .prepare("SELECT email, pseudo FROM users WHERE id = ?")
     .bind(userId)
-    .first<{ email: string }>();
-  return (row?.email ?? "").trim();
+    .first<{ email: string; pseudo: string }>();
+  return { email: (row?.email ?? "").trim(), pseudo: (row?.pseudo ?? "").trim() };
 }
 
 /**
@@ -396,13 +405,28 @@ export async function fulfillPurchase(
     return configFailure("Produit Chariow non configuré (chariow_product_id manquant).");
   }
 
-  const email = await readUserEmail(db, purchase.user_id);
+  const { email, pseudo } = await readUserIdentity(db, purchase.user_id);
   if (!email) return configFailure("Email de l'acheteur introuvable.");
+
+  // Téléphone exigé par l'API Chariow : réglages `chariow_default_phone` /
+  // `chariow_default_phone_country` (code ISO 2 lettres, ex. « CI »). Le champ
+  // est une contrainte du prestataire de livraison, pas une donnée Arsenal.
+  const [phoneSetting, phoneCountrySetting, lastNameSetting] = await Promise.all([
+    getSetting(db, "chariow_default_phone"),
+    getSetting(db, "chariow_default_phone_country"),
+    getSetting(db, "chariow_default_last_name"),
+  ]);
 
   const result = await createChariowCheckout({
     apiKey,
     productId: chariowProductId,
     email,
+    // `first_name`/`last_name` sont exigés par Chariow : le pseudo fait office
+    // de prénom, le nom reste neutre (Arsenal ne collecte pas l'état civil).
+    firstName: pseudo || "Membre",
+    lastName: lastNameSetting || "Arsenal",
+    phoneNumber: phoneSetting,
+    phoneCountry: phoneCountrySetting,
     arsenalPurchase: purchase.id,
     arsenalUser: purchase.user_id,
   });

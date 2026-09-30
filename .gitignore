@@ -75,3 +75,4 @@ TESTING_GUIDE.md
 .dev.vars
 .wrangler-out/
 .prod-backup/
+.chariow-stores.local.json
