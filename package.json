@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "next dev -p 3001",
     "build": "next build",
-    "deploy": "npx wrangler pages deploy .vercel/output/static",
+    "deploy": "npx wrangler pages deploy out --project-name=arsenal-tools --branch=main",
     "lint": "eslint ."
   },
   "overrides": {

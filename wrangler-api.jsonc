@@ -8,9 +8,13 @@
     {
       "binding": "DB",
       "database_name": "arsenal",
-      "database_id": "484b6903-bd1d-4e1d-8115-6a4dfc31d57f"
+      "database_id": "484b6903-bd1d-4e1d-8115-6a4dfc31d57f",
+      "migrations_dir": "migrations"
     }
   ],
+  "vars": {
+    "FRONT_ORIGINS": "https://arsenal-tools.pages.dev,https://arsenal-v3-preview.pages.dev"
+  },
   "observability": {
     "enabled": true
   }

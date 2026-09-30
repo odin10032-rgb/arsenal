@@ -64,3 +64,13 @@ server.log
 .DS_Store
 prod-base/
 TESTING_GUIDE.md
+
+# Artefacts et boilerplates retirés du suivi (chantier v1)
+/deploy.zip
+/prisma/
+/data/
+/db/
+/mini-services/
+*.bak
+.dev.vars
+.wrangler-out/

@@ -1,30 +1,45 @@
 /**
- * Arsenal — Authentification admin
- * Token = sha256(mot de passe). Envoyé par le client dans l'en-tête X-Admin-Auth.
+ * Arsenal — Authentification admin.
+ * Token = sha256(mot de passe), transmis via l'en-tête X-Admin-Auth.
+ * NOTE chantier : schéma conservé pour compatibilité totale avec le front en
+ * prod ; remplacé par des sessions utilisateurs en Phase 1
+ * (voir docs/chantier/01-plan-chantier.md).
  */
-import { createHash } from "crypto";
+import { createHash } from "node:crypto";
 import { getConfig } from "./store";
 
-export const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+interface AdminEnv {
+  DB: D1Database;
+  ADMIN_PASSWORD?: string;
+}
 
 export function sha256hex(input: string): string {
   return createHash("sha256").update(input, "utf-8").digest("hex");
 }
 
-export async function getAdminToken(): Promise<string> {
-  const config = await getConfig();
-  if (!DEFAULT_ADMIN_PASSWORD) {
+/** Comparaison à temps constant (évite les fuites de timing sur le token). */
+export function timingSafeEqualStr(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
+export async function getAdminToken(env: AdminEnv): Promise<string> {
+  const config = await getConfig(env.DB);
+  const envPassword = env.ADMIN_PASSWORD ?? process.env.ADMIN_PASSWORD;
+  if (!config.adminToken && !envPassword) {
     throw new Error("ADMIN_PASSWORD must be set in environment variables");
   }
-  return config.adminToken || sha256hex(DEFAULT_ADMIN_PASSWORD);
+  return config.adminToken || sha256hex(envPassword!);
 }
 
 /** Vérifie l'en-tête X-Admin-Auth de la requête. */
-export async function isAdmin(request: Request): Promise<boolean> {
+export async function isAdmin(request: Request, env: AdminEnv): Promise<boolean> {
   const token = (request.headers.get("x-admin-auth") || "").trim();
   if (!/^[a-f0-9]{64}$/i.test(token)) return false;
-  const expected = await getAdminToken();
-  return token === expected;
+  const expected = await getAdminToken(env);
+  return timingSafeEqualStr(token, expected);
 }
 
 export function unauthorized(): Response {

@@ -1,12 +1,65 @@
-import { Hono } from 'hono';
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import type { Env } from "./env";
+import { healthRoutes } from "./routes/health";
+import { productRoutes } from "./routes/products";
+import { trackRoutes } from "./routes/track";
+import { analyticsRoutes } from "./routes/analytics";
+import { authRoutes } from "./routes/auth";
+import { adminRoutes } from "./routes/admin";
+import { mediaRoutes } from "./routes/media";
+import { rateLimit } from "./middleware/rate-limit";
 
-const app = new Hono<{ Bindings: { DB: any } }>();
+const DEFAULT_FRONT_ORIGINS = [
+  "https://arsenal-tools.pages.dev",
+  "https://arsenal-v3-preview.pages.dev",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "http://localhost:3001",
+  "http://127.0.0.1:3001",
+];
 
-// Import and register routes from the worker directory here
-// Since we have multiple folders/files, we might need a dynamic import or static mapping
-// For now, illustrating the structure:
-// app.post('/api/auth/login', async (c) => { ... })
+const app = new Hono<{ Bindings: Env }>();
 
-app.get('/health', (c) => c.json({ status: 'ok' }));
+/** CORS en allowlist (fin de la réflexion d'origine) — configurable via FRONT_ORIGINS. */
+app.use("*", async (c, next) => {
+  const configured = (c.env?.FRONT_ORIGINS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const allowed = configured.length ? configured : DEFAULT_FRONT_ORIGINS;
+  return cors({
+    origin: (origin) => (origin && allowed.includes(origin) ? origin : undefined),
+    allowHeaders: [
+      "Content-Type",
+      "X-Admin-Auth",
+      "Authorization",
+      "X-GitHub-Token",
+      "X-GitHub-Repo",
+      "X-GitHub-Branch",
+    ],
+    allowMethods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    maxAge: 86400,
+  })(c, next);
+});
+
+/** Garde-fous anti-abus (fenêtre glissante en mémoire). */
+app.use("/api/auth/login", rateLimit({ limit: 10, windowMs: 60_000, label: "login" }));
+app.use("/api/track", rateLimit({ limit: 120, windowMs: 60_000, label: "track" }));
+
+app.route("/", healthRoutes);
+app.route("/", productRoutes);
+app.route("/", trackRoutes);
+app.route("/", analyticsRoutes);
+app.route("/", authRoutes);
+app.route("/", adminRoutes);
+app.route("/", mediaRoutes);
+
+app.notFound((c) => c.json({ ok: false, error: "Route introuvable." }, 404));
+
+app.onError((err, c) => {
+  console.error("Worker error:", err);
+  return c.json({ ok: false, error: "Erreur serveur inattendue." }, 500);
+});
 
 export default app;
