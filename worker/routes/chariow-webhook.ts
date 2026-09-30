@@ -4,6 +4,9 @@ import {
   parseChariowPulse,
   verifyChariowSignature,
 } from "../../src/lib/server/chariow";
+import { readArsenalPurchaseRef } from "../../src/lib/server/chariow-checkout";
+import { completeFulfillmentForPurchase } from "../../src/lib/server/fulfillment";
+import { getPurchaseById } from "../../src/lib/server/purchases";
 import {
   findProductByExternalRef,
   getAffiliateByCode,
@@ -34,6 +37,9 @@ import type { App, Env } from "../env";
  * - sur `successful.sale` : vente `confirmed` + commission `pending` + récompense A éventuelle
  *   en UN SEUL batch ; attribution par `custom_metadata.arsenal_link` puis `affiliate.code`,
  *   sinon vente NON ATTRIBUÉE (`affiliate_id` NULL, visible admin) ;
+ * - Phase 2.6 : si `custom_metadata.arsenal_purchase` est présent, la vente est la
+ *   LIVRAISON d'un achat déjà payé en A → ni commission ni récompense, fulfillment
+ *   marqué `completed` (idempotent) et réponse `{ok:true,fulfilled:true}` ;
  * - tout autre événement : 200 `{ok:true,ignored:true}`.
  */
 export const chariowWebhookRoutes: App = new Hono<{ Bindings: Env }>().post(
@@ -70,6 +76,22 @@ export const chariowWebhookRoutes: App = new Hono<{ Bindings: Env }>().post(
 
     if (!isSuccessfulSaleEvent(pulse)) {
       return c.json({ ok: true, ignored: true });
+    }
+
+    // --- Phase 2.6 : la vente EST la livraison d'un achat déjà payé en A ---
+    // `custom_metadata.arsenal_purchase` présent → AUCUNE commission, AUCUNE
+    // récompense (les A ont déjà été débités côté Arsenal) : on marque seulement
+    // le fulfillment `completed` s'il ne l'est pas déjà (idempotent).
+    const arsenalPurchase = readArsenalPurchaseRef(payload);
+    if (arsenalPurchase) {
+      const purchase = await getPurchaseById(db, arsenalPurchase);
+      if (purchase) {
+        await completeFulfillmentForPurchase(db, {
+          purchaseId: purchase.id,
+          reference: pulse.saleId,
+        });
+      }
+      return c.json({ ok: true, fulfilled: true });
     }
 
     // Idempotence : `sale.id` puis repli sur l'identifiant de livraison du Pulse.

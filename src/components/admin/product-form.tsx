@@ -41,6 +41,13 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
     product?.commissionValue != null ? String(product.commissionValue) : "",
   );
   const [rewardA, setRewardA] = useState(product?.rewardA != null ? String(product.rewardA) : "");
+  // Vente en A (Phase 2.6)
+  const [purchasable, setPurchasable] = useState(product?.purchasable ?? false);
+  const [priceA, setPriceA] = useState(product?.priceA != null ? String(product.priceA) : "");
+  const [chariowProductId, setChariowProductId] = useState(product?.chariowProductId ?? "");
+  const [fulfillmentMethod, setFulfillmentMethod] = useState<"manual" | "chariow_free_checkout">(
+    product?.fulfillmentMethod === "chariow_free_checkout" ? "chariow_free_checkout" : "manual",
+  );
 
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -81,6 +88,11 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
     if (!short.trim()) errors.push("description courte");
     if (!safeUrl(actionUrl)) errors.push(actionType === "chariow" ? "URL du tunnel Chariow" : "URL d'action");
     if (!safeUrl(imageUrl)) errors.push("image de couverture");
+    // Vente en A : prix > 0 requis, et id produit Chariow pour le fulfillment automatique
+    const priceANum = Math.trunc(Number(priceA));
+    if (purchasable && (!Number.isFinite(priceANum) || priceANum <= 0)) errors.push("prix en A (> 0)");
+    if (purchasable && fulfillmentMethod === "chariow_free_checkout" && !chariowProductId.trim())
+      errors.push("id produit Chariow");
     if (errors.length) {
       toast("Champs manquants ou invalides : " + errors.join(", "), "error");
       return;
@@ -106,6 +118,11 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
           ? Number(commissionValue)
           : null,
       rewardA: affiliateEnabled && rewardA.trim() !== "" ? Math.trunc(Number(rewardA)) || 0 : 0,
+      // Vente en A (Phase 2.6) — le serveur valide (prix > 0 si achetable, etc.)
+      purchasable,
+      priceA: purchasable ? Math.trunc(Number(priceA)) || 0 : 0,
+      chariowProductId: chariowProductId.trim() || null,
+      fulfillmentMethod,
     };
     try {
       if (product) {
@@ -415,6 +432,110 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
                 <p className="text-[0.72rem] text-[#666]">
                   Laissez vide pour utiliser les valeurs par défaut d'Arsenal (définies dans les réglages).
                 </p>
+              </div>
+            )}
+          </div>
+
+          {/* Vente en A (Phase 2.6) — prix en A, produit Chariow, méthode de fulfillment */}
+          <div className="rounded-xl border border-[#333] bg-[rgba(255,255,255,0.02)] p-4">
+            <label className="flex cursor-pointer items-center justify-between gap-3">
+              <span className="text-[0.84rem] font-semibold">Achetable avec des A</span>
+              <input
+                type="checkbox"
+                checked={purchasable}
+                onChange={(e) => setPurchasable(e.target.checked)}
+                className="h-5 w-5 accent-[#e63946]"
+              />
+            </label>
+            <p className="mt-1 text-[0.72rem] text-[#666]">
+              Le produit apparaît sur la page produit avec « Obtenir pour X A » et rejoint
+              « Mes produits » du client après livraison.
+            </p>
+
+            {purchasable && (
+              <div className="mt-4 flex flex-col gap-3 border-t border-dashed border-[#333] pt-4">
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <label className="flex-1">
+                    <span className="mb-1.5 block text-[0.8rem] text-[#a0a0a0]">Prix en A *</span>
+                    <input
+                      className="input-arsenal font-mono"
+                      inputMode="numeric"
+                      value={priceA}
+                      onChange={(e) => setPriceA(e.target.value)}
+                      placeholder="500"
+                    />
+                  </label>
+                  <label className="flex-1">
+                    <span className="mb-1.5 block text-[0.8rem] text-[#a0a0a0]">
+                      Méthode de fulfillment
+                    </span>
+                    <select
+                      className="input-arsenal cursor-pointer"
+                      value={fulfillmentMethod}
+                      onChange={(e) =>
+                        setFulfillmentMethod(
+                          e.target.value === "chariow_free_checkout" ? "chariow_free_checkout" : "manual",
+                        )
+                      }
+                    >
+                      <option value="manual">Manuelle (vous livrez)</option>
+                      <option value="chariow_free_checkout">Chariow — checkout produit gratuit</option>
+                    </select>
+                  </label>
+                </div>
+
+                <label>
+                  <span className="mb-1.5 block text-[0.8rem] text-[#a0a0a0]">
+                    Id produit Chariow{" "}
+                    <span className="text-[#666]">
+                      {fulfillmentMethod === "chariow_free_checkout" ? "(requis)" : "(facultatif)"}
+                    </span>
+                  </span>
+                  <input
+                    className="input-arsenal font-mono text-[0.8rem]"
+                    value={chariowProductId}
+                    onChange={(e) => setChariowProductId(e.target.value)}
+                    placeholder="id du produit Chariow « Gratuit » associé"
+                  />
+                </label>
+
+                {fulfillmentMethod === "manual" ? (
+                  <p className="text-[0.72rem] leading-relaxed text-[#666]">
+                    Livraison manuelle : la commande arrive dans l&apos;onglet Commandes —
+                    vous la marquez livrée (référence + note) après avoir transmis l&apos;accès.
+                    Aucun prérequis Chariow n&apos;est nécessaire.
+                  </p>
+                ) : (
+                  <div className="rounded-[10px] border border-[rgba(244,162,97,0.4)] bg-[rgba(244,162,97,0.07)] px-3.5 py-3">
+                    <p className="text-[0.78rem] font-semibold text-[#f4c886]">
+                      Contraintes réelles du checkout Chariow
+                    </p>
+                    <div className="mt-1.5 flex flex-col gap-1.5 text-[0.72rem] leading-relaxed text-[#a0a0a0]">
+                      <p>
+                        • Le produit Chariow doit être en modèle de tarification « Gratuit » :
+                        l&apos;API checkout n&apos;accepte aucun montant, le prix vient du produit.
+                      </p>
+                      <p>
+                        • Un produit gratuit l&apos;est pour quiconque possède l&apos;URL ; la seule
+                        atténuation documentée est de le masquer de la boutique. Recommandation :
+                        un produit Chariow dédié « Arsenal (A) », masqué, distinct du produit payant.
+                      </p>
+                      <p>
+                        • Types Service / Coaching et prix libre : refusés par l&apos;API (422) —
+                        utilisez la méthode manuelle pour ceux-là.
+                      </p>
+                      <p>
+                        • La clé API Chariow (onglet Paramètres) est obligatoire ; sans elle, la
+                        commande part en échec avec ce motif, sans tentative réseau.
+                      </p>
+                      <p>
+                        • Aucun mode sandbox n&apos;est documenté : les tests réels passent par la
+                        clé live. En cas d&apos;échec, les A restent traçables (relance ou
+                        remboursement depuis l&apos;onglet Commandes).
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

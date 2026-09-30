@@ -6,6 +6,8 @@
  * Appelle POST /api/track/affiliate-click (route publique), puis remplace l'URL par
  * celle du produit (`window.location.replace`). Le code peut arriver par query
  * (`?code=` — cas normal via public/_redirects), par hash (`#CODE`) ou par chemin (`/r/CODE`).
+ * Une fois le code validé, il est mémorisé 30 jours (storeAffiliateRef) pour attribuer
+ * les achats en A à venir (contrat Paiement en A).
  *
  * Page nue (aucun header/footer) : elle ne vit que le temps de la redirection.
  * Repli : message court + lien vers le catalogue — jamais d'impasse.
@@ -16,6 +18,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { trackAffiliateClick } from "@/lib/affiliate";
+import { storeAffiliateRef } from "@/lib/purchases";
 
 const FALLBACK_MESSAGE = "Ce lien d'affiliation est introuvable ou n'est plus actif.";
 
@@ -91,6 +94,9 @@ function RedirectBody() {
       try {
         const url = await trackAffiliateClick(code);
         if (cancelled) return;
+        // Code validé par le serveur : mémorisé 30 j côté client pour les achats en A
+        // (contrat Paiement en A — le serveur revérifie à l'achat).
+        storeAffiliateRef(code);
         if (!isHttpUrl(url)) {
           setMessage(FALLBACK_MESSAGE);
           return;

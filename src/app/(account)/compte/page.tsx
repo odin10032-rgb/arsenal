@@ -100,6 +100,9 @@ export default function ComptePage() {
 
           {/* Actions */}
           <div className="mt-6 flex flex-col gap-3 border-t border-dashed border-[#333] pt-6">
+            <Link href="/compte/produits" className="btn-arsenal btn-ghost w-full">
+              Mes produits
+            </Link>
             <Link href="/compte/portefeuille" className="btn-arsenal btn-ghost w-full">
               Voir le portefeuille
             </Link>

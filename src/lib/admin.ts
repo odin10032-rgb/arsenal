@@ -6,6 +6,11 @@
 import { apiFetch, ApiError } from "./api";
 import type { AffiliateStatus } from "./affiliate";
 import { Product } from "./products";
+import {
+  normalizePurchase,
+  type FulfillmentInfo,
+  type PurchaseStatus,
+} from "./purchases";
 
 /** sha256 hex (crypto.subtle) — le token admin est le hash du mot de passe */
 export async function sha256hex(text: string): Promise<string> {
@@ -205,6 +210,148 @@ export async function createManualSale(data: {
   await apiFetch("/api/admin/sales", {
     method: "POST",
     body: data,
+    auth: true,
+    timeoutMs: 8000,
+  });
+}
+
+/* ============================================================
+   Phase 2.6 — achats en A (contrat : docs/chantier/07-contrat-paiement-a.md)
+   ============================================================ */
+
+/** Filtre de la liste admin des commandes (statuts du schéma serveur) */
+export type AdminPurchaseStatusFilter = "all" | PurchaseStatus;
+
+/** Ligne de GET /api/admin/purchases (user pseudo/email + produit + fulfillment + dates) */
+export interface AdminPurchase {
+  id: string;
+  userId: string;
+  productId: string;
+  productTitle: string;
+  amountA: number;
+  status: PurchaseStatus;
+  pseudo: string;
+  email: string;
+  /** provider/status/attempts/last_error — null si le serveur n'en renvoie pas */
+  fulfillment: FulfillmentInfo | null;
+  /** Code du lien affilié attribué à l'achat (facultatif) */
+  linkCode: string | null;
+  createdAt: number;
+  updatedAt: number | null;
+  fulfilledAt: number | null;
+  refundedAt: number | null;
+}
+
+/**
+ * GET /api/admin/purchases?status=&limit= — liste des achats en A.
+ * Tolérant sur la forme (user/produit imbriqués ou plats) : seule la mise en forme est
+ * normalisée, aucune valeur métier n'est inventée (les helpers de coercition `affiliateStr`
+ * & co, définis plus haut, sont réutilisés).
+ */
+export async function fetchAdminPurchases(
+  status: AdminPurchaseStatusFilter = "all",
+): Promise<AdminPurchase[]> {
+  const query = status === "all" ? "" : `?status=${encodeURIComponent(status)}`;
+  const res = await apiFetch<{ ok: boolean; purchases?: unknown[] }>(
+    `/api/admin/purchases${query}`,
+    { auth: true, timeoutMs: 6000 },
+  );
+  return (res.purchases || []).map((raw) => {
+    const item = (raw || {}) as Record<string, unknown> & {
+      user?: { pseudo?: unknown; email?: unknown; id?: unknown } | null;
+      product?: { title?: unknown } | null;
+    };
+    const base = normalizePurchase(item);
+    return {
+      id: base.id,
+      userId: affiliateStr(item.userId) || affiliateStr(item.user_id) || affiliateStr(item.user?.id),
+      productId: base.productId,
+      productTitle: base.product.title || affiliateStr(item.productTitle),
+      amountA: base.amountA,
+      status: base.status,
+      pseudo: affiliateStr(item.pseudo) || affiliateStr(item.user?.pseudo),
+      email: affiliateStr(item.email) || affiliateStr(item.user?.email),
+      fulfillment: base.fulfillment,
+      linkCode:
+        affiliateStr(item.linkCode) ||
+        affiliateStr(item.link_code) ||
+        affiliateStr(item.affiliateCode) ||
+        null,
+      createdAt: base.createdAt,
+      updatedAt: affiliateTs(item.updatedAt) ?? affiliateTs(item.updated_at),
+      fulfilledAt: base.fulfilledAt,
+      refundedAt: base.refundedAt ?? affiliateTs(item.refunded_at),
+    };
+  });
+}
+
+/** POST /api/admin/purchases/:id/fulfill — livraison manuelle (référence + note facultatives) */
+export async function fulfillPurchase(
+  id: string,
+  data: { reference?: string; note?: string } = {},
+): Promise<void> {
+  const body: Record<string, string> = {};
+  if (data.reference?.trim()) body.reference = data.reference.trim();
+  if (data.note?.trim()) body.note = data.note.trim();
+  await apiFetch(`/api/admin/purchases/${encodeURIComponent(id)}/fulfill`, {
+    method: "POST",
+    body,
+    auth: true,
+    timeoutMs: 8000,
+  });
+}
+
+/** POST /api/admin/purchases/:id/retry — relance le fulfillment automatique (idempotent, ≤ 5 essais) */
+export async function retryAdminPurchase(id: string): Promise<void> {
+  await apiFetch(`/api/admin/purchases/${encodeURIComponent(id)}/retry`, {
+    method: "POST",
+    auth: true,
+    timeoutMs: 9000,
+  });
+}
+
+/** POST /api/admin/purchases/:id/refund — rembourse en A (transaction `refund:<id>`, irréversible) */
+export async function refundPurchase(id: string, reason?: string): Promise<void> {
+  const trimmed = (reason || "").trim();
+  await apiFetch(`/api/admin/purchases/${encodeURIComponent(id)}/refund`, {
+    method: "POST",
+    body: trimmed ? { reason: trimmed } : {},
+    auth: true,
+    timeoutMs: 8000,
+  });
+}
+
+/* ---------- Réglages (GET/POST /api/admin/settings) ---------- */
+
+export interface AdminSettings {
+  /**
+   * Clé API Chariow configurée ? `true`/`false` quand le backend l'indique (drapeau
+   * `chariow_api_key_configured` ou valeur masquée), `null` si l'information n'est pas exposée.
+   * La valeur en clair n'est JAMAIS renvoyée par l'API.
+   */
+  chariowApiKeyConfigured: boolean | null;
+}
+
+export async function fetchAdminSettings(): Promise<AdminSettings> {
+  const res = await apiFetch<{ ok: boolean; settings?: Record<string, unknown> }>(
+    "/api/admin/settings",
+    { auth: true, timeoutMs: 4000 },
+  );
+  const settings = res.settings || {};
+  const flag = settings.chariow_api_key_configured;
+  let configured: boolean | null = null;
+  if (typeof flag === "boolean") configured = flag;
+  else if (typeof settings.chariow_api_key === "string") {
+    configured = settings.chariow_api_key.trim().length > 0;
+  }
+  return { chariowApiKeyConfigured: configured };
+}
+
+/** POST /api/admin/settings — écrit une clé whitelistée ({key, value}), jamais relue en clair */
+export async function saveAdminSetting(key: string, value: string): Promise<void> {
+  await apiFetch("/api/admin/settings", {
+    method: "POST",
+    body: { key, value },
     auth: true,
     timeoutMs: 8000,
   });

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Shell du dashboard admin — header + 5 onglets + déconnexion
+ * Shell du dashboard admin — header + 6 onglets + déconnexion
  */
 
 import Link from "next/link";
@@ -10,13 +10,14 @@ import { AffiliatesTab } from "./affiliates-tab";
 import { AnalyticsTab } from "./analytics-tab";
 import { MediaTab } from "./media-tab";
 import { ProductsTab } from "./products-tab";
+import { PurchasesTab } from "./purchases-tab";
 import { SettingsTab } from "./settings-tab";
 import { BrandLogo } from "@/components/brand-logo";
 import { clearAdminToken } from "@/lib/products";
 import { Product } from "@/lib/products";
 import { ToastHost } from "@/lib/toast";
 
-type Tab = "products" | "media" | "analytics" | "affiliates" | "settings";
+type Tab = "products" | "media" | "analytics" | "affiliates" | "purchases" | "settings";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   {
@@ -57,6 +58,17 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
         <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
         <circle cx="9" cy="7" r="4" />
         <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+      </svg>
+    ),
+  },
+  {
+    id: "purchases",
+    label: "Commandes",
+    icon: (
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 4h2l2.4 10.5a2 2 0 0 0 2 1.5h7.4a2 2 0 0 0 2-1.6L21 8H6" />
+        <circle cx="10" cy="20" r="1.3" />
+        <circle cx="17.5" cy="20" r="1.3" />
       </svg>
     ),
   },
@@ -166,6 +178,7 @@ export function AdminDashboard({
           {tab === "affiliates" && (
             <AffiliatesTab apiAvailable={apiAvailable} products={products} />
           )}
+          {tab === "purchases" && <PurchasesTab apiAvailable={apiAvailable} />}
           {tab === "settings" && <SettingsTab apiAvailable={apiAvailable} onLogout={logout} />}
         </div>
       </main>

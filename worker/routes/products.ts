@@ -55,6 +55,7 @@ function normalize(body: Record<string, unknown>): { errors: string[]; data: Par
     videoUrl: sanitizeUrl(body.videoUrl) || null,
     imageUrl: sanitizeUrl(body.imageUrl) || "",
     ...normalizeAffiliation(body),
+    ...normalizePurchaseFields(body),
   };
   if (!data.imageUrl) errors.push("Une image de couverture est requise.");
   return { errors, data };
@@ -71,6 +72,31 @@ function normalizeAffiliation(body: Record<string, unknown>): Partial<Product> {
   const rawReward = Number(body.rewardA);
   const rewardA = Number.isFinite(rawReward) && rawReward >= 0 && rawReward <= 100_000 ? Math.trunc(rawReward) : 0;
   return { affiliateEnabled: enabled, commissionType, commissionValue, rewardA };
+}
+
+/** Bornes du contrat (docs/chantier/07-contrat-paiement-a.md) pour la vente en A. */
+const PRICE_A_MAX = 1_000_000;
+const CHARIOW_PRODUCT_ID_MAX = 120;
+
+/**
+ * Champs de vente en A (Phase 2.6) — validés dans les bornes du contrat :
+ * `priceA` entier 0…1 000 000, `purchasable` booléen, `chariowProductId`
+ * chaîne ≤ 120 caractères, `fulfillmentMethod` ∈ manual | chariow_free_checkout.
+ * INVARIANT : un produit achetable a un prix en A strictement positif (sinon
+ * `purchasable` est ramené à false — le contrat exige « price_a > 0 si purchasable »).
+ */
+function normalizePurchaseFields(body: Record<string, unknown>): Partial<Product> {
+  const rawPrice = Number(body.priceA);
+  const priceA =
+    Number.isFinite(rawPrice) && rawPrice >= 0 && rawPrice <= PRICE_A_MAX ? Math.trunc(rawPrice) : 0;
+  const requested =
+    body.purchasable === true || body.purchasable === 1 || body.purchasable === "1";
+  const rawProductId = typeof body.chariowProductId === "string" ? body.chariowProductId.trim() : "";
+  const chariowProductId =
+    rawProductId && rawProductId.length <= CHARIOW_PRODUCT_ID_MAX ? rawProductId : null;
+  const fulfillmentMethod: Product["fulfillmentMethod"] =
+    body.fulfillmentMethod === "chariow_free_checkout" ? "chariow_free_checkout" : "manual";
+  return { purchasable: requested && priceA > 0, priceA, chariowProductId, fulfillmentMethod };
 }
 
 export const productRoutes: App = new Hono<{ Bindings: Env }>()
@@ -159,6 +185,7 @@ export const productRoutes: App = new Hono<{ Bindings: Env }>()
       videoUrl: sanitizeUrl(body.videoUrl) || null,
       imageUrl: sanitizeUrl(body.imageUrl) || products[index].imageUrl,
       ...normalizeAffiliation(body),
+      ...normalizePurchaseFields(body),
       updatedAt: Date.now(),
     };
 

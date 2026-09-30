@@ -14,6 +14,9 @@ import { affiliateRoutes } from "./routes/affiliate";
 import { affiliateTrackRoutes } from "./routes/affiliate-track";
 import { chariowWebhookRoutes } from "./routes/chariow-webhook";
 import { adminAffiliationRoutes } from "./routes/admin-affiliation";
+import { purchaseRoutes } from "./routes/purchases";
+import { adminPurchaseRoutes } from "./routes/admin-purchases";
+import { PURCHASE_MAX_PER_MIN_DEFAULT, readPurchaseMaxPerMin } from "../src/lib/server/purchases";
 import { rateLimit } from "./middleware/rate-limit";
 
 const DEFAULT_FRONT_ORIGINS = [
@@ -61,6 +64,25 @@ app.use(
 );
 app.use("/api/affiliate/apply", rateLimit({ limit: 5, windowMs: 60_000, label: "affiliate-apply" }));
 
+// Phase 2.6 — achats en A. Le plafond d'achat (5/min/IP par défaut) est RÉGLABLE
+// via `settings.purchase_max_per_min` : il est donc relu du réglage à chaque
+// requête. La liste des achats (GET) n'est pas concernée. Le retry est borné
+// séparément (3/min/IP, contrat) — et par la garde de 5 tentatives serveur.
+app.use("/api/purchases", async (c, next) => {
+  if (c.req.method !== "POST" || c.req.path !== "/api/purchases") return next();
+  let limit = PURCHASE_MAX_PER_MIN_DEFAULT;
+  try {
+    limit = await readPurchaseMaxPerMin(c.env.DB);
+  } catch {
+    /* réglage illisible → défaut du contrat */
+  }
+  return rateLimit({ limit, windowMs: 60_000, label: "purchase" })(c, next);
+});
+app.use(
+  "/api/purchases/:id/retry",
+  rateLimit({ limit: 3, windowMs: 60_000, label: "purchase-retry" })
+);
+
 app.route("/", healthRoutes);
 app.route("/", productRoutes);
 app.route("/", trackRoutes);
@@ -74,6 +96,8 @@ app.route("/", affiliateRoutes);
 app.route("/", affiliateTrackRoutes);
 app.route("/", chariowWebhookRoutes);
 app.route("/", adminAffiliationRoutes);
+app.route("/", purchaseRoutes);
+app.route("/", adminPurchaseRoutes);
 
 app.notFound((c) => c.json({ ok: false, error: "Route introuvable." }, 404));
 

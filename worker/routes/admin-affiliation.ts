@@ -49,6 +49,8 @@ import type {
   AdminPaymentRow,
   CommissionRow,
 } from "../../src/lib/server/commissions";
+import { readChariowApiKey } from "../../src/lib/server/chariow-checkout";
+import { isPurchaseSettingKey, readPurchaseMaxPerMin, writePurchaseSetting } from "../../src/lib/server/purchases";
 import type { App, Env } from "../env";
 
 /* --------------------------------- Utilitaires --------------------------------- */
@@ -187,16 +189,25 @@ function paymentToJson(row: AdminPaymentRow) {
   };
 }
 
-/** Réglages effectifs pour l'admin : le secret du webhook n'est JAMAIS renvoyé en clair. */
+/**
+ * Réglages effectifs pour l'admin : ni le secret du webhook ni la clé API
+ * Chariow ne sont JAMAIS renvoyés en clair (un booléen `*_configured` suffit).
+ */
 async function settingsJson(db: D1Database) {
-  const [settings, secret] = await Promise.all([
+  const [settings, secret, apiKey, purchaseMaxPerMin] = await Promise.all([
     readAffiliateSettings(db),
     readChariowWebhookSecret(db),
+    readChariowApiKey(db),
+    readPurchaseMaxPerMin(db),
   ]);
   return {
     ...settings,
     chariow_webhook_secret: "",
     chariow_webhook_secret_configured: Boolean(secret),
+    // Phase 2.6 — vente en A : clé API Chariow (masquée) et plafond d'achats/min.
+    chariow_api_key: "",
+    chariow_api_key_configured: Boolean(apiKey),
+    purchase_max_per_min: purchaseMaxPerMin,
   };
 }
 
@@ -218,8 +229,9 @@ const AFFILIATE_TRANSITIONS: Record<string, string[]> = {
  * - POST /api/admin/commissions/:id/state    transitions STRICTES (409 sinon)
  * - GET  /api/admin/payments?affiliate_id=
  * - POST /api/admin/payments                 paiement manuel + payable→paid dans le même batch
- * - GET  /api/admin/settings                 réglages (clés whitelistées, secret masqué)
+ * - GET  /api/admin/settings                 réglages (clés whitelistées, secrets masqués)
  * - POST /api/admin/settings                 écriture des réglages whitelistés
+ *   (Phase 2.6 : `chariow_api_key` masquée et `purchase_max_per_min` ajoutées à la whitelist)
  *
  * Chaque MUTATION écrit un `security_events` (action `admin_*`) dans le même
  * batch que l'écriture métier.
@@ -682,7 +694,7 @@ export const adminAffiliationRoutes: App = new Hono<{ Bindings: Env }>()
 
     if (!entries.length) return badRequest("Aucun réglage fourni.");
     for (const [key] of entries) {
-      if (!isAffiliateSettingKey(key) && key !== CHARIOW_WEBHOOK_SECRET_KEY) {
+      if (!isAffiliateSettingKey(key) && key !== CHARIOW_WEBHOOK_SECRET_KEY && !isPurchaseSettingKey(key)) {
         return badRequest(`Réglage inconnu : ${key}.`);
       }
     }
@@ -695,6 +707,11 @@ export const adminAffiliationRoutes: App = new Hono<{ Bindings: Env }>()
         // pas effacer accidentellement le secret déjà configuré.
         if (!value.trim()) continue;
         await setSetting(c.env.DB, CHARIOW_WEBHOOK_SECRET_KEY, value.trim());
+      } else if (isPurchaseSettingKey(key)) {
+        // Phase 2.6 : `chariow_api_key` (masquée, une valeur vide est ignorée) et
+        // `purchase_max_per_min` (entier borné, défaut 5).
+        const stored = await writePurchaseSetting(c.env.DB, key, value);
+        if (stored === null) continue;
       } else if (isAffiliateSettingKey(key)) {
         await writeAffiliateSetting(c.env.DB, key, value);
       }

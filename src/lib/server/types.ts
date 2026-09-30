@@ -21,7 +21,19 @@ export interface Product {
   commissionType?: "percent" | "fixed" | null;
   commissionValue?: number | null;
   rewardA?: number;
+  /* --- Vente en A (Phase 2.6 — migration 0004) --- */
+  /** Achetable avec des A (exige `priceA > 0`). */
+  purchasable?: boolean;
+  /** Prix en A (entier ≥ 0) — le prix affiché en FCFA reste `price`. */
+  priceA?: number;
+  /** Id du produit Chariow « Gratuit » utilisé par le fulfillment. */
+  chariowProductId?: string | null;
+  /** manual | chariow_free_checkout */
+  fulfillmentMethod?: FulfillmentMethod;
 }
+
+/** Méthodes de livraison d'un produit (contrat § Fulfillment). */
+export type FulfillmentMethod = "manual" | "chariow_free_checkout";
 
 export interface Analytics {
   visits: number;

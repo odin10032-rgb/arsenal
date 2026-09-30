@@ -1,12 +1,17 @@
 "use client";
 
 /**
- * Paramètres — GitHub (upload d'images), sécurité (mot de passe),
- * données (export / import JSON), à propos.
+ * Paramètres — GitHub (upload d'images), clé API Chariow (fulfillment automatique),
+ * sécurité (mot de passe), données (export / import JSON), à propos.
  */
 
-import { useRef, useState } from "react";
-import { changeAdminPassword, sha256hex } from "@/lib/admin";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  changeAdminPassword,
+  fetchAdminSettings,
+  saveAdminSetting,
+  sha256hex,
+} from "@/lib/admin";
 import { Product } from "@/lib/products";
 import { toast } from "@/lib/toast";
 
@@ -29,6 +34,7 @@ export function SettingsTab({
   return (
     <section className="flex max-w-2xl flex-col gap-5">
       <GithubCard />
+      <ChariowCard apiAvailable={apiAvailable} />
       <SecurityCard apiAvailable={apiAvailable} onLogout={onLogout} />
       <DataCard />
       <AboutCard apiAvailable={apiAvailable} />
@@ -110,6 +116,124 @@ function GithubCard() {
           Tester la connexion
         </button>
       </div>
+    </SettingsCard>
+  );
+}
+
+/* ---------------- Clé API Chariow (Phase 2.6) ---------------- */
+
+/**
+ * Clé API Chariow — indispensable au fulfillment automatique (`chariow_free_checkout`).
+ * La valeur n'est jamais renvoyée par l'API : on n'affiche qu'un état « configurée » quand le
+ * backend l'indique (drapeau `chariow_api_key_configured` ou champ masqué), sinon « inconnu ».
+ */
+function ChariowCard({ apiAvailable }: { apiAvailable: boolean }) {
+  const [value, setValue] = useState("");
+  const [configured, setConfigured] = useState<boolean | null>(null);
+  const [stateLoading, setStateLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+
+  const loadState = useCallback(async () => {
+    if (!apiAvailable) {
+      setConfigured(null);
+      setStateLoading(false);
+      return;
+    }
+    setStateLoading(true);
+    try {
+      const settings = await fetchAdminSettings();
+      setConfigured(settings.chariowApiKeyConfigured);
+    } catch {
+      // État inconnu (route absente ou backend injoignable) — aucune valeur n'est inventée
+      setConfigured(null);
+    } finally {
+      setStateLoading(false);
+    }
+  }, [apiAvailable]);
+
+  useEffect(() => {
+    void loadState();
+  }, [loadState]);
+
+  const save = async () => {
+    if (busy) return;
+    if (!apiAvailable) return toast("Configuration possible uniquement avec le backend connecté.", "error");
+    if (!value.trim()) return toast("Collez d'abord la clé API Chariow.", "error");
+    setBusy(true);
+    try {
+      await saveAdminSetting("chariow_api_key", value.trim());
+      toast("Clé API Chariow enregistrée — elle n'est plus relisible en clair.", "success");
+      setValue("");
+      await loadState();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Enregistrement impossible.", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <SettingsCard
+      icon={
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M15 7a4 4 0 1 1-3.5 5.9L4 20.4V17H6v-2h2l1.1-1.1A4 4 0 0 1 15 7z" />
+          <path d="M16.5 10.5h.01" />
+        </svg>
+      }
+      title="Clé API Chariow"
+      subtitle="Nécessaire au fulfillment automatique des achats en A (méthode « checkout produit gratuit »). La clé n'est jamais renvoyée en clair par l'API ; enregistrer une nouvelle valeur remplace l'ancienne."
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[0.66rem]"
+          style={
+            stateLoading
+              ? { color: "#a0a0a0", borderColor: "#333", background: "#141414" }
+              : configured === true
+                ? { color: "#56b8a8", borderColor: "rgba(42,157,143,0.4)", background: "rgba(42,157,143,0.08)" }
+                : configured === false
+                  ? { color: "#f4a261", borderColor: "rgba(244,162,97,0.4)", background: "rgba(244,162,97,0.08)" }
+                  : { color: "#a0a0a0", borderColor: "#333", background: "#141414" }
+          }
+        >
+          {stateLoading
+            ? "Vérification…"
+            : configured === true
+              ? "Clé configurée"
+              : configured === false
+                ? "Aucune clé configurée"
+                : "État non communiqué par le backend"}
+        </span>
+        <button type="button" onClick={() => void loadState()} disabled={stateLoading} className="btn-arsenal btn-ghost btn-sm">
+          {stateLoading && <span className="spin" />}
+          Vérifier
+        </button>
+      </div>
+
+      <SettingsField label="Nouvelle clé (sk_live_…)">
+        <input
+          className="input-arsenal font-mono text-[0.8rem]"
+          type="password"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="sk_live_…"
+          autoComplete="off"
+        />
+      </SettingsField>
+
+      <div className="flex flex-wrap gap-2.5">
+        <button type="button" onClick={save} disabled={busy} className="btn-arsenal btn-primary btn-sm">
+          {busy && <span className="spin" />}
+          Enregistrer la clé
+        </button>
+      </div>
+
+      <p className="text-[0.72rem] leading-relaxed text-[#666]">
+        Le fulfillment automatique exige aussi un produit Chariow en modèle de tarification
+        « Gratuit » et l&apos;id renseigné dans le formulaire produit. Sans clé, les commandes
+        passent en échec avec le motif « Clé API Chariow non configurée » et l&apos;équipe peut
+        toujours livrer manuellement depuis l&apos;onglet Commandes.
+      </p>
     </SettingsCard>
   );
 }

@@ -12,6 +12,7 @@ import { Suspense, useEffect, useState } from "react";
 import { ActionBlock } from "@/components/action-block";
 import { MediaEmbed } from "@/components/media-embed";
 import { BadgePill } from "@/components/product-card";
+import { BuyWithA } from "@/components/product/buy-with-a";
 import { useCatalog } from "@/hooks/use-catalog";
 import { fmt, timeAgo } from "@/lib/format";
 import { CATEGORIES } from "@/lib/products";
@@ -147,6 +148,12 @@ function ProductBody() {
           Accès · {CATEGORIES[product.category]}
           <span className="h-px flex-1 bg-[#333]" />
         </h2>
+        {/* Achat en A — au-dessus des canaux existants, qui restent intacts */}
+        {product.purchasable && (product.priceA ?? 0) > 0 && (
+          <div className="mb-3">
+            <BuyWithA product={product} />
+          </div>
+        )}
         <ActionBlock product={product} />
       </section>
     </article>

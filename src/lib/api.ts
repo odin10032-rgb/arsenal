@@ -23,9 +23,12 @@ export interface ApiOptions {
 
 export class ApiError extends Error {
   status: number;
-  constructor(message: string, status: number) {
+  /** Corps JSON de la réponse d'erreur — lu tel quel (ex. 402 d'achat : {balanceA, priceA, missingA}) */
+  data: Record<string, unknown>;
+  constructor(message: string, status: number, data: Record<string, unknown> = {}) {
     super(message);
     this.status = status;
+    this.data = data;
   }
 }
 
@@ -62,7 +65,7 @@ export async function apiFetch<T = Record<string, unknown>>(
       /* réponse non-JSON : on garde {} */
     }
     if (!res.ok) {
-      throw new ApiError(String(json.error || `Erreur ${res.status}`), res.status);
+      throw new ApiError(String(json.error || `Erreur ${res.status}`), res.status, json);
     }
     return json as T;
   } finally {

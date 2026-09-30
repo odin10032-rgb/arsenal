@@ -34,6 +34,11 @@ export async function getProducts(db: D1Database): Promise<Product[]> {
     commissionType: p.commission_type || null,
     commissionValue: p.commission_value === null || p.commission_value === undefined ? null : Number(p.commission_value),
     rewardA: Number(p.reward_a || 0),
+    /* --- Vente en A (Phase 2.6 — migration 0004) --- */
+    purchasable: Number(p.purchasable) === 1,
+    priceA: Number(p.price_a || 0),
+    chariowProductId: p.chariow_product_id || null,
+    fulfillmentMethod: p.fulfillment_method === "chariow_free_checkout" ? "chariow_free_checkout" : "manual",
   }));
 }
 
@@ -41,15 +46,18 @@ export async function saveProducts(db: D1Database, products: Product[]): Promise
   const batch = products.map(p =>
     db.prepare(`
       INSERT OR REPLACE INTO products
-      (id, title, short_description, description, category, action_type, badges, price, action_url, apk_url, pwa_url, command, video_url, image_url, clicks, created_at, updated_at, affiliate_enabled, commission_type, commission_value, reward_a)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, title, short_description, description, category, action_type, badges, price, action_url, apk_url, pwa_url, command, video_url, image_url, clicks, created_at, updated_at, affiliate_enabled, commission_type, commission_value, reward_a, purchasable, price_a, chariow_product_id, fulfillment_method)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       p.id, p.title, p.shortDescription, p.description, p.category,
       p.actionType, JSON.stringify(p.badges), p.price, p.actionUrl,
       p.apkUrl || null, p.pwaUrl || null, p.command || null,
       p.videoUrl || null, p.imageUrl, p.clicks, p.createdAt, p.updatedAt,
       p.affiliateEnabled ? 1 : 0, p.commissionType || null,
-      p.commissionValue ?? null, p.rewardA ?? 0
+      p.commissionValue ?? null, p.rewardA ?? 0,
+      p.purchasable ? 1 : 0, Math.trunc(Number(p.priceA ?? 0)) || 0,
+      p.chariowProductId || null,
+      p.fulfillmentMethod === "chariow_free_checkout" ? "chariow_free_checkout" : "manual"
     )
   );
   await db.batch(batch);
