@@ -1,26 +1,49 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import { BRAND_FAVICON } from "@/components/brand-logo";
 import "./globals.css";
-import { Toaster } from "@/components/ui/toaster";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
+
+const jetbrains = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains",
+  display: "swap",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-space",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
-  title: "Bêta Arsenal — L'arsenal des créateurs digitaux",
+  title: "Arsenal Tools — L'arsenal des créateurs digitaux",
   description:
-    "Catalogue de SaaS, applications desktop, mobiles/PWA, e-books et packs de prompts & automations. Bêta Arsenal v2.0.",
-  icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
-  },
+    "SaaS, apps desktop, Mobile/PWA, e-books et packs de prompts & automations. Le catalogue des outils des bâtisseurs du web — Arsenal Tools.",
+  icons: { icon: BRAND_FAVICON },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0a0a0a",
+  width: "device-width",
+  initialScale: 1,
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="fr" suppressHydrationWarning>
-      <body className="antialiased">
+    <html
+      lang="fr"
+      className={`${inter.variable} ${jetbrains.variable} ${spaceGrotesk.variable}`}
+    >
+      <body className="font-sans antialiased">
         {children}
-        <Toaster />
       </body>
     </html>
   );

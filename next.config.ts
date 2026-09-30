@@ -5,8 +5,9 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
-  output: 'export',
-  distDir: 'out',
+  output: "export",
+  trailingSlash: true,
+  distDir: "out",
   images: {
     unoptimized: true,
   },
