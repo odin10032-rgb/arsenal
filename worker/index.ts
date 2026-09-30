@@ -6,6 +6,8 @@ import { productRoutes } from "./routes/products";
 import { trackRoutes } from "./routes/track";
 import { analyticsRoutes } from "./routes/analytics";
 import { authRoutes } from "./routes/auth";
+import { userAuthRoutes } from "./routes/user-auth";
+import { meRoutes } from "./routes/me";
 import { adminRoutes } from "./routes/admin";
 import { mediaRoutes } from "./routes/media";
 import { rateLimit } from "./middleware/rate-limit";
@@ -45,6 +47,8 @@ app.use("*", async (c, next) => {
 
 /** Garde-fous anti-abus (fenêtre glissante en mémoire). */
 app.use("/api/auth/login", rateLimit({ limit: 10, windowMs: 60_000, label: "login" }));
+app.use("/api/auth/register", rateLimit({ limit: 3, windowMs: 60_000, label: "register" }));
+app.use("/api/auth/session", rateLimit({ limit: 10, windowMs: 60_000, label: "user-session" }));
 app.use("/api/track", rateLimit({ limit: 120, windowMs: 60_000, label: "track" }));
 
 app.route("/", healthRoutes);
@@ -52,6 +56,8 @@ app.route("/", productRoutes);
 app.route("/", trackRoutes);
 app.route("/", analyticsRoutes);
 app.route("/", authRoutes);
+app.route("/", userAuthRoutes);
+app.route("/", meRoutes);
 app.route("/", adminRoutes);
 app.route("/", mediaRoutes);
 

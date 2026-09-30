@@ -4,6 +4,7 @@
  */
 
 import { readAdminToken } from "./products";
+import { getToken } from "./user-auth";
 
 export const API_URL = (
   process.env.NEXT_PUBLIC_API_URL || "https://beta-arsenal-api.aimane-project-api.workers.dev"
@@ -13,7 +14,10 @@ export interface ApiOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE";
   body?: unknown;
   formData?: FormData;
+  /** Auth admin : header X-Admin-Auth (token en sessionStorage) */
   auth?: boolean;
+  /** Auth utilisateur : header Authorization Bearer (token de session, cf. lib/user-auth.ts) */
+  bearer?: boolean;
   timeoutMs?: number;
 }
 
@@ -27,7 +31,7 @@ export class ApiError extends Error {
 
 export async function apiFetch<T = Record<string, unknown>>(
   path: string,
-  { method = "GET", body, formData, auth = false, timeoutMs }: ApiOptions = {},
+  { method = "GET", body, formData, auth = false, bearer = false, timeoutMs }: ApiOptions = {},
 ): Promise<T> {
   const timeout = (timeoutMs ?? 2500) * (method === "GET" ? 1 : 4);
   const controller = new AbortController();
@@ -38,6 +42,10 @@ export async function apiFetch<T = Record<string, unknown>>(
   if (auth) {
     const token = readAdminToken();
     if (token) headers["X-Admin-Auth"] = token;
+  }
+  if (bearer) {
+    const token = getToken();
+    if (token) headers["Authorization"] = `Bearer ${token}`;
   }
 
   try {

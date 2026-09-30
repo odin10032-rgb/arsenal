@@ -24,6 +24,7 @@
   --accent-red-hover: #d62839;
   --accent-green: #2a9d8f;
   --accent-orange: #f4a261;
+  --accent-gold: #d4af37;
 
   --badge-premium: #9b5de5;
   --badge-beta: #f4a261;
@@ -77,6 +78,7 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-gold: var(--accent-gold);
 
   --radius-sm: 6px;
   --radius-md: 10px;
