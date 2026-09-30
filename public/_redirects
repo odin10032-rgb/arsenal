@@ -1,3 +1,4 @@
 # URLs propres pour les pages produits (export statique Next.js)
-# /produit/<id> sert /produit/ avec ?id=<id> sans redirection visible
-/produit/:id /produit/index.html?id=:id 200
+# /produit/<id> sert la page produit ; l'id est lu depuis le hash (#<id>)
+# par la page elle-même (les rewrites Pages ne transmettent pas les query).
+/produit/* /produit/index.html 200

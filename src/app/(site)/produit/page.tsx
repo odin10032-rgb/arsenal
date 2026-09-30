@@ -20,12 +20,24 @@ import { parseVideoUrl } from "@/lib/video";
 
 function ProductBody() {
   const searchId = useSearchParams().get("id") || "";
-  // URL propre /produit/<id> : le rewrite Pages transmet le query quand il le peut,
-  // sinon on décode l'id depuis le pathname (robuste dans tous les cas).
+  // Trois formats d'URL supportés :
+  //  /produit/?id=<id>       (liens internes — le plus fiable)
+  //  /produit/#<id>          (partage d'URL propre)
+  //  /produit/<id>           (rewrite Pages : pathname réécrit, hash requis)
   const [pathId, setPathId] = useState("");
   useEffect(() => {
-    const m = window.location.pathname.match(/^\/produit\/([^/?#]+)/);
-    if (m) setPathId(decodeURIComponent(m[1]));
+    const applyLocation = () => {
+      const hash = window.location.hash.replace(/^#/, "").trim();
+      if (hash && !hash.includes("=")) {
+        setPathId(decodeURIComponent(hash));
+        return;
+      }
+      const m = window.location.pathname.match(/^\/produit\/([^/?#]+)/);
+      if (m) setPathId(decodeURIComponent(m[1]));
+    };
+    applyLocation();
+    window.addEventListener("hashchange", applyLocation);
+    return () => window.removeEventListener("hashchange", applyLocation);
   }, []);
   const id = searchId || pathId;
 
