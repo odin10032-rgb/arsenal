@@ -1,7 +1,8 @@
-# Actions utilisateur — tutoriels (à faire à la fin du chantier)
+# Actions utilisateur — tutoriels
 
-> Décision utilisateur (30/09) : ces actions seront exécutées **à la fin du chantier**, après que l'agent aura fini d'utiliser l'état actuel pour vérifier tout le workflow.
-> Conséquence acceptée : tant que ce n'est pas fait, **rien ne se déploie** (CI en échec sur secret manquant) — le développement continue en local sur `chantier-v1`.
+> **État au 30/09/2026** : les actions **A** (token Cloudflare + secrets GitHub) et **C** (Workers Builds) ont été **réalisées** — l'utilisateur s'est connecté à Cloudflare dans le navigateur de la session, l'agent a créé le token, posé les secrets GitHub et neutralisé les builds parasites. **Le CI est vert et la production est à jour** (front Next.js + Worker + migrations).
+> **Reste à faire par l'utilisateur** : la **rotation du mot de passe administrateur** (§ B), à effectuer quand il le souhaite — c'est le dernier point de sécurité en suspens (le mot de passe par défaut est public dans l'historique Git).
+> Et **en Phase 2** : la clé API Chariow (§ E).
 
 ---
 
