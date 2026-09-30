@@ -6,11 +6,22 @@
 export async function uploadToGitHub(
   filename: string,
   buffer: Buffer,
-  config: { token: string; owner: string; repo: string; branch: string }
+  config: {
+    token: string;
+    owner: string;
+    repo: string;
+    branch: string;
+    /**
+     * Sous-dossier du dépôt (défaut `uploads/`, comportement des médias).
+     * Les fichiers livrables des produits utilisent `products/` (Phase 2.6).
+     */
+    folder?: string;
+  }
 ): Promise<string> {
   const { token, owner, repo, branch } = config;
-
-  const path = `uploads/${filename}`;
+  // Dossier normalisé : jamais de chemin absolu ni de remontée (`..`).
+  const folder = (config.folder || "uploads").replace(/^\/+|\/+$/g, "").replace(/\.\./g, "");
+  const path = `${folder}/${filename}`;
   const targetUrl = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
 
   const content = buffer.toString("base64");
@@ -23,7 +34,7 @@ export async function uploadToGitHub(
       "User-Agent": "Arsenal-App"
     },
     body: JSON.stringify({
-      message: `Upload media: ${filename}`,
+      message: `Upload ${path}`,
       content,
       branch,
     }),

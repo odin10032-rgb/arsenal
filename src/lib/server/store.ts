@@ -7,7 +7,7 @@
  * quatre tables (analytics_counters / clicks_by_product / visits_by_day /
  * recent_visits) et `settings` (clé/valeur) au lieu de `config`.
  */
-import { Product, Analytics, MediaItem, FulfillmentMethod } from "./types";
+import { Product, Analytics, MediaItem, FulfillmentMethod, DeliveryKind } from "./types";
 
 const RECENT_VISITS_MAX = 500;
 
@@ -22,6 +22,18 @@ function normalizeFulfillmentMethod(raw: unknown): FulfillmentMethod {
   if (value === "chariow_free_checkout") return "chariow_free_checkout";
   if (value === "chariow_discount_checkout") return "chariow_discount_checkout";
   return "manual";
+}
+
+/**
+ * Type de livraison EFFECTIVEMENT stocké (migration 0006) : `file` | `license`
+ * | `null`. Toute valeur inconnue retombe sur `null` (aucune livraison
+ * Arsenal) — jamais de livraison devinée à partir d'une donnée illisible.
+ */
+function normalizeDeliveryKind(raw: unknown): DeliveryKind | null {
+  const value = typeof raw === "string" ? raw.trim() : "";
+  if (value === "file") return "file";
+  if (value === "license") return "license";
+  return null;
 }
 
 /* ------------------------------- Products ------------------------------- */
@@ -54,6 +66,15 @@ export async function getProducts(db: D1Database): Promise<Product[]> {
     fulfillmentMethod: normalizeFulfillmentMethod(p.fulfillment_method),
     /* --- Fulfillment par code promo (migration 0005) --- */
     chariowDiscountCode: p.chariow_discount_code || null,
+    /* --- Fichier livrable + licences (Phase 2.6 — migration 0006) --- */
+    productFileUrl: p.product_file_url || null,
+    productFileName: p.product_file_name || null,
+    productFileSize:
+      p.product_file_size === null || p.product_file_size === undefined
+        ? null
+        : Number(p.product_file_size),
+    productFileMime: p.product_file_mime || null,
+    deliveryKind: normalizeDeliveryKind(p.delivery_kind),
   }));
 }
 
@@ -61,8 +82,8 @@ export async function saveProducts(db: D1Database, products: Product[]): Promise
   const batch = products.map(p =>
     db.prepare(`
       INSERT OR REPLACE INTO products
-      (id, title, short_description, description, category, action_type, badges, price, action_url, apk_url, pwa_url, command, video_url, image_url, clicks, created_at, updated_at, affiliate_enabled, commission_type, commission_value, reward_a, purchasable, price_a, chariow_product_id, fulfillment_method, chariow_discount_code)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, title, short_description, description, category, action_type, badges, price, action_url, apk_url, pwa_url, command, video_url, image_url, clicks, created_at, updated_at, affiliate_enabled, commission_type, commission_value, reward_a, purchasable, price_a, chariow_product_id, fulfillment_method, chariow_discount_code, product_file_url, product_file_name, product_file_size, product_file_mime, delivery_kind)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       p.id, p.title, p.shortDescription, p.description, p.category,
       p.actionType, JSON.stringify(p.badges), p.price, p.actionUrl,
@@ -73,7 +94,17 @@ export async function saveProducts(db: D1Database, products: Product[]): Promise
       p.purchasable ? 1 : 0, Math.trunc(Number(p.priceA ?? 0)) || 0,
       p.chariowProductId || null,
       normalizeFulfillmentMethod(p.fulfillmentMethod),
-      p.chariowDiscountCode || null
+      p.chariowDiscountCode || null,
+      // Fichier livrable + type de livraison (migration 0006) : sans ces
+      // colonnes, l'INSERT OR REPLACE ci-dessus effacerait le fichier livrable
+      // à chaque modification du produit.
+      p.productFileUrl || null,
+      p.productFileName || null,
+      p.productFileSize === null || p.productFileSize === undefined
+        ? null
+        : Math.trunc(Number(p.productFileSize)) || 0,
+      p.productFileMime || null,
+      normalizeDeliveryKind(p.deliveryKind)
     )
   );
   await db.batch(batch);
@@ -82,6 +113,58 @@ export async function saveProducts(db: D1Database, products: Product[]): Promise
 export async function deleteProduct(db: D1Database, id: string): Promise<boolean> {
   const res = await db.prepare("DELETE FROM products WHERE id = ?").bind(id).run();
   return res.success;
+}
+
+/* ------------------------ Fichier livrable du produit ------------------------ */
+/* Phase 2.6 (migration 0006) : le fichier est hébergé sur GitHub, mais son URL
+ * n'est JAMAIS exposée au client — seul `GET /api/purchases/:id/download` (achat
+ * vérifié) sert les octets. Ces deux écritures sont donc les seules à manipuler
+ * les colonnes `product_file_*`. */
+
+export interface ProductFileColumns {
+  url: string;
+  name: string;
+  size: number;
+  mime: string;
+}
+
+/** Écrit les 4 colonnes `product_file_*` — false si le produit n'existe pas. */
+export async function setProductFile(
+  db: D1Database,
+  productId: string,
+  file: ProductFileColumns
+): Promise<boolean> {
+  const res = await db
+    .prepare(
+      `UPDATE products
+          SET product_file_url = ?, product_file_name = ?, product_file_size = ?,
+              product_file_mime = ?, updated_at = ?
+        WHERE id = ?`
+    )
+    .bind(
+      file.url,
+      file.name,
+      Math.trunc(Number(file.size) || 0),
+      file.mime,
+      Date.now(),
+      productId
+    )
+    .run();
+  return Number(res.meta?.changes ?? 0) > 0;
+}
+
+/** Retire le fichier livrable (colonnes à NULL) — false si le produit n'existe pas. */
+export async function clearProductFile(db: D1Database, productId: string): Promise<boolean> {
+  const res = await db
+    .prepare(
+      `UPDATE products
+          SET product_file_url = NULL, product_file_name = NULL, product_file_size = NULL,
+              product_file_mime = NULL, updated_at = ?
+        WHERE id = ?`
+    )
+    .bind(Date.now(), productId)
+    .run();
+  return Number(res.meta?.changes ?? 0) > 0;
 }
 
 /* --------------------------- Analytique (normalisée) --------------------------- */

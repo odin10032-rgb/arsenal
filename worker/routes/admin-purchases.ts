@@ -3,6 +3,7 @@ import type { Context } from "hono";
 import { isAdmin, unauthorized, sha256hex } from "../../src/lib/server/auth";
 import { securityEventStatement } from "../../src/lib/server/user-auth";
 import { changesOf } from "../../src/lib/server/commissions";
+import { licenseStatementsIfApplicable } from "../../src/lib/server/delivery-license";
 import {
   FULFILLMENT_MAX_ATTEMPTS,
   canAttemptFulfillment,
@@ -139,6 +140,13 @@ export const adminPurchaseRoutes: App = new Hono<{ Bindings: Env }>()
     if (!fulfillment) return notFound("Fulfillment introuvable.");
 
     const now = Date.now();
+    // Si le produit est `delivery_kind = 'license'`, la clé est générée dans le
+    // même lot (idempotent : rejouer la livraison ne crée pas de seconde clé).
+    const licenseStatements = await licenseStatementsIfApplicable(db, {
+      purchaseId: purchase.id,
+      userId: purchase.user_id,
+      productId: purchase.product_id,
+    });
     await db.batch([
       // provider = manual : la livraison qui aboutit est bien humaine.
       completeFulfillmentStatement(db, fulfillment, {
@@ -148,6 +156,7 @@ export const adminPurchaseRoutes: App = new Hono<{ Bindings: Env }>()
         now,
       }),
       markPurchaseFulfilledStatement(db, purchase.id, now),
+      ...licenseStatements,
       securityEventStatement(db, {
         actor: "admin",
         action: "admin_purchase_fulfill",

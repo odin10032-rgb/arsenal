@@ -9,6 +9,21 @@ export function fmt(n: number): string {
   return numberFmt.format(n);
 }
 
+/** 1536000 → "1,5 Mo" — taille de fichier lisible (octets) */
+export function fmtBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 o";
+  const units = ["o", "Ko", "Mo", "Go"];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  // Arrondi entier au-delà de 10 unités (et pour les octets), sinon 1 décimale
+  const rounded = unit === 0 || value >= 10 ? Math.round(value) : Math.round(value * 10) / 10;
+  return `${rounded.toLocaleString("fr-FR")} ${units[unit]}`;
+}
+
 /** Timestamp ms → "il y a 3 j", "à l'instant", … */
 export function timeAgo(ts: number): string {
   const diff = Date.now() - ts;

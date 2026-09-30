@@ -321,6 +321,144 @@ export async function refundPurchase(id: string, reason?: string): Promise<void>
   });
 }
 
+/* ============================================================
+   Phase 2.7 — livraison : fichier du produit & licences (admin)
+   ============================================================ */
+
+/** Taille maximale acceptée par POST /api/admin/products/:id/file (contrat : 25 Mo) */
+export const MAX_PRODUCT_FILE_BYTES = 25 * 1024 * 1024;
+
+/** Extensions acceptées par l'endpoint d'upload (contrat figé) */
+export const PRODUCT_FILE_EXTENSIONS = ["pdf", "epub", "mobi", "zip", "mp4", "apk"] as const;
+
+/** Fichier livré tel que renvoyé par l'upload `{file:{name,size,mime,url}}` */
+export interface ProductFileInfo {
+  name: string;
+  size: number;
+  mime: string;
+  url: string;
+}
+
+/**
+ * Message explicite des erreurs d'upload du contrat :
+ * 413 trop volumineux · 400 type refusé · 503 stockage GitHub non configuré.
+ */
+export function productFileErrorMessage(err: unknown): string {
+  if (err instanceof ApiError) {
+    if (err.status === 413) return "Fichier trop volumineux (25 Mo maximum).";
+    if (err.status === 400)
+      return err.message || `Type de fichier refusé (acceptés : ${PRODUCT_FILE_EXTENSIONS.join(", ")}).`;
+    if (err.status === 503)
+      return "Stockage des fichiers non configuré côté serveur (jeton GitHub manquant).";
+    if (err.status === 401) return "Session admin expirée — reconnectez-vous.";
+    return err.message || "Téléversement impossible.";
+  }
+  return err instanceof Error ? err.message : "Téléversement impossible.";
+}
+
+/**
+ * POST /api/admin/products/:id/file (multipart, champ `file`) — fichier livré du produit.
+ * Le produit doit exister (édition). Limite 25 Mo, formats pdf/epub/mobi/zip/mp4/apk.
+ */
+export async function uploadProductFile(productId: string, file: File): Promise<ProductFileInfo> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await apiFetch<{ ok: boolean; file?: Partial<ProductFileInfo> }>(
+    `/api/admin/products/${encodeURIComponent(productId)}/file`,
+    // apiFetch multiplie le délai par 4 hors GET : 30 000 ms ⇒ 120 s pour un envoi de 25 Mo
+    { method: "POST", formData, auth: true, timeoutMs: 30_000 },
+  );
+  const info = res.file || {};
+  return {
+    name: affiliateStr(info.name) || file.name,
+    size: affiliateNum(info.size) || file.size,
+    mime: affiliateStr(info.mime) || file.type,
+    url: affiliateStr(info.url),
+  };
+}
+
+/** DELETE /api/admin/products/:id/file — retire le fichier livré du produit */
+export async function deleteProductFile(productId: string): Promise<void> {
+  await apiFetch(`/api/admin/products/${encodeURIComponent(productId)}/file`, {
+    method: "DELETE",
+    auth: true,
+    timeoutMs: 9000,
+  });
+}
+
+/** Filtre de la liste admin des licences */
+export type AdminLicenseStatusFilter = "all" | "active" | "revoked";
+
+/** Ligne de GET /api/admin/licenses (user pseudo/email + produit + activations + dates) */
+export interface AdminLicense {
+  id: string;
+  productId: string;
+  productTitle: string;
+  pseudo: string;
+  email: string;
+  licenseKey: string;
+  /** Statut brut du serveur (« active » / « revoked ») */
+  status: string;
+  activationsCount: number;
+  maxActivations: number;
+  createdAt: number | null;
+  revokedAt: number | null;
+}
+
+export function isAdminLicenseRevoked(license: AdminLicense): boolean {
+  return license.status === "revoked" || license.revokedAt !== null;
+}
+
+/**
+ * GET /api/admin/licenses?status=&product_id= — clés de licence générées par les achats.
+ * Tolérant sur la forme (produit/user imbriqués ou plats) : seule la mise en forme est
+ * normalisée, aucune valeur métier n'est inventée.
+ */
+export async function fetchAdminLicenses(
+  status: AdminLicenseStatusFilter = "all",
+  productId?: string,
+): Promise<AdminLicense[]> {
+  const params = new URLSearchParams();
+  if (status !== "all") params.set("status", status);
+  if (productId) params.set("product_id", productId);
+  const query = params.toString();
+  const res = await apiFetch<{ ok: boolean; licenses?: unknown[] }>(
+    `/api/admin/licenses${query ? `?${query}` : ""}`,
+    { auth: true, timeoutMs: 6000 },
+  );
+  return (res.licenses || []).map((raw) => {
+    const item = (raw || {}) as Record<string, unknown> & {
+      user?: { pseudo?: unknown; email?: unknown } | null;
+      product?: { id?: unknown; title?: unknown } | null;
+    };
+    return {
+      id: affiliateStr(item.id),
+      productId: affiliateStr(item.productId) || affiliateStr(item.product_id) || affiliateStr(item.product?.id),
+      productTitle:
+        affiliateStr(item.productTitle) ||
+        affiliateStr(item.product_title) ||
+        affiliateStr(item.product?.title),
+      pseudo: affiliateStr(item.pseudo) || affiliateStr(item.user?.pseudo),
+      email: affiliateStr(item.email) || affiliateStr(item.user?.email),
+      licenseKey: affiliateStr(item.licenseKey) || affiliateStr(item.license_key),
+      status: affiliateStr(item.status) || "active",
+      activationsCount: affiliateNum(item.activationsCount ?? item.activations_count),
+      maxActivations: affiliateNum(item.maxActivations ?? item.max_activations),
+      createdAt: affiliateTs(item.createdAt ?? item.created_at),
+      revokedAt: affiliateTs(item.revokedAt ?? item.revoked_at),
+    } satisfies AdminLicense;
+  });
+}
+
+/** POST /api/admin/licenses/:id/revoke — révoque définitivement une clé (irréversible) */
+export async function revokeLicense(id: string): Promise<void> {
+  await apiFetch(`/api/admin/licenses/${encodeURIComponent(id)}/revoke`, {
+    method: "POST",
+    auth: true,
+    timeoutMs: 8000,
+  });
+}
+
 /* ---------- Réglages (GET/POST /api/admin/settings) ---------- */
 
 export interface AdminSettings {

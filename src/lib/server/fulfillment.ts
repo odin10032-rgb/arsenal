@@ -32,6 +32,7 @@
 
 import { createChariowCheckout, readChariowApiKey } from "./chariow-checkout";
 import { getSetting } from "./store";
+import { licenseStatementsIfApplicable } from "./delivery-license";
 import type { PurchaseRow } from "./purchases";
 
 /* -------------------------------- Constantes -------------------------------- */
@@ -477,8 +478,15 @@ export async function fulfillPurchase(
     arsenalUser: purchase.user_id,
   });
 
-  /** Succès : livraison effective → fulfillment `completed`, purchase `fulfilled`. */
+  /** Succès : livraison effective → fulfillment `completed`, purchase `fulfilled`.
+   *  Si le produit est `delivery_kind = 'license'`, la clé est générée dans le
+   *  même lot (idempotent : rejouer ne crée pas de seconde clé). */
   const succeed = async (reference: string | null): Promise<FulfillmentOutcome> => {
+    const licenseStatements = await licenseStatementsIfApplicable(db, {
+      purchaseId: purchase.id,
+      userId: purchase.user_id,
+      productId: purchase.product_id,
+    });
     await db.batch([
       completeFulfillmentStatement(db, fulfillment, {
         provider,
@@ -487,6 +495,7 @@ export async function fulfillPurchase(
         now,
       }),
       markPurchaseFulfilledStatement(db, purchase.id, now),
+      ...licenseStatements,
     ]);
     return {
       attempted: true,

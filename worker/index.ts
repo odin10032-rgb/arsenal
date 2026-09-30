@@ -17,6 +17,9 @@ import { adminAffiliationRoutes } from "./routes/admin-affiliation";
 import { purchaseRoutes } from "./routes/purchases";
 import { adminPurchaseRoutes } from "./routes/admin-purchases";
 import { adminChariowRoutes } from "./routes/admin-chariow";
+import { adminFileRoutes } from "./routes/product-files";
+import { downloadRoutes } from "./routes/downloads";
+import { licenseVerifyRoutes, licenseUserRoutes, licenseAdminRoutes } from "./routes/licenses";
 import { PURCHASE_MAX_PER_MIN_DEFAULT, readPurchaseMaxPerMin } from "../src/lib/server/purchases";
 import { rateLimit } from "./middleware/rate-limit";
 
@@ -95,6 +98,12 @@ app.use(
   "/api/admin/products/:id/chariow-link",
   rateLimit({ limit: 10, windowMs: 60_000, label: "admin-chariow-link" })
 );
+/** Fichier livrable + licences (phase 2.6, vente en A autonome). */
+app.use(
+  "/api/admin/products/:id/file",
+  rateLimit({ limit: 10, windowMs: 60_000, label: "admin-product-file" })
+);
+app.use("/api/licenses/verify", rateLimit({ limit: 30, windowMs: 60_000, label: "license-verify" }));
 
 app.route("/", healthRoutes);
 app.route("/", productRoutes);
@@ -112,6 +121,11 @@ app.route("/", adminAffiliationRoutes);
 app.route("/", purchaseRoutes);
 app.route("/", adminPurchaseRoutes);
 app.route("/", adminChariowRoutes);
+app.route("/", adminFileRoutes);
+app.route("/", downloadRoutes);
+app.route("/", licenseVerifyRoutes);
+app.route("/", licenseUserRoutes);
+app.route("/", licenseAdminRoutes);
 
 app.notFound((c) => c.json({ ok: false, error: "Route introuvable." }, 404));
 

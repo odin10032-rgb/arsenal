@@ -18,6 +18,7 @@
 
 import { aTransactionStatement, guardedDebitStatement, transactionExistsSql } from "./ledger";
 import { getSetting, setSetting } from "./store";
+import { securityEventStatement } from "./user-auth";
 import { CHARIOW_API_KEY_SETTING } from "./chariow-checkout";
 import {
   getAffiliateById,
@@ -78,6 +79,15 @@ export const AFFILIATE_REF_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 export const PURCHASE_MAX_PER_MIN_KEY = "purchase_max_per_min";
 export const PURCHASE_MAX_PER_MIN_DEFAULT = 5;
 const PURCHASE_MAX_PER_MIN_MAX = 120;
+
+/** Réglage du plafond de téléchargements par heure et PAR UTILISATEUR (défaut 20). */
+export const DOWNLOAD_MAX_PER_HOUR_KEY = "download_max_per_hour";
+export const DOWNLOAD_MAX_PER_HOUR_DEFAULT = 20;
+const DOWNLOAD_MAX_PER_HOUR_MAX = 1000;
+/** Fenêtre du compteur de téléchargements (une heure). */
+export const DOWNLOAD_WINDOW_MS = 60 * 60 * 1000;
+/** Action journalisée pour chaque téléchargement servi (compteur + traçabilité). */
+export const PURCHASE_DOWNLOAD_ACTION = "purchase_download";
 
 /* ---------------------------------- Types ---------------------------------- */
 
@@ -235,6 +245,90 @@ export async function getPurchaseForUser(
 /** Statut relançable (contrat : `fulfillment_pending` | `failed`). */
 export function isRetryablePurchaseStatus(status: string): boolean {
   return (RETRYABLE_PURCHASE_STATUSES as readonly string[]).includes(status);
+}
+
+/* --------------------------- Téléchargement vérifié --------------------------- */
+/* L'URL GitHub du fichier livrable n'est JAMAIS renvoyée au client : la seule
+ * voie d'accès est `GET /api/purchases/:id/download`, qui exige la session de
+ * l'ACHETEUR et un achat `fulfilled`. Lecture scopée par `user_id` : un achat
+ * d'autrui est introuvable (404) — jamais de fuite d'existence. */
+
+/** Achat + fichier livrable de son produit (colonnes `product_file_*`). */
+export interface PurchaseDownloadRow {
+  id: string;
+  user_id: string;
+  product_id: string;
+  status: string;
+  product_file_url: string | null;
+  product_file_name: string | null;
+  product_file_size: number | null;
+  product_file_mime: string | null;
+}
+
+export async function getPurchaseForDownload(
+  db: D1Database,
+  userId: string,
+  purchaseId: string
+): Promise<PurchaseDownloadRow | null> {
+  const id = (purchaseId ?? "").trim();
+  if (!id) return null;
+  const row = await db
+    .prepare(
+      `SELECT p.id, p.user_id, p.product_id, p.status,
+              pr.product_file_url AS product_file_url,
+              pr.product_file_name AS product_file_name,
+              pr.product_file_size AS product_file_size,
+              pr.product_file_mime AS product_file_mime
+         FROM purchases p
+         LEFT JOIN products pr ON pr.id = p.product_id
+        WHERE p.id = ? AND p.user_id = ?`
+    )
+    .bind(id, userId)
+    .first<PurchaseDownloadRow>();
+  return row ?? null;
+}
+
+/**
+ * Nombre de téléchargements servis à cet utilisateur depuis `since`
+ * (compteur du réglage `download_max_per_hour`). Ne compte QUE les
+ * téléchargements réellement servis — un échec de récupération du fichier ne
+ * consomme jamais de place.
+ */
+export async function countRecentDownloads(
+  db: D1Database,
+  userId: string,
+  since: number
+): Promise<number> {
+  const row = await db
+    .prepare(
+      `SELECT COUNT(*) AS n FROM security_events
+        WHERE action = ? AND actor = ? AND at > ?`
+    )
+    .bind(PURCHASE_DOWNLOAD_ACTION, userId, Math.trunc(since))
+    .first<{ n: number }>();
+  return Math.trunc(Number(row?.n) || 0);
+}
+
+/**
+ * Journalisation d'un téléchargement servi : c'est LUI le compteur du réglage
+ * `download_max_per_hour` (une ligne par téléchargement réellement servi), et
+ * la traçabilité de la livraison (qui a téléchargé quoi, quand, quelle IP).
+ */
+export function downloadEventStatement(
+  db: D1Database,
+  input: {
+    userId: string;
+    purchaseId: string;
+    productId: string;
+    ipHash?: string | null;
+  }
+): D1PreparedStatement {
+  return securityEventStatement(db, {
+    actor: input.userId,
+    action: PURCHASE_DOWNLOAD_ACTION,
+    ipHash: input.ipHash ?? null,
+    meta: { purchaseId: input.purchaseId, productId: input.productId },
+  });
 }
 
 /* ------------------------------- Jointures ------------------------------- */
@@ -811,9 +905,32 @@ export async function readPurchaseMaxPerMin(db: D1Database): Promise<number> {
   return normalizePurchaseMaxPerMin(await getSetting(db, PURCHASE_MAX_PER_MIN_KEY));
 }
 
+/**
+ * Plafond de téléchargements par heure et par utilisateur (défaut 20) : une
+ * valeur absente/illisible retombe sur le défaut (jamais de blocage accidentel),
+ * une valeur excessive est bornée.
+ */
+export function normalizeDownloadMaxPerHour(raw: unknown): number {
+  if (raw === null || raw === undefined) return DOWNLOAD_MAX_PER_HOUR_DEFAULT;
+  const text = typeof raw === "string" ? raw.trim() : "";
+  if (typeof raw === "string" && text === "") return DOWNLOAD_MAX_PER_HOUR_DEFAULT;
+  const value = typeof raw === "number" ? raw : Number(text);
+  if (!Number.isFinite(value) || value <= 0) return DOWNLOAD_MAX_PER_HOUR_DEFAULT;
+  return Math.min(Math.trunc(value), DOWNLOAD_MAX_PER_HOUR_MAX);
+}
+
+/** Plafond effectif de téléchargements par heure et par utilisateur (défaut 20). */
+export async function readDownloadMaxPerHour(db: D1Database): Promise<number> {
+  return normalizeDownloadMaxPerHour(await getSetting(db, DOWNLOAD_MAX_PER_HOUR_KEY));
+}
+
 /** Clés de réglage de la Phase 2.6 (whitelist de `POST /api/admin/settings`). */
 export function isPurchaseSettingKey(key: string): boolean {
-  return key === PURCHASE_MAX_PER_MIN_KEY || key === CHARIOW_API_KEY_SETTING;
+  return (
+    key === PURCHASE_MAX_PER_MIN_KEY ||
+    key === DOWNLOAD_MAX_PER_HOUR_KEY ||
+    key === CHARIOW_API_KEY_SETTING
+  );
 }
 
 /**

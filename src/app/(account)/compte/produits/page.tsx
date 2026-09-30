@@ -9,7 +9,12 @@
  *   • fulfillment_pending / failed → état « livraison en cours / en échec » bien visible
  *     avec bouton Relancer (POST /api/purchases/:id/retry, idempotent) ;
  *   • fulfilled → panneau d'accès (portail Chariow app.ateliat.com clé par l'email, ou
- *     instructions fournies par l'admin).
+ *     instructions fournies par l'admin) puis livraison du produit :
+ *       – deliveryKind = 'file' → bouton Télécharger (GET /api/purchases/:id/download en
+ *         Bearer → Blob → téléchargement navigateur), désactivé tant que la livraison
+ *         n'est pas terminée ;
+ *       – deliveryKind = 'license' → clé lue via GET /api/me/licenses (mono, copiable,
+ *         compteur d'activations, message si révoquée).
  *
  * Aucun montant ni statut n'est calculé ici : tout vient de l'API.
  * Garde : non connecté → /connexion (pattern des pages /compte).
@@ -25,12 +30,16 @@ import { ApiError } from "@/lib/api";
 import { fmt } from "@/lib/format";
 import {
   canRetryPurchase,
+  downloadPurchaseFile,
+  fetchMyLicenses,
   fetchMyPurchases,
   isDeliveryFailed,
   isDeliveryPending,
+  isLicenseRevoked,
   retryPurchase,
   type Purchase,
   type PurchaseStatus,
+  type UserLicense,
 } from "@/lib/purchases";
 import { logout } from "@/lib/user-auth";
 
@@ -78,6 +87,10 @@ export default function MyProductsPage() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  /** Clés de licence par produit (GET /api/me/licenses) — vide si aucune n'est nécessaire */
+  const [licenses, setLicenses] = useState<Record<string, UserLicense>>({});
+  const [licensesError, setLicensesError] = useState(false);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Garde : session absente → porte de connexion (une fois le boot terminé)
@@ -91,10 +104,34 @@ export default function MyProductsPage() {
     noticeTimer.current = setTimeout(() => setNotice(""), 3500);
   }, []);
 
+  /**
+   * Clés de licence : lecture unique, seulement si un achat du lot est en mode « licence »
+   * (aucun appel inutile). Un échec n'invalide pas la page : le bloc affiche son propre message.
+   */
+  const loadLicenses = useCallback(async (needed: boolean) => {
+    if (!needed) {
+      setLicenses({});
+      setLicensesError(false);
+      return;
+    }
+    try {
+      const list = await fetchMyLicenses();
+      const byProduct: Record<string, UserLicense> = {};
+      for (const license of list) if (license.productId) byProduct[license.productId] = license;
+      setLicenses(byProduct);
+      setLicensesError(false);
+    } catch {
+      setLicenses({});
+      setLicensesError(true);
+    }
+  }, []);
+
   const load = useCallback(async () => {
     try {
-      setPurchases(await fetchMyPurchases());
+      const list = await fetchMyPurchases();
+      setPurchases(list);
       setError("");
+      void loadLicenses(list.some((p) => p.product.deliveryKind === "license"));
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
         // Session invalide ou expirée : nettoyage local + porte de connexion
@@ -106,7 +143,7 @@ export default function MyProductsPage() {
     } finally {
       setPageLoading(false);
     }
-  }, [router]);
+  }, [router, loadLicenses]);
 
   // Chargement unique au boot (une fois la session connue)
   const startedRef = useRef(false);
@@ -141,6 +178,36 @@ export default function MyProductsPage() {
       setError(err instanceof Error ? err.message : "Relance impossible pour le moment.");
     } finally {
       setRetryingId(null);
+    }
+  };
+
+  /** Téléchargement du fichier livré (Bearer → Blob → téléchargement navigateur) */
+  const download = async (purchase: Purchase) => {
+    if (downloadingId) return;
+    setDownloadingId(purchase.id);
+    setError("");
+    try {
+      await downloadPurchaseFile(purchase.id, purchase.product.title || "fichier");
+      flashNotice("Téléchargement lancé.");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        await logout();
+        router.replace("/connexion");
+        return;
+      }
+      setError(err instanceof Error ? err.message : "Téléchargement impossible pour le moment.");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  /** Copie de la clé de licence (le presse-papiers peut être refusé hors HTTPS) */
+  const copyLicenseKey = async (licenseKey: string) => {
+    try {
+      await navigator.clipboard.writeText(licenseKey);
+      flashNotice("Clé de licence copiée.");
+    } catch {
+      setError("Copie impossible sur ce navigateur — sélectionnez la clé à la main.");
     }
   };
 
@@ -230,6 +297,15 @@ export default function MyProductsPage() {
               const failed = isDeliveryFailed(p);
               const retryable = canRetryPurchase(p);
               const busy = retryingId === p.id;
+              const delivered = p.status === "fulfilled";
+              // Livraison du produit (champ absent = comportement existant : rien à afficher)
+              const deliveryKind = p.product.deliveryKind ?? null;
+              const license = licenses[p.productId];
+              const downloadBusy = downloadingId === p.id;
+              const showDelivery =
+                (deliveryKind === "file" || deliveryKind === "license") &&
+                p.status !== "refunded" &&
+                p.status !== "cancelled";
 
               return (
                 <li key={p.id} className="rounded-2xl border border-[#333] bg-[#141414] p-4 sm:p-5">
@@ -308,6 +384,113 @@ export default function MyProductsPage() {
                   {p.status === "fulfilled" && (
                     <div className="mt-4 border-t border-dashed border-[#333] pt-4">
                       <PurchaseAccessPanel purchase={p} sessionEmail={user.email} />
+                    </div>
+                  )}
+
+                  {/* Fichier téléchargeable (deliveryKind = 'file') */}
+                  {showDelivery && deliveryKind === "file" && (
+                    <div className="mt-4 border-t border-dashed border-[#333] pt-4">
+                      <button
+                        type="button"
+                        onClick={() => void download(p)}
+                        disabled={!delivered || downloadingId !== null}
+                        className={delivered ? "btn-arsenal btn-primary w-full" : "btn-arsenal btn-ghost w-full"}
+                      >
+                        {downloadBusy ? (
+                          <span className="spin" />
+                        ) : (
+                          <svg
+                            viewBox="0 0 24 24"
+                            width="16"
+                            height="16"
+                            aria-hidden="true"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <path d="M12 3v12m0 0 4-4m-4 4-4-4M4 21h16" />
+                          </svg>
+                        )}
+                        Télécharger le fichier
+                      </button>
+                      <p className="mt-1.5 text-[0.72rem] leading-relaxed text-[#666]">
+                        {delivered
+                          ? "Lien personnel lié à votre compte — ne le partagez pas."
+                          : failed
+                            ? "Désactivé : la livraison a échoué — relancez-la ci-dessous."
+                            : "Désactivé : disponible dès que la livraison de cette commande sera confirmée."}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Clé de licence (deliveryKind = 'license') */}
+                  {showDelivery && deliveryKind === "license" && (
+                    <div className="mt-4 border-t border-dashed border-[#333] pt-4">
+                      {!delivered ? (
+                        <>
+                          <button type="button" disabled className="btn-arsenal btn-ghost w-full">
+                            Clé de licence
+                          </button>
+                          <p className="mt-1.5 text-[0.72rem] leading-relaxed text-[#666]">
+                            {failed
+                              ? "Désactivée : la livraison a échoué — relancez-la ci-dessous."
+                              : "Votre clé s'affichera ici dès que la livraison de cette commande sera confirmée."}
+                          </p>
+                        </>
+                      ) : license ? (
+                        <div
+                          className="rounded-[10px] border px-3.5 py-3"
+                          style={
+                            isLicenseRevoked(license)
+                              ? { borderColor: "rgba(230,57,70,0.45)", background: "rgba(230,57,70,0.1)" }
+                              : { borderColor: "#333", background: "rgba(255,255,255,0.02)" }
+                          }
+                        >
+                          <p className="font-mono text-[0.64rem] uppercase tracking-[0.12em] text-[#666]">
+                            Clé de licence
+                          </p>
+                          <p className="mt-1 break-all font-mono text-[0.86rem] text-[#f0f0f0]">
+                            {license.licenseKey}
+                          </p>
+                          <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
+                            <button
+                              type="button"
+                              onClick={() => void copyLicenseKey(license.licenseKey)}
+                              className="btn-arsenal btn-ghost"
+                            >
+                              Copier
+                            </button>
+                            <span className="font-mono text-[0.72rem] text-[#a0a0a0]">
+                              {license.maxActivations > 0
+                                ? `${fmt(license.activationsCount)} / ${fmt(license.maxActivations)} appareils`
+                                : `${fmt(license.activationsCount)} appareil${license.activationsCount > 1 ? "s" : ""} activé${license.activationsCount > 1 ? "s" : ""}`}
+                            </span>
+                          </div>
+                          {isLicenseRevoked(license) && (
+                            <p className="mt-2 text-[0.76rem] leading-relaxed text-[#fda4af]">
+                              Cette clé a été révoquée
+                              {license.revokedAt ? ` le ${formatDate(license.revokedAt)}` : ""} : elle
+                              n&apos;active plus aucun nouvel appareil. Contactez l&apos;équipe Arsenal
+                              si vous pensez qu&apos;il s&apos;agit d&apos;une erreur.
+                            </p>
+                          )}
+                          <p className="mt-1.5 text-[0.72rem] leading-relaxed text-[#666]">
+                            À saisir dans l&apos;application du produit — chaque appareil activé
+                            consomme une activation.
+                          </p>
+                        </div>
+                      ) : licensesError ? (
+                        <p className="rounded-[10px] border border-[rgba(244,162,97,0.4)] bg-[rgba(244,162,97,0.07)] px-3.5 py-3 text-[0.78rem] leading-relaxed text-[#f4a261]">
+                          Clés de licence momentanément indisponibles — rechargez la page ou
+                          réessayez plus tard.
+                        </p>
+                      ) : (
+                        <p className="font-mono text-[0.78rem] text-[#666]">
+                          Chargement de votre clé de licence…
+                        </p>
+                      )}
                     </div>
                   )}
 

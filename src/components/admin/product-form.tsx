@@ -3,12 +3,21 @@
 /**
  * Formulaire produit (création / édition) — panneau latéral
  * Champs conditionnels : PWA (mobile), commande (terminal), aperçu vidéo live,
- * image par URL ou dropzone (upload API + repli compression locale).
+ * image par URL ou dropzone (upload API + repli compression locale),
+ * livraison en A (fichier téléchargeable ou clé de licence).
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { uploadImage } from "@/lib/admin";
+import {
+  MAX_PRODUCT_FILE_BYTES,
+  PRODUCT_FILE_EXTENSIONS,
+  deleteProductFile,
+  productFileErrorMessage,
+  uploadImage,
+  uploadProductFile,
+} from "@/lib/admin";
 import { apiFetch } from "@/lib/api";
+import { fmtBytes } from "@/lib/format";
 import { ACTION_TYPES, BADGES, BADGE_LABELS, Badge, CATEGORIES, Category, ActionType, Product, safeUrl } from "@/lib/products";
 import { parseVideoUrl } from "@/lib/video";
 import { toast } from "@/lib/toast";
@@ -57,6 +66,19 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
   const [chariowDiscountCode, setChariowDiscountCode] = useState(
     product?.chariowDiscountCode ?? "",
   );
+  // Livraison (Phase 2.7) — 'none' = méthode Chariow/manuelle existante
+  const [deliveryKind, setDeliveryKind] = useState<"none" | "file" | "license">(
+    product?.deliveryKind === "file" ? "file" : product?.deliveryKind === "license" ? "license" : "none",
+  );
+  const [storedFile, setStoredFile] = useState<{ name: string; size: number } | null>(
+    product?.productFileName
+      ? { name: product.productFileName, size: product.productFileSize ?? 0 }
+      : null,
+  );
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [removingFile, setRemovingFile] = useState(false);
+  const [fileDragOver, setFileDragOver] = useState(false);
+  const productFileRef = useRef<HTMLInputElement>(null);
 
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -87,6 +109,54 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
       toast(err instanceof Error ? err.message : "Téléversement impossible.", "error");
     } finally {
       setUploading(false);
+    }
+  };
+
+  /**
+   * Upload du fichier livré — réservé à l'édition (le produit doit exister).
+   * Le serveur reste l'arbitre : contrôles locaux (taille, extension) puis erreurs du
+   * contrat (413 / 400 / 503) rendues en message explicite.
+   */
+  const onDropProductFile = async (file: File | undefined | null) => {
+    if (!file || !product) return;
+    if (file.size > MAX_PRODUCT_FILE_BYTES)
+      return toast("Fichier trop volumineux (25 Mo maximum).", "error");
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    if (!(PRODUCT_FILE_EXTENSIONS as readonly string[]).includes(ext))
+      return toast(
+        `Format refusé — acceptés : ${PRODUCT_FILE_EXTENSIONS.join(", ").toUpperCase()}.`,
+        "error",
+      );
+    if (uploadingFile || removingFile) return;
+    setUploadingFile(true);
+    try {
+      const info = await uploadProductFile(product.id, file);
+      setStoredFile({ name: info.name || file.name, size: info.size || file.size });
+      toast(
+        product.deliveryKind === "file"
+          ? "Nouveau fichier téléversé."
+          : "Fichier téléversé — enregistrez le produit pour activer la livraison.",
+        "success",
+      );
+    } catch (err) {
+      toast(productFileErrorMessage(err), "error");
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  /** Retrait du fichier livré (immédiat côté serveur — le mode de livraison, lui, se règle avec « Enregistrer ») */
+  const removeProductFile = async () => {
+    if (!product || uploadingFile || removingFile) return;
+    setRemovingFile(true);
+    try {
+      await deleteProductFile(product.id);
+      setStoredFile(null);
+      toast("Fichier retiré du serveur.", "success");
+    } catch (err) {
+      toast(productFileErrorMessage(err), "error");
+    } finally {
+      setRemovingFile(false);
     }
   };
 
@@ -135,6 +205,8 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
       chariowProductId: chariowProductId.trim() || null,
       chariowDiscountCode: chariowDiscountCode.trim().toUpperCase() || null,
       fulfillmentMethod,
+      // Livraison (Phase 2.7) — null = méthode existante (Chariow / manuelle)
+      deliveryKind: deliveryKind === "none" ? null : deliveryKind,
     };
     try {
       if (product) {
@@ -623,6 +695,160 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
                 )}
               </div>
             )}
+
+            {/* Livraison (Phase 2.7) — fichier téléchargeable ou clé de licence, appliqués aux achats en A */}
+            <div className="mt-4 flex flex-col gap-3 border-t border-dashed border-[#333] pt-4">
+              <div>
+                <p className="text-[0.84rem] font-semibold">Livraison</p>
+                <p className="mt-0.5 text-[0.72rem] leading-relaxed text-[#666]">
+                  {purchasable
+                    ? "Ce que le client reçoit après un achat en A."
+                    : "Appliqué aux achats en A — cochez « Achetable avec des A » ci-dessus pour l'utiliser."}
+                </p>
+              </div>
+
+              <label>
+                <span className="mb-1.5 block text-[0.8rem] text-[#a0a0a0]">Mode de livraison</span>
+                <select
+                  className="input-arsenal cursor-pointer"
+                  value={deliveryKind}
+                  onChange={(e) =>
+                    setDeliveryKind(
+                      e.target.value === "file" ? "file" : e.target.value === "license" ? "license" : "none",
+                    )
+                  }
+                >
+                  <option value="none">Via Chariow (aucun fichier ni clé)</option>
+                  <option value="file">Fichier téléchargeable</option>
+                  <option value="license">Clé de licence</option>
+                </select>
+              </label>
+
+              {deliveryKind === "file" && !product && (
+                <p className="rounded-[10px] border border-dashed border-[#333] px-3.5 py-3 text-[0.76rem] leading-relaxed text-[#666]">
+                  Enregistrez d&apos;abord le produit pour téléverser son fichier.
+                </p>
+              )}
+
+              {deliveryKind === "file" && product && (
+                <div className="flex flex-col gap-2.5">
+                  {storedFile && (
+                    <div className="flex flex-wrap items-center gap-3 rounded-[10px] border border-[#333] bg-[rgba(255,255,255,0.02)] px-3.5 py-3">
+                      <svg
+                        viewBox="0 0 24 24"
+                        width="20"
+                        height="20"
+                        fill="none"
+                        stroke="#4fb3a1"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                        <path d="M14 2v6h6" />
+                      </svg>
+                      <div className="min-w-0 flex-1">
+                        <p className="break-all font-mono text-[0.76rem] text-[#f0f0f0]">
+                          {storedFile.name}
+                        </p>
+                        <p className="mt-0.5 font-mono text-[0.66rem] text-[#666]">
+                          {storedFile.size > 0 ? fmtBytes(storedFile.size) : "taille inconnue"} · fichier
+                          livré actuel
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void removeProductFile()}
+                        disabled={uploadingFile || removingFile}
+                        className="btn-arsenal btn-danger"
+                      >
+                        {removingFile && <span className="spin" />}
+                        Retirer
+                      </button>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => productFileRef.current?.click()}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setFileDragOver(true);
+                    }}
+                    onDragLeave={() => setFileDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      setFileDragOver(false);
+                      void onDropProductFile(e.dataTransfer.files?.[0]);
+                    }}
+                    disabled={uploadingFile || removingFile}
+                    className={`flex min-h-[96px] flex-col items-center justify-center gap-1.5 rounded-[10px] border-[1.6px] border-dashed p-4 text-center transition-colors ${
+                      fileDragOver
+                        ? "border-[#2a9d8f] bg-[rgba(42,157,143,0.1)] text-[#4fb3a1]"
+                        : "border-[rgba(230,57,70,0.4)] bg-[rgba(230,57,70,0.045)] text-[#666] hover:border-[rgba(230,57,70,0.7)]"
+                    }`}
+                  >
+                    {uploadingFile ? (
+                      <>
+                        <span className="spin" />
+                        <span className="font-mono text-[0.7rem]">Téléversement en cours…</span>
+                      </>
+                    ) : (
+                      <>
+                        <svg
+                          viewBox="0 0 24 24"
+                          width="20"
+                          height="20"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <path d="M12 16V4m0 0 4 4m-4-4-4 4M4 20h16" />
+                        </svg>
+                        <span className="text-[0.84rem] font-semibold text-[#a0a0a0]">
+                          {storedFile
+                            ? "Glissez-déposez un nouveau fichier pour remplacer"
+                            : "Glissez-déposez le fichier livré ici"}
+                        </span>
+                        <span className="font-mono text-[0.66rem]">
+                          PDF · EPUB · MOBI · ZIP · MP4 · APK — 25 Mo max
+                        </span>
+                      </>
+                    )}
+                  </button>
+                  <input
+                    ref={productFileRef}
+                    type="file"
+                    accept=".pdf,.epub,.mobi,.zip,.mp4,.apk,application/pdf,application/epub+zip,application/x-mobipocket-ebook,application/zip,application/vnd.android.package-archive,video/mp4"
+                    className="hidden"
+                    onChange={(e) => void onDropProductFile(e.target.files?.[0])}
+                  />
+                  <p className="text-[0.68rem] leading-relaxed text-[#666]">
+                    Le fichier est stocké dès le téléversement, mais le client ne pourra le
+                    télécharger qu&apos;une fois la livraison terminée. Cliquez sur « Enregistrer »
+                    pour appliquer ce mode de livraison au produit.
+                  </p>
+                </div>
+              )}
+
+              {deliveryKind === "license" && (
+                <p className="rounded-[10px] border border-[rgba(42,157,143,0.35)] bg-[rgba(42,157,143,0.06)] px-3.5 py-3 text-[0.76rem] leading-relaxed text-[#a0a0a0]">
+                  Une clé de licence sera générée automatiquement à chaque achat et vérifiable par
+                  votre application (activation par appareil, révocation possible depuis l&apos;onglet
+                  Licences).
+                </p>
+              )}
+
+              {deliveryKind === "none" && (
+                <p className="text-[0.72rem] leading-relaxed text-[#666]">
+                  Aucun fichier ni clé : la livraison suit la méthode Chariow / manuelle choisie
+                  ci-dessus.
+                </p>
+              )}
+            </div>
           </div>
         </div>
 

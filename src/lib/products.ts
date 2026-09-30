@@ -40,6 +40,16 @@ export interface Product {
   fulfillmentMethod?: string | null;
   /** Code promo Chariow réservé aux achats en A (méthode chariow_discount_checkout) */
   chariowDiscountCode?: string | null;
+  /* --- Livraison fichier / licence (Phase 2.7 — miroir du backend) --- */
+  /**
+   * Mode de livraison appliqué aux achats : `'file'` (fichier téléchargeable),
+   * `'license'` (clé générée à chaque achat) ou `null` (méthode Chariow / manuelle).
+   */
+  deliveryKind?: "file" | "license" | null;
+  /** Nom du fichier livré (deliveryKind = 'file') — null si aucun fichier */
+  productFileName?: string | null;
+  /** Taille du fichier en octets (deliveryKind = 'file') — null si inconnue */
+  productFileSize?: number | null;
 }
 
 export const CATEGORIES: Record<Category, string> = {

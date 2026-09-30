@@ -32,7 +32,30 @@ export interface Product {
   fulfillmentMethod?: FulfillmentMethod;
   /** Code promo Chariow réservé aux achats en A (méthode `chariow_discount_checkout`). */
   chariowDiscountCode?: string | null;
+  /* --- Fichier livrable + licences (Phase 2.6 — migration 0006) --- */
+  /**
+   * URL GitHub raw du fichier livrable. INTERNE : le catalogue public ne
+   * l'expose JAMAIS (le téléchargement passe par
+   * `GET /api/purchases/:id/download`, qui vérifie l'achat côté serveur).
+   */
+  productFileUrl?: string | null;
+  /** Nom de fichier présenté au téléchargement (`Content-Disposition`). */
+  productFileName?: string | null;
+  /** Taille du fichier en octets (≤ 25 Mo, limite de l'API Contents GitHub). */
+  productFileSize?: number | null;
+  /** Type MIME du fichier (repli : extension). */
+  productFileMime?: string | null;
+  /**
+   * Type de livraison du produit (interne, non exposé publiquement) :
+   * `file` (téléchargement vérifié du fichier livrable), `license` (clé générée
+   * à la livraison) ou `null` (aucune livraison Arsenal — portail Chariow,
+   * instructions manuelles, etc.).
+   */
+  deliveryKind?: DeliveryKind;
 }
+
+/** Type de livraison d'un produit (Phase 2.6 — vente en A autonome). */
+export type DeliveryKind = "file" | "license";
 
 /**
  * Méthodes de livraison d'un produit (contrat § Fulfillment) :

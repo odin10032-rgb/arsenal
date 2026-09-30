@@ -67,7 +67,11 @@ export type SecurityEventAction =
   | "user_login_fail"
   | "logout"
   /** Phase 2 : mutations administrateur (`admin_affiliate_status`, `admin_sale_create`, …). */
-  | `admin_${string}`;
+  | `admin_${string}`
+  /** Phase 2.6 : téléchargement d'un fichier produit (traçabilité). */
+  | "purchase_download"
+  /** Phase 2.6 : un affilié a tenté d'acheter avec son propre code. */
+  | "self_affiliation_blocked";
 
 export interface SecurityEventInput {
   /** user_id, "admin" ou null. */
