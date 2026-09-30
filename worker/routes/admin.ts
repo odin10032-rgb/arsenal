@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import { isAdmin, unauthorized, sha256hex } from "../../src/lib/server/auth";
-import { saveConfig, getConfig } from "../../src/lib/server/store";
+import { setSetting } from "../../src/lib/server/store";
 import type { App, Env } from "../env";
 
 /**
@@ -24,9 +24,8 @@ export const adminRoutes: App = new Hono<{ Bindings: Env }>().post(
         400
       );
     }
-    const config = await getConfig(c.env.DB);
     const newToken = sha256hex(next);
-    await saveConfig(c.env.DB, { ...config, adminToken: newToken });
+    await setSetting(c.env.DB, "admin_token", newToken);
     return c.json({ ok: true, token: newToken });
   }
 );

@@ -6,7 +6,7 @@
  * (voir docs/chantier/01-plan-chantier.md).
  */
 import { createHash } from "node:crypto";
-import { getConfig } from "./store";
+import { getSetting } from "./store";
 
 interface AdminEnv {
   DB: D1Database;
@@ -25,13 +25,17 @@ export function timingSafeEqualStr(a: string, b: string): boolean {
   return diff === 0;
 }
 
+/**
+ * Token admin attendu : `settings.admin_token` (écrit par le changement de mot
+ * de passe) sinon repli sur la variable d'environnement ADMIN_PASSWORD.
+ */
 export async function getAdminToken(env: AdminEnv): Promise<string> {
-  const config = await getConfig(env.DB);
+  const stored = await getSetting(env.DB, "admin_token");
   const envPassword = env.ADMIN_PASSWORD ?? process.env.ADMIN_PASSWORD;
-  if (!config.adminToken && !envPassword) {
+  if (!stored && !envPassword) {
     throw new Error("ADMIN_PASSWORD must be set in environment variables");
   }
-  return config.adminToken || sha256hex(envPassword!);
+  return stored || sha256hex(envPassword!);
 }
 
 /** Vérifie l'en-tête X-Admin-Auth de la requête. */

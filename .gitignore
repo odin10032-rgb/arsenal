@@ -74,3 +74,4 @@ TESTING_GUIDE.md
 *.bak
 .dev.vars
 .wrangler-out/
+.prod-backup/

@@ -1,14 +1,14 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "arsenal-api",
+  "name": "beta-arsenal-api",
   "main": "worker/index.ts",
   "compatibility_date": "2026-08-31",
   "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "arsenal",
-      "database_id": "484b6903-bd1d-4e1d-8115-6a4dfc31d57f",
+      "database_name": "arsenal-db-prod",
+      "database_id": "969f85c2-1e05-48e0-b438-728e24aae71e",
       "migrations_dir": "migrations"
     }
   ],

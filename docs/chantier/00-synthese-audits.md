@@ -73,8 +73,25 @@ Aucune trace de : comptes utilisateurs, sessions, monnaie A, affiliation, Super 
 
 ---
 
-## 🧭 Décisions d'architecture qui découlent des audits
+## 🔎 Découvertes de l'inspection du Cloudflare RÉEL (30/09, après accès navigateur)
 
+L'accès direct au compte Cloudflare a révélé des écarts importants entre le dépôt et la production :
+
+| Élément | Dépôt (avant) | **Réalité de production (vérifiée)** |
+|---------|---------------|--------------------------------------|
+| Worker API | `arsenal-api` (quasi inactif, 9 requêtes) | **`beta-arsenal-api`** (54 versions, 355 requêtes) |
+| Base D1 | `arsenal` (484b6903) | **`arsenal-db-prod`** (969f85c2) |
+| Analytique | ligne unique JSON (`analytics`) | **4 tables normalisées** : `analytics_counters`, `clicks_by_product`, `visits_by_day`, `recent_visits` |
+| Réglages | table `config` | **table `settings`** (clé/valeur, clé `admin_token`) |
+| Médias | name/url/kind/size | **+ `data` (base64), `mime`, `hosted`** (`github`\|`d1`) — les octets peuvent être servis par le Worker |
+| Upload | `POST /api/media` | `POST /api/upload` (5 Mo, images uniquement) — le nôtre accepte désormais **les deux** |
+| Secrets worker | aucun | `ADMIN_PASSWORD`, `GITHUB_TOKEN`, `JWT_SECRET` + restes inutilisés `FIREBASE_*`, `FEDAPAY_*` (aucune trace dans le code déployé) |
+
+Le code du worker de production a été **sauvegardé localement** (`.prod-backup/beta-arsenal-api.js`, hors suivi git) avant toute opération, alors qu'il n'existait nulle part dans le dépôt.
+
+**Conséquence traitée en Phase 0.5 (alignement)** : `store.ts`, `auth.ts`, les routes `analytics`/`media`/`admin` et la migration `0001` ont été réécrits sur le schéma réel. Les contrats d'API sont **identiques** (vérifié en preview puis en production : même `version` de catalogue, même structure produit, média D1 servi à l'octet près). Les tables `users`, `sessions`, `a_transactions`, `security_events` ont été créées sur `arsenal-db-prod` et testées (inscription +100 A, 409 doublon, login, `/api/me`, 401) puis le compte de test a été supprimé.
+
+## 🧭 Décisions d'architecture qui découlent des audits
 1. **Reconstruire le Worker comme un seul app Hono** (`worker/index.ts` montant des routes modulaires) : code audité = code déployé, rollback possible. Portage fidèle des handlers existants (contrats préservés : enveloppe `{ok,…}`, formats identiques).
 2. **Découpler l'accès D1** : fonctions pures recevant `D1Database` en paramètre (fini `getCloudflareContext()` de `@cloudflare/next-on-pages`, pensé pour Pages Functions).
 3. **Migrations D1 versionnées** (`migrations/`, `wrangler d1 migrations`) — fin des `schema.sql` destructifs.

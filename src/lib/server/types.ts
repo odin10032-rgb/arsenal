@@ -32,9 +32,9 @@ export interface MediaItem {
   url: string;
   kind: "image";
   size: number;
+  /** base64 — uniquement pour les médias hébergés en D1 (hosted === "d1"). */
+  data?: string;
+  mime?: string;
+  hosted?: "github" | "d1";
   uploadedAt: number;
-}
-
-export interface AppConfig {
-  adminToken?: string;
 }
