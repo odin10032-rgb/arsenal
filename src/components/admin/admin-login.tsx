@@ -4,6 +4,7 @@
  * Porte de connexion admin — mot de passe + œil + erreur
  */
 
+import Link from "next/link";
 import { useState } from "react";
 import { BrandLogo } from "@/components/brand-logo";
 import { adminLogin } from "@/lib/admin";
@@ -38,7 +39,10 @@ export function AdminLogin({ onLogin }: { onLogin: (token: string) => void }) {
         className="flex w-full max-w-[400px] flex-col gap-4 rounded-2xl border border-[#333] bg-[#141414] p-8 text-center"
       >
         <div className="flex justify-center">
-          <BrandLogo size={46} />
+          {/* Le logo ramène à l'accueil du site public (cohérence avec les autres headers) */}
+          <Link href="/" aria-label="Arsenal Tools — retour à l'accueil" className="transition-opacity hover:opacity-80">
+            <BrandLogo size={46} />
+          </Link>
         </div>
         <div>
           <h1 className="font-display text-[1.35rem] font-bold">Zone administrateur</h1>

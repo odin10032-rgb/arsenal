@@ -131,7 +131,8 @@ export function AdminDashboard({
           libellés des actions masqués au profit de leurs icônes (accessibles). */}
       <header className="sticky top-0 z-50 border-b border-[#333] bg-[rgba(10,10,10,0.95)]">
         <div className="container-arsenal flex flex-wrap items-center gap-x-2.5 gap-y-2 py-2.5">
-          <Link href="/admin" className="flex flex-shrink-0 items-center gap-2">
+          {/* Le logo/marque ramène toujours à l'accueil du site public (comme le header public) */}
+          <Link href="/" className="flex flex-shrink-0 items-center gap-2" aria-label="Arsenal Tools — retour à l'accueil">
             <BrandLogo size={28} />
             <span className="text-[0.95rem] font-bold tracking-wide">
               Arsenal <span className="text-[#e63946]">Tools</span>
