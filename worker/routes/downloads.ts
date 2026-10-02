@@ -52,9 +52,25 @@ export const downloadRoutes: App = new Hono<{ Bindings: Env }>().get(
 
     let upstream: Response;
     try {
+      // Dépôt produits PRIVÉ : la lecture brute de NOTRE dépôt exige le token
+      // du Worker. Les URL d'un autre dépôt (médias publics) restent servies
+      // sans en-tête — jamais de token envoyé à un domaine tiers par erreur.
+      const githubToken = c.env.GITHUB_TOKEN || "";
+      const owner = (c.env.GITHUB_REPO_OWNER || "").trim();
+      const repo = (c.env.GITHUB_REPO_NAME || "").trim();
+      const isOwnRepo =
+        githubToken !== "" &&
+        owner !== "" &&
+        repo !== "" &&
+        purchase.product_file_url.startsWith(
+          `https://raw.githubusercontent.com/${owner}/${repo}/`
+        );
       upstream = await fetch(purchase.product_file_url, {
         // GitHub raw suit les redirections par défaut ; pas de cache.
-        headers: { "User-Agent": "Arsenal-Worker" },
+        headers: {
+          "User-Agent": "Arsenal-Worker",
+          ...(isOwnRepo ? { Authorization: `Bearer ${githubToken}` } : {}),
+        },
         cf: { cacheTtl: 0, cacheEverything: false },
       } as RequestInit);
     } catch (e: any) {

@@ -13,7 +13,10 @@
     }
   ],
   "vars": {
-    "FRONT_ORIGINS": "https://arsenal-tools.pages.dev,https://arsenal-v3-preview.pages.dev"
+    "FRONT_ORIGINS": "https://arsenal-tools.pages.dev,https://arsenal-v3-preview.pages.dev",
+    "GITHUB_REPO_OWNER": "odin10032-rgb",
+    "GITHUB_REPO_NAME": "arsenal-produits",
+    "GITHUB_BRANCH": "main"
   },
   "observability": {
     "enabled": true
