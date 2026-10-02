@@ -128,6 +128,10 @@ export interface AdminAffiliate {
   id: string;
   code: string;
   status: AffiliateStatus;
+  /** Rôle du compte (user | affiliate | super_affiliate) — Phase 3. */
+  role?: string | null;
+  /** Une demande de promotion Super Affiliate est en attente. */
+  superRequested?: boolean;
   pseudo: string;
   email: string;
   clicks: number;
@@ -175,6 +179,8 @@ export async function fetchAdminAffiliates(
       paid: affiliateNum(item.paid ?? item.commissionsPaid),
       appliedAt: affiliateTs(item.appliedAt),
       activatedAt: affiliateTs(item.activatedAt),
+      role: typeof item.role === 'string' ? item.role : null,
+      superRequested: item.superRequested === true,
     };
   });
 }
@@ -647,5 +653,102 @@ function compressImage(file: File): Promise<string> {
     };
     reader.onerror = () => reject(new Error("Fichier illisible"));
     reader.readAsDataURL(file);
+  });
+}
+
+/* ---------------- Phase 3 — campagnes & Super Affiliate ---------------- */
+
+export interface AdminCampaign {
+  id: string;
+  name: string;
+  productId: string;
+  productName: string | null;
+  startsAt: number | null;
+  endsAt: number | null;
+  commissionType: "percent" | "fixed";
+  commissionValue: number | null;
+  rewardA: number;
+  goalSales: number | null;
+  status: "draft" | "active" | "ended";
+  participants: number;
+  createdAt: number;
+}
+
+export async function fetchAdminCampaigns(status?: "draft" | "active" | "ended"): Promise<AdminCampaign[]> {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  const res = await apiFetch<{ ok: boolean; campaigns?: unknown[] }>(`/api/admin/campaigns${query}`, {
+    auth: true,
+    timeoutMs: 6000,
+  });
+  return (res.campaigns || []).map((raw) => {
+    const c = (raw || {}) as Record<string, unknown>;
+    return {
+      id: String(c.id ?? ""),
+      name: String(c.name ?? ""),
+      productId: String(c.productId ?? ""),
+      productName: typeof c.productName === "string" ? c.productName : null,
+      startsAt: typeof c.startsAt === "number" ? c.startsAt : null,
+      endsAt: typeof c.endsAt === "number" ? c.endsAt : null,
+      commissionType: (c.commissionType === "fixed" ? "fixed" : "percent") as "percent" | "fixed",
+      commissionValue: typeof c.commissionValue === "number" ? c.commissionValue : null,
+      rewardA: typeof c.rewardA === "number" ? Math.trunc(c.rewardA) : 0,
+      goalSales: typeof c.goalSales === "number" ? Math.trunc(c.goalSales) : null,
+      status: (["draft", "active", "ended"].includes(String(c.status))
+        ? String(c.status)
+        : "draft") as AdminCampaign["status"],
+      participants: typeof c.participants === "number" ? Math.trunc(c.participants) : 0,
+      createdAt: typeof c.createdAt === "number" ? c.createdAt : 0,
+    };
+  });
+}
+
+export interface AdminCampaignInput {
+  name: string;
+  productId: string;
+  startsAt?: number | null;
+  endsAt?: number | null;
+  commissionType: "percent" | "fixed";
+  commissionValue: number;
+  rewardA?: number;
+  goalSales?: number | null;
+}
+
+export async function createAdminCampaign(input: AdminCampaignInput): Promise<AdminCampaign> {
+  const res = await apiFetch<{ ok: boolean; campaign: AdminCampaign }>("/api/admin/campaigns", {
+    method: "POST",
+    body: input,
+    auth: true,
+    timeoutMs: 8000,
+  });
+  return res.campaign;
+}
+
+export async function setCampaignState(
+  id: string,
+  status: "draft" | "active" | "ended"
+): Promise<void> {
+  await apiFetch(`/api/admin/campaigns/${encodeURIComponent(id)}/state`, {
+    method: "POST",
+    body: { status },
+    auth: true,
+    timeoutMs: 6000,
+  });
+}
+
+export async function deleteAdminCampaign(id: string): Promise<void> {
+  await apiFetch(`/api/admin/campaigns/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+    auth: true,
+    timeoutMs: 6000,
+  });
+}
+
+/** POST /api/admin/affiliates/:id/promote-super — promotion Super Affiliate (irréversible). */
+export async function promoteSuperAffiliate(id: string, reason?: string): Promise<void> {
+  await apiFetch(`/api/admin/affiliates/${encodeURIComponent(id)}/promote-super`, {
+    method: "POST",
+    body: reason ? { reason } : {},
+    auth: true,
+    timeoutMs: 8000,
   });
 }

@@ -16,6 +16,7 @@ import type { AffiliateStatus } from "@/lib/affiliate";
 import {
   createManualSale,
   fetchAdminAffiliates,
+  promoteSuperAffiliate,
   setAffiliateStatus,
   type AdminAffiliate,
   type AffiliateStatusFilter,
@@ -105,6 +106,27 @@ export function AffiliatesTab({
   useEffect(() => {
     void load();
   }, [load]);
+
+  const [promoteTarget, setPromoteTarget] = useState<AdminAffiliate | null>(null);
+  const [busyPromote, setBusyPromote] = useState(false);
+
+  const confirmPromote = async () => {
+    if (!promoteTarget || busyPromote) return;
+    setBusyPromote(true);
+    try {
+      await promoteSuperAffiliate(promoteTarget.id);
+      toast(
+        `${promoteTarget.pseudo || promoteTarget.code} — Super Affiliate. L'animation sera jouée à sa prochaine visite.`,
+        "success",
+      );
+      setPromoteTarget(null);
+      await load();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Promotion impossible.", "error");
+    } finally {
+      setBusyPromote(false);
+    }
+  };
 
   const confirmAction = async () => {
     if (!action || busyAction) return;
@@ -228,6 +250,15 @@ export function AffiliatesTab({
                           {r.status === "suspended" ? "Réactiver" : "Valider"}
                         </button>
                       )}
+                      {r.status === "active" && r.role !== "super_affiliate" && (
+                        <button
+                          type="button"
+                          onClick={() => setPromoteTarget(r)}
+                          className="rounded-xl border border-[rgba(212,175,55,0.45)] bg-[rgba(212,175,55,0.08)] px-3 py-2 text-[0.74rem] font-semibold text-[#e9cd6c] transition-colors hover:border-[#d4af37]"
+                        >
+                          {r.superRequested ? "Demande ⤴" : "Super"}
+                        </button>
+                      )}
                       {r.status === "active" && (
                         <button
                           type="button"
@@ -265,6 +296,17 @@ export function AffiliatesTab({
           busy={busyAction}
           onCancel={() => setAction(null)}
           onConfirm={() => void confirmAction()}
+        />
+      )}
+
+      {promoteTarget && (
+        <ConfirmDialog
+          title="Promouvoir Super Affiliate ?"
+          message={`« ${promoteTarget.pseudo || promoteTarget.code} » obtiendra le rôle Super Affiliate : statistiques avancées, campagnes et privilèges associés. Un événement d'animation sera créé pour sa prochaine visite (irréversible).`}
+          confirmLabel="Promouvoir"
+          busy={busyPromote}
+          onCancel={() => setPromoteTarget(null)}
+          onConfirm={() => void confirmPromote()}
         />
       )}
     </section>

@@ -148,6 +148,39 @@ export async function applyToAffiliate(note?: string): Promise<Affiliate> {
   return normalizeAffiliate(res.affiliate);
 }
 
+/**
+ * GET /api/affiliate/me — version Phase 3 : état + progression Super +
+ * animation de déblocage en attente (champs tolérés absents).
+ */
+export async function fetchAffiliateMeData(): Promise<AffiliateMe | null> {
+  const res = await apiFetch<Record<string, unknown>>("/api/affiliate/me", {
+    bearer: true,
+    timeoutMs: 4000,
+  });
+  if (!res.affiliate) return null;
+  const raw = res as Record<string, unknown>;
+  const sup = raw.super as Record<string, unknown> | undefined;
+  const pending = raw.unlockPending;
+  return {
+    affiliate: normalizeAffiliate(res.affiliate as Affiliate),
+    super: sup
+      ? {
+          requested: bool(sup.requested),
+          eligible: bool(sup.eligible),
+          criteria: {
+            minSales: num((sup.criteria as Record<string, unknown> | undefined)?.minSales),
+            minClicks: num((sup.criteria as Record<string, unknown> | undefined)?.minClicks),
+          },
+          progress: {
+            sales: num((sup.progress as Record<string, unknown> | undefined)?.sales),
+            clicks: num((sup.progress as Record<string, unknown> | undefined)?.clicks),
+          },
+        }
+      : undefined,
+    unlockPending: pending === "affiliate" || pending === "super_affiliate" ? pending : null,
+  };
+}
+
 /** GET /api/affiliate/me — état de la candidature + statistiques (null si jamais candidaté) */
 export async function fetchAffiliateMe(): Promise<Affiliate | null> {
   const res = await apiFetch<{ ok: boolean; affiliate: Affiliate | null }>("/api/affiliate/me", {
@@ -199,4 +232,86 @@ export async function trackAffiliateClick(code: string): Promise<string> {
     timeoutMs: 1500, // POST → garde-fou de 6 s maximum dans apiFetch
   });
   return str(res.url);
+}
+
+/* ---------------- Phase 3 — Super Affiliate + campagnes ---------------- */
+
+/** Progression vers le statut Super Affiliate (critères configurables côté serveur). */
+export interface SuperProgress {
+  requested: boolean;
+  eligible: boolean;
+  criteria: { minSales: number; minClicks: number };
+  progress: { sales: number; clicks: number };
+}
+
+/** Réponse enrichie de GET /api/affiliate/me (champs Phase 3, tolérés absents). */
+export interface AffiliateMe {
+  affiliate: Affiliate | null;
+  super?: SuperProgress;
+  unlockPending?: UnlockStatusValue | null;
+}
+
+export type UnlockStatusValue = "affiliate" | "super_affiliate";
+
+const bool = (v: unknown): boolean => v === true;
+
+/** POST /api/affiliate/me/upgrade — demande de promotion (403 si critères non atteints). */
+export async function requestSuperUpgrade(): Promise<{ requested: boolean }> {
+  const res = await apiFetch<{ ok: boolean; requested?: boolean }>("/api/affiliate/me/upgrade", {
+    method: "POST",
+    body: {},
+    bearer: true,
+    timeoutMs: 6000,
+  });
+  return { requested: bool(res.requested) || true };
+}
+
+/** GET /api/affiliate/me/campaigns — campagnes actives + progression personnelle. */
+export interface AffiliateCampaign {
+  id: string;
+  name: string;
+  productName: string | null;
+  endsAt: number | null;
+  commissionType: CommissionType;
+  commissionValue: number | null;
+  rewardA: number;
+  goalSales: number | null;
+  mySales: number;
+  myClicks: number;
+  joined: boolean;
+  expired: boolean;
+}
+
+export async function fetchMyCampaigns(): Promise<AffiliateCampaign[]> {
+  const res = await apiFetch<{ ok: boolean; campaigns?: unknown[] }>("/api/affiliate/me/campaigns", {
+    bearer: true,
+    timeoutMs: 6000,
+  });
+  return (res.campaigns || []).map((raw) => {
+    const c = raw as Record<string, unknown>;
+    return {
+      id: str(c.id),
+      name: str(c.name),
+      productName: typeof c.productName === "string" ? c.productName : null,
+      endsAt: typeof c.endsAt === "number" ? c.endsAt : null,
+      commissionType: (c.commissionType === "fixed" ? "fixed" : "percent") as CommissionType,
+      commissionValue: typeof c.commissionValue === "number" ? c.commissionValue : null,
+      rewardA: num(c.rewardA),
+      goalSales: typeof c.goalSales === "number" ? c.goalSales : null,
+      mySales: num(c.mySales),
+      myClicks: num(c.myClicks),
+      joined: bool(c.joined),
+      expired: bool(c.expired),
+    };
+  });
+}
+
+/** POST /api/affiliate/me/campaigns/:id/join — participer à une campagne active. */
+export async function joinCampaign(campaignId: string): Promise<void> {
+  await apiFetch(`/api/affiliate/me/campaigns/${encodeURIComponent(campaignId)}/join`, {
+    method: "POST",
+    body: {},
+    bearer: true,
+    timeoutMs: 6000,
+  });
 }

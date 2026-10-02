@@ -4,9 +4,15 @@ import { isAdmin, unauthorized, sha256hex } from "../../src/lib/server/auth";
 import { securityEventStatement } from "../../src/lib/server/user-auth";
 import { setSetting } from "../../src/lib/server/store";
 import {
+  isSuperRequested,
+  statusHistoryStatement,
+  unlockEventStatement,
+} from "../../src/lib/server/super-affiliate";
+import {
   AFFILIATE_STATUSES,
   CHARIOW_WEBHOOK_SECRET_KEY,
   affiliateStatsMap,
+  getAffiliateById,
   getAffiliateByCode,
   getAffiliateWithUserById,
   getProductById,
@@ -247,9 +253,73 @@ export const adminAffiliationRoutes: App = new Hono<{ Bindings: Env }>()
     }
     const affiliates = await listAffiliatesAdmin(c.env.DB, status);
     const stats = await affiliateStatsMap(c.env.DB, affiliates);
+    // Phase 3 : demande de promotion Super Affiliate en cours ?
+    const superRequestedMap = new Map<string, boolean>();
+    await Promise.all(
+      affiliates.map(async (a) => {
+        superRequestedMap.set(a.id, await isSuperRequested(c.env.DB, a.user_id));
+      })
+    );
     return c.json({
       ok: true,
-      affiliates: affiliates.map((a) => affiliateToJson(a, stats.get(a.id) ?? EMPTY_STATS)),
+      affiliates: affiliates.map((a) => ({
+        ...affiliateToJson(a, stats.get(a.id) ?? EMPTY_STATS),
+        superRequested: superRequestedMap.get(a.id) ?? false,
+      })),
+    });
+  })
+  /**
+   * Phase 3 — promotion Super Affiliate (action ADMIN, §19) : rôle
+   * `super_affiliate` + historique + événement d'animation (une seule fois).
+   */
+  .post("/api/admin/affiliates/:id/promote-super", async (c) => {
+    const denied = await requireAdmin(c);
+    if (denied) return denied;
+
+    let body: { reason?: unknown } = {};
+    try {
+      body = (await c.req.json()) as { reason?: unknown };
+    } catch {
+      body = {};
+    }
+    const reason = typeof body.reason === "string" ? body.reason.slice(0, 200) : null;
+
+    const affiliate = await getAffiliateById(c.env.DB, c.req.param("id"));
+    if (!affiliate) return notFound("Affilié introuvable.");
+
+    const userRow = await c.env.DB
+      .prepare("SELECT id, role FROM users WHERE id = ?")
+      .bind(affiliate.user_id)
+      .first<{ id: string; role: string }>();
+    if (!userRow) return notFound("Utilisateur introuvable pour cet affilié.");
+
+    const alreadySuper = userRow.role === "super_affiliate";
+    const now = Date.now();
+    await c.env.DB.batch([
+      // Rôle (aucun effet si déjà super) + historique + animation (OR IGNORE).
+      c.env.DB
+        .prepare(`UPDATE users SET role = 'super_affiliate', updated_at = ? WHERE id = ?`)
+        .bind(now, userRow.id),
+      statusHistoryStatement(c.env.DB, {
+        userId: userRow.id,
+        fromRole: userRow.role,
+        toRole: "super_affiliate",
+        reason: reason ?? "admin_promotion",
+        now,
+      }),
+      unlockEventStatement(c.env.DB, { userId: userRow.id, status: "super_affiliate", now }),
+      securityEventStatement(c.env.DB, {
+        actor: "admin",
+        action: "admin_super_promote",
+        ipHash: ipHashOf(c.req.header("cf-connecting-ip")),
+        meta: { affiliateId: affiliate.id, userId: userRow.id, alreadySuper, reason },
+      }),
+    ]);
+
+    return c.json({
+      ok: true,
+      user: { id: userRow.id, role: "super_affiliate" },
+      unlocked: !alreadySuper,
     });
   })
   .post("/api/admin/affiliates/:id/status", async (c) => {

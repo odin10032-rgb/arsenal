@@ -15,6 +15,18 @@ import {
   toPublicAffiliate,
 } from "../../src/lib/server/affiliation";
 import { getActiveCampaign, resolveCommissionRule } from "../../src/lib/server/commissions";
+import {
+  isEligible,
+  isSuperRequested,
+  markUnlockSeenStatement,
+  readCampaignProgressForAffiliate,
+  readSuperProgress,
+  readUnlockPending,
+  statusHistoryStatement,
+  superCriteria,
+  unlockEventStatement,
+} from "../../src/lib/server/super-affiliate";
+import { securityEventStatement } from "../../src/lib/server/user-auth";
 import type { AuthedApp, AuthedEnv } from "../env";
 
 /** 403 générique du contrat (« 403 si non affilié actif »). */
@@ -79,10 +91,136 @@ export const affiliateRoutes: AuthedApp = new Hono<AuthedEnv>()
       computeAffiliateStats(c.env.DB, affiliate),
       readAffiliateSettings(c.env.DB),
     ]);
+
+    // Phase 3 — progression Super Affiliate + animation de déblocage en attente.
+    const criteria = superCriteria(settings);
+    const progress = await readSuperProgress(c.env.DB, affiliate.id);
+    const [requested, unlockPending] = await Promise.all([
+      isSuperRequested(c.env.DB, user.id),
+      readUnlockPending(c.env.DB, user.id),
+    ]);
+
     return c.json({
       ok: true,
       affiliate: toPublicAffiliate(affiliate, stats, isSuperAffiliate(user.role, stats, settings)),
+      super: {
+        requested,
+        eligible: isEligible(criteria, progress),
+        criteria,
+        progress,
+      },
+      unlockPending: unlockPending ? unlockPending.status : null,
     });
+  })
+  /** Phase 3 — candidature Super Affiliate (validation ADMIN ultérieure, §19). */
+  .post("/api/affiliate/me/upgrade", requireAuth, async (c) => {
+    const { user } = c.get("authUser");
+    const affiliate = await getAffiliateByUserId(c.env.DB, user.id);
+    if (!affiliate || affiliate.status !== "active") {
+      return forbidden("Espace affilié réservé aux affiliés actifs.");
+    }
+    if (user.role === "super_affiliate") {
+      return c.json({ ok: false, error: "Vous êtes déjà Super Affiliate." }, 409);
+    }
+
+    const settings = await readAffiliateSettings(c.env.DB);
+    const criteria = superCriteria(settings);
+    const progress = await readSuperProgress(c.env.DB, affiliate.id);
+    if (!isEligible(criteria, progress)) {
+      return c.json(
+        { ok: false, error: "Critères non atteints pour devenir Super Affiliate.", criteria, progress },
+        403
+      );
+    }
+
+    const requested = await isSuperRequested(c.env.DB, user.id);
+    if (!requested) {
+      await c.env.DB.batch([
+        statusHistoryStatement(c.env.DB, {
+          userId: user.id,
+          fromRole: user.role,
+          toRole: "super_affiliate",
+          reason: "request",
+        }),
+        securityEventStatement(c.env.DB, {
+          actor: user.id,
+          action: "super_upgrade_request",
+          meta: { affiliateId: affiliate.id },
+        }),
+      ]);
+    }
+    return c.json({ ok: true, requested: true }, requested ? 200 : 201);
+  })
+  /** Phase 3 — campagnes actives visibles par l'affilié. */
+  .get("/api/affiliate/me/campaigns", requireAuth, async (c) => {
+    const { user } = c.get("authUser");
+    const affiliate = await getAffiliateByUserId(c.env.DB, user.id);
+    if (!affiliate || affiliate.status !== "active") {
+      return forbidden("Espace affilié réservé aux affiliés actifs.");
+    }
+
+    const now = Date.now();
+    const { results = [] } = await c.env.DB
+      .prepare(
+        `SELECT c.*, p.title AS product_title
+           FROM campaigns c LEFT JOIN products p ON p.id = c.product_id
+          WHERE c.status = 'active'
+          ORDER BY c.created_at DESC, c.id DESC
+          LIMIT 100`
+      )
+      .all<any>();
+
+    const campaigns = await Promise.all(
+      (results || []).map(async (row) => {
+        const progress = await readCampaignProgressForAffiliate(c.env.DB, {
+          campaignId: row.id,
+          productId: row.product_id,
+          affiliateId: affiliate.id,
+        });
+        const joined = await c.env.DB
+          .prepare("SELECT 1 AS ok FROM campaign_participants WHERE campaign_id = ? AND affiliate_id = ?")
+          .bind(row.id, affiliate.id)
+          .first<{ ok: number }>();
+        return {
+          id: row.id,
+          name: row.name,
+          productName: row.product_title ?? null,
+          endsAt: row.ends_at != null ? Number(row.ends_at) : null,
+          commissionType: row.commission_type,
+          commissionValue: row.commission_value != null ? Number(row.commission_value) : null,
+          rewardA: Math.trunc(Number(row.reward_a) || 0),
+          goalSales: row.goal_sales != null ? Math.trunc(Number(row.goal_sales)) : null,
+          mySales: progress.mySales,
+          myClicks: progress.myClicks,
+          joined: Boolean(joined),
+          // Une campagne dont la période est expirée reste visible mais marquée.
+          expired: row.ends_at != null && Number(row.ends_at) < now,
+        };
+      })
+    );
+    return c.json({ ok: true, campaigns });
+  })
+  .post("/api/affiliate/me/campaigns/:id/join", requireAuth, async (c) => {
+    const { user } = c.get("authUser");
+    const affiliate = await getAffiliateByUserId(c.env.DB, user.id);
+    if (!affiliate || affiliate.status !== "active") {
+      return forbidden("Espace affilié réservé aux affiliés actifs.");
+    }
+    const campaignId = String(c.req.param("id") ?? "");
+    const campaign = await c.env.DB
+      .prepare("SELECT id, status FROM campaigns WHERE id = ?")
+      .bind(campaignId)
+      .first<{ id: string; status: string }>();
+    if (!campaign || campaign.status !== "active") {
+      return c.json({ ok: false, error: "Campagne introuvable ou inactive." }, 404);
+    }
+    await c.env.DB
+      .prepare(
+        `INSERT OR IGNORE INTO campaign_participants (campaign_id, affiliate_id, joined_at) VALUES (?, ?, ?)`
+      )
+      .bind(campaignId, affiliate.id, Date.now())
+      .run();
+    return c.json({ ok: true, joined: true });
   })
   .get("/api/affiliate/me/products", requireAuth, async (c) => {
     const { user } = c.get("authUser");

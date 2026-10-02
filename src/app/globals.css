@@ -221,3 +221,30 @@ body {
   outline: none;
   border-color: rgba(230, 57, 70, 0.6);
 }
+
+/* ---- Phase 3 : animation de déblocage de statut (pièce A + révélation) ---- */
+.unlock-coin {
+  perspective: 900px;
+  animation: unlock-coin-spin 1.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  filter: drop-shadow(0 0 34px rgba(212, 175, 55, 0.35));
+}
+@keyframes unlock-coin-spin {
+  0% { opacity: 0; transform: rotateY(540deg) scale(0.55); }
+  55% { opacity: 1; transform: rotateY(0deg) scale(1.06); }
+  100% { opacity: 1; transform: rotateY(0deg) scale(1); }
+}
+.unlock-reveal {
+  animation: unlock-reveal-up 0.5s ease both;
+}
+@keyframes unlock-reveal-up {
+  0% { opacity: 0; transform: translateY(12px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.unlock-delay-1 { animation-delay: 0.55s; }
+.unlock-delay-2 { animation-delay: 0.75s; }
+.unlock-delay-3 { animation-delay: 0.95s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .unlock-coin { animation: none; }
+  .unlock-reveal { animation-duration: 0.01s; }
+}

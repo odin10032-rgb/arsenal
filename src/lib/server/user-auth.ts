@@ -71,7 +71,9 @@ export type SecurityEventAction =
   /** Phase 2.6 : téléchargement d'un fichier produit (traçabilité). */
   | "purchase_download"
   /** Phase 2.6 : un affilié a tenté d'acheter avec son propre code. */
-  | "self_affiliation_blocked";
+  | "self_affiliation_blocked"
+  /** Phase 3 : demande de promotion Super Affiliate. */
+  | "super_upgrade_request";
 
 export interface SecurityEventInput {
   /** user_id, "admin" ou null. */
