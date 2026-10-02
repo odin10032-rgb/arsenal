@@ -17,6 +17,7 @@ import {
   CATEGORIES,
   Category,
   DEFAULT_FILTERS,
+  PRODUCT_LANGUAGES,
   Product,
   ProductFilters,
   SortMode,
@@ -53,13 +54,28 @@ export default function CatalogPage() {
   const freeCount = products.filter((p) => p.badges.includes("gratuit")).length;
   const totalClicks = products.reduce((sum, p) => sum + p.clicks, 0);
 
+  // Rangée « Langue » affichée uniquement si au moins un produit en déclare (migration 0007)
+  const hasLanguages = products.some((p) => p.languages?.length);
+
   const filtersActive =
-    filters.q !== "" || filters.category !== "all" || filters.badges.length > 0;
+    filters.q !== "" ||
+    filters.category !== "all" ||
+    filters.badges.length > 0 ||
+    filters.languages.length > 0;
 
   const toggleBadge = (b: (typeof BADGES)[number]) => {
     setFilters((f) => ({
       ...f,
       badges: f.badges.includes(b) ? f.badges.filter((x) => x !== b) : [...f.badges, b],
+    }));
+  };
+
+  const toggleLanguage = (code: string) => {
+    setFilters((f) => ({
+      ...f,
+      languages: f.languages.includes(code)
+        ? f.languages.filter((x) => x !== code)
+        : [...f.languages, code],
     }));
   };
 
@@ -188,6 +204,47 @@ export default function CatalogPage() {
             </select>
           </div>
         </div>
+
+        {/* Langues (migration 0007) — multi-sélection en ET, style des badges */}
+        {hasLanguages && (
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filtrer par langue">
+            <span className="mr-1 font-mono text-[0.68rem] uppercase tracking-[0.1em] text-[#666]">
+              Langue
+            </span>
+            {Object.entries(PRODUCT_LANGUAGES).map(([code, label]) => (
+              <button
+                key={code}
+                type="button"
+                onClick={() => toggleLanguage(code)}
+                aria-pressed={filters.languages.includes(code)}
+                className="rounded-md border px-2.5 py-1 text-[0.8rem] font-semibold transition-colors aria-pressed:before:mr-1 aria-pressed:before:content-['✕']"
+                style={
+                  filters.languages.includes(code)
+                    ? {
+                        color: "#2a9d8f",
+                        borderColor: "currentColor",
+                        background: "rgba(255,255,255,0.04)",
+                      }
+                    : undefined
+                }
+                onMouseEnter={(e) => {
+                  if (!filters.languages.includes(code)) {
+                    e.currentTarget.style.color = "#f0f0f0";
+                    e.currentTarget.style.borderColor = "#444";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!filters.languages.includes(code)) {
+                    e.currentTarget.style.color = "";
+                    e.currentTarget.style.borderColor = "";
+                  }
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {/* Compteur + reset */}
         <div className="flex min-h-[26px] items-center justify-between gap-3">

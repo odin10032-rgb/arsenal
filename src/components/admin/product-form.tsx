@@ -18,7 +18,7 @@ import {
 } from "@/lib/admin";
 import { apiFetch } from "@/lib/api";
 import { fmtBytes } from "@/lib/format";
-import { ACTION_TYPES, BADGES, BADGE_LABELS, Badge, CATEGORIES, Category, ActionType, Product, safeUrl } from "@/lib/products";
+import { ACTION_TYPES, BADGES, BADGE_LABELS, Badge, CATEGORIES, Category, ActionType, PRODUCT_LANGUAGES, Product, safeUrl } from "@/lib/products";
 import { parseVideoUrl } from "@/lib/video";
 import { toast } from "@/lib/toast";
 
@@ -35,6 +35,8 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
   const [category, setCategory] = useState<Category>(product?.category ?? "saas");
   const [actionType, setActionType] = useState<ActionType>(product?.actionType ?? "chariow");
   const [badges, setBadges] = useState<Badge[]>(product?.badges ?? []);
+  // Langues disponibles (migration 0007) — codes de PRODUCT_LANGUAGES
+  const [languages, setLanguages] = useState<string[]>(product?.languages ?? []);
   const [price, setPrice] = useState(product?.price ?? "");
   const [actionUrl, setActionUrl] = useState(product?.actionUrl ?? "");
   const [pwaUrl, setPwaUrl] = useState(product?.pwaUrl ?? "");
@@ -95,6 +97,9 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
 
   const toggleBadge = (b: Badge) =>
     setBadges((bs) => (bs.includes(b) ? bs.filter((x) => x !== b) : [...bs, b]));
+
+  const toggleLanguage = (code: string) =>
+    setLanguages((ls) => (ls.includes(code) ? ls.filter((x) => x !== code) : [...ls, code]));
 
   const onDropFile = async (file: File | undefined | null) => {
     if (!file) return;
@@ -189,6 +194,8 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
       category,
       actionType,
       badges,
+      // Langues (migration 0007) — le serveur filtre sur les codes connus
+      languages,
       price: price.trim(),
       actionUrl: safeUrl(actionUrl),
       pwaUrl: actionType === "mobile" ? safeUrl(pwaUrl) || null : null,
@@ -338,6 +345,32 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
                     style={{ background: badges.includes(b) ? "currentColor" : "#666" }}
                   />
                   {BADGE_LABELS[b]}
+                </button>
+              ))}
+            </div>
+          </Field>
+
+          {/* Langues disponibles (migration 0007) — pastilles à cocher, style des badges */}
+          <Field label="Langues disponibles" hint="Pour les ebooks — laissez vide si non applicable.">
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(PRODUCT_LANGUAGES).map(([code, label]) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => toggleLanguage(code)}
+                  aria-pressed={languages.includes(code)}
+                  className="inline-flex items-center gap-2 rounded-full border px-3.5 py-2 text-[0.8rem] font-semibold transition-colors"
+                  style={
+                    languages.includes(code)
+                      ? { color: "#2a9d8f", borderColor: "currentColor", background: "rgba(255,255,255,0.05)" }
+                      : { color: "#a0a0a0", borderColor: "#333", background: "rgba(255,255,255,0.035)" }
+                  }
+                >
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ background: languages.includes(code) ? "currentColor" : "#666" }}
+                  />
+                  {label}
                 </button>
               ))}
             </div>

@@ -52,10 +52,24 @@ export interface Product {
    * instructions manuelles, etc.).
    */
   deliveryKind?: DeliveryKind | null;
+  /* --- Langues des produits (migration 0007) --- */
+  /**
+   * Langues dans lesquelles le produit (ebook) est disponible — vide/absent =
+   * non applicable. Stocké en JSON dans la colonne `languages` (nullable).
+   */
+  languages?: ProductLanguage[];
 }
 
 /** Type de livraison d'un produit (Phase 2.6 — vente en A autonome). */
 export type DeliveryKind = "file" | "license";
+
+/**
+ * Langues produit (migration 0007) — liste FIGÉE, dans cet ordre.
+ * Chaque code est un tag BCP 47 court ; les libellés d'affichage vivent côté
+ * front (`PRODUCT_LANGUAGES` de src/lib/products.ts — duplication assumée).
+ */
+export const PRODUCT_LANGUAGE_CODES = ["fr", "en", "es", "pt", "ar", "de", "it"] as const;
+export type ProductLanguage = (typeof PRODUCT_LANGUAGE_CODES)[number];
 
 /**
  * Méthodes de livraison d'un produit (contrat § Fulfillment) :

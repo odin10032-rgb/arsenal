@@ -7,7 +7,7 @@ import {
   catalogVersion,
 } from "../../src/lib/server/store";
 import { isAdmin, unauthorized } from "../../src/lib/server/auth";
-import type { Product } from "../../src/lib/server/types";
+import { PRODUCT_LANGUAGE_CODES, type Product, type ProductLanguage } from "../../src/lib/server/types";
 import type { App, Env } from "../env";
 
 const CATEGORIES = ["saas", "desktop", "mobile", "ebook", "prompts"];
@@ -56,6 +56,8 @@ function normalize(body: Record<string, unknown>): { errors: string[]; data: Par
     ...normalizeAffiliation(body),
     // Création : aucun champ de vente en A préexistant (défauts du contrat).
     ...normalizePurchaseFields(body, errors),
+    // Langues (migration 0007) : création ⇒ tableau vide si absent du corps.
+    languages: languagesOf(body),
   };
   if (!data.imageUrl) errors.push("Une image de couverture est requise.");
   // L'URL est requise sauf produit 100 % A : type « chariow » ET vendable en A
@@ -148,6 +150,22 @@ function deliveryKindOf(
   if (body.deliveryKind === "file") return "file";
   if (body.deliveryKind === "license") return "license";
   return null;
+}
+
+/**
+ * Langues du produit (migration 0007) : tableau de codes connus, filtré sur la
+ * liste FIGÉE (donc dédoublonné et borné à 7 codes). Absent du corps ⇒ valeur
+ * existante PRÉSERVÉE en modification (PUT) ; en création, tableau vide —
+ * jamais de langue devinée à partir d'une valeur invalide.
+ */
+function languagesOf(
+  body: Record<string, unknown>,
+  existing?: Partial<Product>
+): ProductLanguage[] {
+  if (body.languages === undefined) return existing?.languages ?? [];
+  if (!Array.isArray(body.languages)) return [];
+  const raw = (body.languages as unknown[]).map(String);
+  return PRODUCT_LANGUAGE_CODES.filter((code) => raw.includes(code));
 }
 
 /**
@@ -323,6 +341,8 @@ export const productRoutes: App = new Hono<{ Bindings: Env }>()
       imageUrl: sanitizeUrl(body.imageUrl) || products[index].imageUrl,
       ...normalizeAffiliation(body),
       ...purchaseFields,
+      // Langues (migration 0007) : absent du corps ⇒ langues existantes préservées.
+      languages: languagesOf(body, products[index]),
       updatedAt: Date.now(),
     };
 

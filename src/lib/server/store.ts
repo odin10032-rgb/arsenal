@@ -7,7 +7,7 @@
  * quatre tables (analytics_counters / clicks_by_product / visits_by_day /
  * recent_visits) et `settings` (clé/valeur) au lieu de `config`.
  */
-import { Product, Analytics, MediaItem, FulfillmentMethod, DeliveryKind } from "./types";
+import { Product, Analytics, MediaItem, FulfillmentMethod, DeliveryKind, PRODUCT_LANGUAGE_CODES, ProductLanguage } from "./types";
 
 const RECENT_VISITS_MAX = 500;
 
@@ -34,6 +34,25 @@ function normalizeDeliveryKind(raw: unknown): DeliveryKind | null {
   if (value === "file") return "file";
   if (value === "license") return "license";
   return null;
+}
+
+/**
+ * Langues du produit (migration 0007) : la colonne `languages` contient un
+ * tableau JSON de codes connus (ou NULL). Analyse DÉFENSIVE — jamais d'erreur :
+ * valeur illisible, non-tableau ou codes inconnus sont ignorés, doublons
+ * supprimés (filtre sur la liste FIGÉE, donc ordre canonique), et un résultat
+ * vide vaut `undefined` (« non applicable »).
+ */
+function parseLanguages(raw: unknown): ProductLanguage[] | undefined {
+  if (typeof raw !== "string" || !raw.trim()) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return undefined;
+    const languages = PRODUCT_LANGUAGE_CODES.filter((code) => parsed.includes(code));
+    return languages.length > 0 ? languages : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /* ------------------------------- Products ------------------------------- */
@@ -75,6 +94,8 @@ export async function getProducts(db: D1Database): Promise<Product[]> {
         : Number(p.product_file_size),
     productFileMime: p.product_file_mime || null,
     deliveryKind: normalizeDeliveryKind(p.delivery_kind),
+    /* --- Langues (migration 0007) --- */
+    languages: parseLanguages(p.languages),
   }));
 }
 
@@ -82,8 +103,8 @@ export async function saveProducts(db: D1Database, products: Product[]): Promise
   const batch = products.map(p =>
     db.prepare(`
       INSERT OR REPLACE INTO products
-      (id, title, short_description, description, category, action_type, badges, price, action_url, apk_url, pwa_url, command, video_url, image_url, clicks, created_at, updated_at, affiliate_enabled, commission_type, commission_value, reward_a, purchasable, price_a, chariow_product_id, fulfillment_method, chariow_discount_code, product_file_url, product_file_name, product_file_size, product_file_mime, delivery_kind)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, title, short_description, description, category, action_type, badges, price, action_url, apk_url, pwa_url, command, video_url, image_url, clicks, created_at, updated_at, affiliate_enabled, commission_type, commission_value, reward_a, purchasable, price_a, chariow_product_id, fulfillment_method, chariow_discount_code, product_file_url, product_file_name, product_file_size, product_file_mime, delivery_kind, languages)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       p.id, p.title, p.shortDescription, p.description, p.category,
       p.actionType, JSON.stringify(p.badges), p.price, p.actionUrl,
@@ -104,7 +125,10 @@ export async function saveProducts(db: D1Database, products: Product[]): Promise
         ? null
         : Math.trunc(Number(p.productFileSize)) || 0,
       p.productFileMime || null,
-      normalizeDeliveryKind(p.deliveryKind)
+      normalizeDeliveryKind(p.deliveryKind),
+      // Langues (migration 0007) : même piège que ci-dessus — sans cette
+      // colonne, l'INSERT OR REPLACE effacerait les langues déclarées.
+      p.languages?.length ? JSON.stringify(p.languages) : null
     )
   );
   await db.batch(batch);

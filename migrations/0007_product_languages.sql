@@ -1,0 +1,20 @@
+-- Arsenal — migration 0007 : langues des produits (ebooks multi-langues).
+--
+-- Objectif : l'admin coche les langues dans lesquelles il possède l'ebook
+-- (colonne `languages`, tableau JSON de codes : "fr", "en", "es", "pt", "ar",
+-- "de", "it"). Le catalogue public gagne un filtre par langue et la fiche
+-- produit affiche « Disponible en : … ».
+--
+-- Additive et rétrocompatible : colonne nullable, les produits existants
+-- restent INCHANGÉS (aucune langue déclarée, cas « non applicable »).
+--
+-- ⚠️ AVERTISSEMENT ALTER TABLE (SQLite/D1) : SQLite ne connaît PAS
+-- `ADD COLUMN IF NOT EXISTS`. L'ALTER TABLE ci-dessous ÉCHOUE si la colonne
+-- existe déjà. C'est acceptable et volontaire : une migration n'est appliquée
+-- qu'une seule fois (suivi interne `d1_migrations`). NE PAS rejouer ce fichier
+-- à la main sur une base déjà migrée.
+--
+-- ⚠️ ORDRE DE DÉPLOIEMENT : appliquer cette migration AVANT de déployer le code
+-- qui lit/écrit `languages` (INSERT OR REPLACE liste la colonne : sans elle,
+-- toute sauvegarde de produit échouerait).
+ALTER TABLE products ADD COLUMN languages TEXT; -- JSON array de codes ("fr","en",…) ou NULL

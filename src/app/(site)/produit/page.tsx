@@ -15,7 +15,7 @@ import { BadgePill } from "@/components/product-card";
 import { BuyWithA } from "@/components/product/buy-with-a";
 import { useCatalog } from "@/hooks/use-catalog";
 import { fmt, timeAgo } from "@/lib/format";
-import { CATEGORIES } from "@/lib/products";
+import { CATEGORIES, PRODUCT_LANGUAGES } from "@/lib/products";
 import { trackClick } from "@/lib/track";
 import { parseVideoUrl } from "@/lib/video";
 
@@ -113,6 +113,13 @@ function ProductBody() {
           </span>
           <span>{timeAgo(product.createdAt)}</span>
           <span className="font-semibold text-[#f0808a]">{product.price}</span>
+          {/* Langues disponibles (migration 0007) — ligne discrète si déclarées */}
+          {product.languages && product.languages.length > 0 && (
+            <span>
+              Disponible en :{" "}
+              {product.languages.map((code) => PRODUCT_LANGUAGES[code] ?? code).join(" · ")}
+            </span>
+          )}
         </p>
       </header>
 

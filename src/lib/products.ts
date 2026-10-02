@@ -50,6 +50,12 @@ export interface Product {
   productFileName?: string | null;
   /** Taille du fichier en octets (deliveryKind = 'file') — null si inconnue */
   productFileSize?: number | null;
+  /* --- Langues disponibles (migration 0007 — miroir du backend) --- */
+  /**
+   * Langues déclarées par l'admin (codes de `PRODUCT_LANGUAGES`) — vide/absent
+   * = non applicable (produit non linguistique ou langue unique non déclarée).
+   */
+  languages?: string[];
 }
 
 export const CATEGORIES: Record<Category, string> = {
@@ -75,12 +81,30 @@ export const BADGE_LABELS: Record<Badge, string> = {
   nouveau: "Nouveau",
 };
 
+/**
+ * Langues produit (migration 0007) — codes FIGÉS dans cet ordre, libellés
+ * d'affichage. Duplication assumée de `PRODUCT_LANGUAGE_CODES` de
+ * src/lib/server/types.ts : le bundle client ne peut pas importer les types
+ * serveur. Garder les deux listes synchronisées.
+ */
+export const PRODUCT_LANGUAGES: Record<string, string> = {
+  fr: "Français",
+  en: "Anglais",
+  es: "Espagnol",
+  pt: "Portugais",
+  ar: "Arabe",
+  de: "Allemand",
+  it: "Italien",
+};
+
 export type SortMode = "popular" | "recent";
 
 export interface ProductFilters {
   q: string;
   category: Category | "all";
   badges: Badge[];
+  /** Langues multi-sélect en ET logique (codes de PRODUCT_LANGUAGES). */
+  languages: string[];
   sort: SortMode;
 }
 
@@ -88,6 +112,7 @@ export const DEFAULT_FILTERS: ProductFilters = {
   q: "",
   category: "all",
   badges: [],
+  languages: [],
   sort: "popular",
 };
 
@@ -103,17 +128,19 @@ export function safeUrl(raw: unknown): string {
  * Pipeline filtre + tri identique au site validé :
  * - catégorie mono-sélect
  * - badges multi-sélect en ET logique (tous présents)
+ * - langues multi-sélect en ET logique (toutes disponibles)
  * - recherche insensible à la casse sur titre, descriptions, catégorie, type, badges
  * - tri "recent" (date desc) ou "popular" (clics desc, tie-break date desc)
  */
 export function filterProducts(
   products: Product[],
-  { q, category, badges, sort }: ProductFilters,
+  { q, category, badges, languages, sort }: ProductFilters,
 ): Product[] {
   const query = q.trim().toLowerCase();
   const filtered = products.filter((p) => {
     if (category !== "all" && p.category !== category) return false;
     if (badges.length > 0 && !badges.every((b) => p.badges.includes(b))) return false;
+    if (languages.length > 0 && !languages.every((l) => p.languages?.includes(l))) return false;
     if (query) {
       const haystack = [
         p.title,
