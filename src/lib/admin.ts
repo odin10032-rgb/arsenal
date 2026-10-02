@@ -487,6 +487,14 @@ export interface AdminSettings {
    * La valeur en clair n'est JAMAIS renvoyée par l'API.
    */
   chariowApiKeyConfigured: boolean | null;
+  /**
+   * Chantier B — textes des pages légales (PUBLICS côté API, jamais masqués) :
+   * politique de confidentialité, conditions générales, mentions légales.
+   * `""` tant que l'admin ne les a pas renseignés (jamais de contenu inventé).
+   */
+  legal_privacy?: string;
+  legal_terms?: string;
+  legal_notice?: string;
 }
 
 export async function fetchAdminSettings(): Promise<AdminSettings> {
@@ -501,7 +509,15 @@ export async function fetchAdminSettings(): Promise<AdminSettings> {
   else if (typeof settings.chariow_api_key === "string") {
     configured = settings.chariow_api_key.trim().length > 0;
   }
-  return { chariowApiKeyConfigured: configured };
+  // Chantier B — textes légaux relayés bruts (publics : jamais masqués côté API).
+  const legalText = (value: unknown): string | undefined =>
+    typeof value === "string" ? value : undefined;
+  return {
+    chariowApiKeyConfigured: configured,
+    legal_privacy: legalText(settings.legal_privacy),
+    legal_terms: legalText(settings.legal_terms),
+    legal_notice: legalText(settings.legal_notice),
+  };
 }
 
 /** POST /api/admin/settings — écrit une clé whitelistée ({key, value}), jamais relue en clair */

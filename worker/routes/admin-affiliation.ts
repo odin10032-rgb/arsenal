@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { Context } from "hono";
 import { isAdmin, unauthorized, sha256hex } from "../../src/lib/server/auth";
 import { securityEventStatement } from "../../src/lib/server/user-auth";
-import { setSetting } from "../../src/lib/server/store";
+import { getSetting, setSetting } from "../../src/lib/server/store";
 import {
   isSuperRequested,
   statusHistoryStatement,
@@ -57,6 +57,8 @@ import type {
 } from "../../src/lib/server/commissions";
 import { readChariowApiKey } from "../../src/lib/server/chariow-checkout";
 import { isPurchaseSettingKey, readPurchaseMaxPerMin, writePurchaseSetting } from "../../src/lib/server/purchases";
+// Chantier B — pages légales : clés et validation partagées avec la route publique GET /api/legal.
+import { LEGAL_SETTING_KEYS, isLegalSettingKey } from "./legal";
 import type { App, Env } from "../env";
 
 /* --------------------------------- Utilitaires --------------------------------- */
@@ -198,14 +200,20 @@ function paymentToJson(row: AdminPaymentRow) {
 /**
  * Réglages effectifs pour l'admin : ni le secret du webhook ni la clé API
  * Chariow ne sont JAMAIS renvoyés en clair (un booléen `*_configured` suffit).
+ * Chantier B : les textes des pages légales sont PUBLICS — renvoyés BRUTS
+ * (défaut "" tant que l'admin ne les a pas renseignés).
  */
 async function settingsJson(db: D1Database) {
-  const [settings, secret, apiKey, purchaseMaxPerMin] = await Promise.all([
-    readAffiliateSettings(db),
-    readChariowWebhookSecret(db),
-    readChariowApiKey(db),
-    readPurchaseMaxPerMin(db),
-  ]);
+  const [settings, secret, apiKey, purchaseMaxPerMin, legalPrivacy, legalTerms, legalNotice] =
+    await Promise.all([
+      readAffiliateSettings(db),
+      readChariowWebhookSecret(db),
+      readChariowApiKey(db),
+      readPurchaseMaxPerMin(db),
+      getSetting(db, LEGAL_SETTING_KEYS.privacy),
+      getSetting(db, LEGAL_SETTING_KEYS.terms),
+      getSetting(db, LEGAL_SETTING_KEYS.notice),
+    ]);
   return {
     ...settings,
     chariow_webhook_secret: "",
@@ -214,6 +222,10 @@ async function settingsJson(db: D1Database) {
     chariow_api_key: "",
     chariow_api_key_configured: Boolean(apiKey),
     purchase_max_per_min: purchaseMaxPerMin,
+    // Chantier B — pages légales : textes publics, jamais masqués.
+    legal_privacy: legalPrivacy ?? "",
+    legal_terms: legalTerms ?? "",
+    legal_notice: legalNotice ?? "",
   };
 }
 
@@ -238,6 +250,8 @@ const AFFILIATE_TRANSITIONS: Record<string, string[]> = {
  * - GET  /api/admin/settings                 réglages (clés whitelistées, secrets masqués)
  * - POST /api/admin/settings                 écriture des réglages whitelistés
  *   (Phase 2.6 : `chariow_api_key` masquée et `purchase_max_per_min` ajoutées à la whitelist)
+ *   (Chantier B : `legal_privacy`, `legal_terms`, `legal_notice` — textes PUBLICS,
+ *    une valeur vide EFFACE volontairement le contenu)
  *
  * Chaque MUTATION écrit un `security_events` (action `admin_*`) dans le même
  * batch que l'écriture métier.
@@ -764,7 +778,12 @@ export const adminAffiliationRoutes: App = new Hono<{ Bindings: Env }>()
 
     if (!entries.length) return badRequest("Aucun réglage fourni.");
     for (const [key] of entries) {
-      if (!isAffiliateSettingKey(key) && key !== CHARIOW_WEBHOOK_SECRET_KEY && !isPurchaseSettingKey(key)) {
+      if (
+        !isAffiliateSettingKey(key) &&
+        key !== CHARIOW_WEBHOOK_SECRET_KEY &&
+        !isPurchaseSettingKey(key) &&
+        !isLegalSettingKey(key)
+      ) {
         return badRequest(`Réglage inconnu : ${key}.`);
       }
     }
@@ -782,6 +801,14 @@ export const adminAffiliationRoutes: App = new Hono<{ Bindings: Env }>()
         // `purchase_max_per_min` (entier borné, défaut 5).
         const stored = await writePurchaseSetting(c.env.DB, key, value);
         if (stored === null) continue;
+      } else if (isLegalSettingKey(key)) {
+        // Chantier B — pages légales : texte BRUT multi-lignes. Contrairement aux
+        // secrets ci-dessus, une valeur VIDE est significative : elle efface le
+        // contenu (la page publique repasse en « non renseignée »).
+        if (typeof value !== "string") {
+          return badRequest(`Le contenu de « ${key} » doit être une chaîne.`);
+        }
+        await setSetting(c.env.DB, key, value);
       } else if (isAffiliateSettingKey(key)) {
         await writeAffiliateSetting(c.env.DB, key, value);
       }

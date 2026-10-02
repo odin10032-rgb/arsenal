@@ -35,6 +35,7 @@ export function SettingsTab({
     <section className="flex max-w-2xl flex-col gap-5">
       <GithubCard />
       <ChariowCard apiAvailable={apiAvailable} />
+      <LegalCard apiAvailable={apiAvailable} />
       <SecurityCard apiAvailable={apiAvailable} onLogout={onLogout} />
       <DataCard />
       <AboutCard apiAvailable={apiAvailable} />
@@ -235,6 +236,131 @@ function ChariowCard({ apiAvailable }: { apiAvailable: boolean }) {
         commandes passent en échec avec le motif « Clé API Chariow non configurée » et l&apos;équipe
         peut toujours livrer manuellement depuis l&apos;onglet Commandes.
       </p>
+    </SettingsCard>
+  );
+}
+
+/* ---------------- Pages légales (chantier B) ---------------- */
+
+/** Les trois pages légales publiques : clé de réglage · libellé · chemin public. */
+const LEGAL_FIELDS = [
+  { key: "legal_privacy", label: "Politique de confidentialité", path: "/confidentialite" },
+  { key: "legal_terms", label: "Conditions générales", path: "/conditions" },
+  { key: "legal_notice", label: "Mentions légales", path: "/mentions-legales" },
+] as const;
+
+/**
+ * Textes des pages légales — publiés tels quels (texte brut, multi-lignes) sur
+ * les pages publiques liées depuis le pied de page. Aucun contenu n'est
+ * pré-rempli ni inventé : vide, la page publique affiche « non renseignée ».
+ * Un enregistrement à vide EFFACE donc volontairement le contenu publié.
+ */
+function LegalCard({ apiAvailable }: { apiAvailable: boolean }) {
+  const [values, setValues] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [savingKey, setSavingKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!apiAvailable) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setLoading(true);
+    fetchAdminSettings()
+      .then((settings) => {
+        if (cancelled) return;
+        setValues({
+          legal_privacy: settings.legal_privacy ?? "",
+          legal_terms: settings.legal_terms ?? "",
+          legal_notice: settings.legal_notice ?? "",
+        });
+        setLoadFailed(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Textes actuels illisibles : on bloque l'enregistrement — un
+        // enregistrement à vide effacerait le contenu déjà publié.
+        setLoadFailed(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiAvailable]);
+
+  const save = async (key: string, label: string) => {
+    if (savingKey) return;
+    if (!apiAvailable) {
+      return toast("Enregistrement possible uniquement avec le backend connecté.", "error");
+    }
+    if (loadFailed) {
+      return toast("Textes actuels illisibles — rechargez la page avant d'enregistrer.", "error");
+    }
+    setSavingKey(key);
+    try {
+      await saveAdminSetting(key, values[key] ?? "");
+      toast(`${label} : contenu enregistré.`, "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Enregistrement impossible.", "error");
+    } finally {
+      setSavingKey(null);
+    }
+  };
+
+  return (
+    <SettingsCard
+      icon={
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" />
+          <path d="M14 3v5h5M9 13h6M9 17h6" />
+        </svg>
+      }
+      title="Pages légales"
+      subtitle="Trois pages publiques accessibles depuis le pied de page du site. Le texte est publié tel quel — aucun contenu n'est pré-rempli."
+    >
+      {loading ? (
+        <p className="font-mono text-[0.76rem] text-[#666]">Chargement des textes…</p>
+      ) : (
+        <>
+          {LEGAL_FIELDS.map((field) => (
+            <SettingsField key={field.key} label={field.label}>
+              <textarea
+                rows={8}
+                className="input-arsenal min-h-[9rem] resize-y font-mono text-[0.8rem] leading-relaxed"
+                value={values[field.key] ?? ""}
+                onChange={(e) => setValues((v) => ({ ...v, [field.key]: e.target.value }))}
+                placeholder="Texte brut — laissez vide pour afficher « non renseignée » sur la page publique."
+              />
+              <span className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-mono text-[0.68rem] text-[#666]">{field.path}</span>
+                <button
+                  type="button"
+                  onClick={() => void save(field.key, field.label)}
+                  disabled={savingKey !== null || loadFailed}
+                  className="btn-arsenal btn-primary btn-sm"
+                >
+                  {savingKey === field.key && <span className="spin" />}
+                  Enregistrer
+                </button>
+              </span>
+            </SettingsField>
+          ))}
+          {loadFailed && (
+            <p className="text-[0.74rem] leading-relaxed text-[#f4a261]">
+              Textes actuels illisibles (backend injoignable) — enregistrement bloqué pour ne pas
+              effacer un contenu publié. Rechargez la page pour réessayer.
+            </p>
+          )}
+          <p className="text-[0.72rem] leading-relaxed text-[#666]">
+            Ces textes s&apos;affichent sur les pages publiques Confidentialité / Conditions /
+            Mentions légales. Vide = la page affiche « non renseignée ».
+          </p>
+        </>
+      )}
     </SettingsCard>
   );
 }
