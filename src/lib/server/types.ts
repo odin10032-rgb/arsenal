@@ -51,7 +51,7 @@ export interface Product {
    * à la livraison) ou `null` (aucune livraison Arsenal — portail Chariow,
    * instructions manuelles, etc.).
    */
-  deliveryKind?: DeliveryKind;
+  deliveryKind?: DeliveryKind | null;
 }
 
 /** Type de livraison d'un produit (Phase 2.6 — vente en A autonome). */

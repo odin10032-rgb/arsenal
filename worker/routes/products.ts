@@ -135,11 +135,27 @@ function fulfillmentMethodOf(
 }
 
 /**
+ * Mode de livraison Arsenal du canal A (`delivery_kind`) : `file` (fichier
+ * hébergé sur GitHub), `license` (clé générée) ou `null` (via Chariow/manuelle).
+ * Absent du corps ⇒ valeur existante PRÉSERVÉE (même règle que les autres
+ * champs de vente en A — le champ était silencieusement perdu avant ce correctif).
+ */
+function deliveryKindOf(
+  body: Record<string, unknown>,
+  existing?: Partial<Product>
+): Product["deliveryKind"] {
+  if (body.deliveryKind === undefined) return existing?.deliveryKind ?? null;
+  if (body.deliveryKind === "file") return "file";
+  if (body.deliveryKind === "license") return "license";
+  return null;
+}
+
+/**
  * Champs de vente en A (Phase 2.6) — validés dans les bornes du contrat :
  * `priceA` entier 0…1 000 000, `purchasable` booléen, `chariowProductId`
  * chaîne ≤ 120 caractères, `chariowDiscountCode` chaîne ≤ 60 (majuscules/
  * chiffres/tirets), `fulfillmentMethod` ∈ manual | chariow_free_checkout |
- * chariow_discount_checkout.
+ * chariow_discount_checkout, `deliveryKind` ∈ file | license | null.
  *
  * INVARIANTS :
  * - `purchasable` exige `priceA > 0` (sinon ramené à false — contrat
@@ -160,6 +176,7 @@ function normalizePurchaseFields(
   const chariowProductId = chariowProductIdOf(body, existing);
   const chariowDiscountCode = chariowDiscountCodeOf(body, existing);
   const fulfillmentMethod = fulfillmentMethodOf(body, existing);
+  const deliveryKind = deliveryKindOf(body, existing);
   const purchasable = purchasableOf(body, existing) && priceA > 0;
   if (purchasable && fulfillmentMethod === "chariow_free_checkout" && !chariowProductId) {
     errors.push(
@@ -183,7 +200,7 @@ function normalizePurchaseFields(
       );
     }
   }
-  return { purchasable, priceA, chariowProductId, chariowDiscountCode, fulfillmentMethod };
+  return { purchasable, priceA, chariowProductId, chariowDiscountCode, fulfillmentMethod, deliveryKind };
 }
 
 /**
