@@ -171,7 +171,16 @@ export interface PurchaseJson {
   createdAt: number;
   fulfilledAt: number | null;
   refundedAt: number | null;
-  product: { id: string; title: string; imageUrl: string; category: string } | null;
+  product:
+    | {
+        id: string;
+        title: string;
+        imageUrl: string;
+        category: string;
+        /** Livraison Arsenal du produit — pilote le bouton Télécharger / la clé. */
+        deliveryKind: "file" | "license" | null;
+      }
+    | null;
   fulfillment: { provider: string | null; status: string | null; completedAt: number | null } | null;
   access: PurchaseAccess | null;
 }
