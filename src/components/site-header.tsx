@@ -5,7 +5,8 @@ import { BrandLogo } from "./brand-logo";
 
 /**
  * En-tête commun — logo clé + marque + pill de solde A
- * (+ lien discret « Affilié » pour les sessions affilié/super affilié) + accès admin discret
+ * (+ lien discret « Affilié » pour les sessions affilié/super affilié).
+ * Aucun lien vers l'admin : la porte n'est atteignable que par son URL directe.
  */
 export function SiteHeader() {
   return (
@@ -21,17 +22,6 @@ export function SiteHeader() {
         <div className="flex flex-shrink-0 items-center gap-1.5">
           <AffiliateLink />
           <BalancePill />
-          <Link
-            href="/admin"
-            className="flex h-[38px] w-[38px] items-center justify-center rounded-xl border border-transparent text-[#666] transition-colors hover:border-[#333] hover:bg-[#1a1a1a] hover:text-[#f0f0f0]"
-            title="Espace administrateur"
-            aria-label="Espace administrateur"
-          >
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-              <rect x="5" y="11" width="14" height="9" rx="2" fill="none" stroke="currentColor" strokeWidth="2" />
-              <path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" strokeWidth="2" />
-            </svg>
-          </Link>
         </div>
       </div>
     </header>
