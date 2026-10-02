@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Shell du dashboard admin — header compact + 8 onglets + déconnexion
+ * Shell du dashboard admin — header compact + 9 onglets + déconnexion
  */
 
 import Link from "next/link";
@@ -14,12 +14,13 @@ import { MediaTab } from "./media-tab";
 import { ProductsTab } from "./products-tab";
 import { PurchasesTab } from "./purchases-tab";
 import { SettingsTab } from "./settings-tab";
+import { UsersTab } from "./users-tab";
 import { BrandLogo } from "@/components/brand-logo";
 import { clearAdminToken } from "@/lib/products";
 import { Product } from "@/lib/products";
 import { ToastHost } from "@/lib/toast";
 
-type Tab = "products" | "media" | "analytics" | "affiliates" | "purchases" | "campaigns" | "chariow" | "settings";
+type Tab = "products" | "media" | "analytics" | "affiliates" | "users" | "purchases" | "campaigns" | "chariow" | "settings";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   {
@@ -60,6 +61,18 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
         <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
         <circle cx="9" cy="7" r="4" />
         <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
+      </svg>
+    ),
+  },
+  {
+    id: "users",
+    label: "Utilisateurs",
+    icon: (
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="9" cy="7" r="4" />
+        <path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2" />
+        <circle cx="17.5" cy="14.5" r="4.5" />
+        <path d="M17.5 12.5v2l1.5 1.5" />
       </svg>
     ),
   },
@@ -219,6 +232,7 @@ export function AdminDashboard({
           {tab === "affiliates" && (
             <AffiliatesTab apiAvailable={apiAvailable} products={products} />
           )}
+          {tab === "users" && <UsersTab apiAvailable={apiAvailable} />}
           {tab === "campaigns" && <CampaignsTab apiAvailable={apiAvailable} products={products} />}
           {tab === "purchases" && <PurchasesTab apiAvailable={apiAvailable} />}
           {tab === "chariow" && <ChariowTab apiAvailable={apiAvailable} products={products} />}
