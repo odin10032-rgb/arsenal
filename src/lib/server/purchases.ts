@@ -124,6 +124,9 @@ export interface PurchaseJoinRow extends PurchaseRow {
   product_image_url: string | null;
   product_category: string | null;
   product_fulfillment_method: string | null;
+  /** Mode de livraison Arsenal du produit ('file' | 'license' | null) — pilote
+   *  l'affichage du bouton Télécharger / de la clé côté client. */
+  product_delivery_kind: string | null;
   fulfillment_id: string | null;
   fulfillment_provider: string | null;
   fulfillment_status: string | null;
@@ -338,6 +341,7 @@ const PURCHASE_JOIN_COLUMNS = `
   p.created_at, p.updated_at, p.fulfilled_at, p.refunded_at,
   pr.title AS product_title, pr.image_url AS product_image_url, pr.category AS product_category,
   pr.fulfillment_method AS product_fulfillment_method,
+  pr.delivery_kind AS product_delivery_kind,
   f.id AS fulfillment_id, f.provider AS fulfillment_provider, f.status AS fulfillment_status,
   f.provider_reference AS fulfillment_reference, f.attempts AS fulfillment_attempts,
   f.last_error AS fulfillment_last_error, f.completed_at AS fulfillment_completed_at
@@ -997,6 +1001,9 @@ export function purchaseToJson(row: PurchaseJoinRow, viewer: { email: string }):
           title: row.product_title,
           imageUrl: row.product_image_url ?? "",
           category: row.product_category ?? "",
+          // Mode de livraison Arsenal — le client s'en sert pour afficher le
+          // bouton de téléchargement (fichier) ou la clé de licence.
+          deliveryKind: row.product_delivery_kind ?? null,
         }
       : null,
     fulfillment: row.fulfillment_id

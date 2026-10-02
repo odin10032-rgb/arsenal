@@ -380,8 +380,10 @@ export default function MyProductsPage() {
                     </div>
                   )}
 
-                  {/* Accès */}
-                  {p.status === "fulfilled" && (
+                  {/* Accès — masqué quand la livraison Arsenal (fichier/clé) porte
+                      déjà l'accès juste en dessous (le panneau « manuel » n'aurait
+                      aucun sens pour un téléchargement ou une licence). */}
+                  {p.status === "fulfilled" && !showDelivery && (
                     <div className="mt-4 border-t border-dashed border-[#333] pt-4">
                       <PurchaseAccessPanel purchase={p} sessionEmail={user.email} />
                     </div>
