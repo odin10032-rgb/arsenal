@@ -88,6 +88,8 @@ interface FulfillmentProductRow {
   chariow_product_id: string | null;
   chariow_discount_code: string | null;
   fulfillment_method: string | null;
+  /** Nature de la livraison Arsenal : `file` (fichier hébergé) ou `license`. */
+  delivery_kind: string | null;
 }
 
 /** Résultat d'une tentative (ou d'un constat) de fulfillment. */
@@ -154,7 +156,8 @@ async function readFulfillmentProduct(
 ): Promise<FulfillmentProductRow | null> {
   const row = await db
     .prepare(
-      `SELECT id, title, chariow_product_id, chariow_discount_code, fulfillment_method
+      `SELECT id, title, chariow_product_id, chariow_discount_code, fulfillment_method,
+              delivery_kind
          FROM products WHERE id = ?`
     )
     .bind(productId)
@@ -332,8 +335,10 @@ export function markPurchaseFulfilledStatement(
 
 /**
  * Route le fulfillment d'une purchase selon `products.fulfillment_method` :
- * - `manual` : rien d'automatique — la ligne reste `pending`, l'admin livre puis
- *   marque la commande (`POST /api/admin/purchases/:id/fulfill`) ;
+ * - `manual` : rien d'automatique SAUF la livraison AUTONOME (`delivery_kind`
+ *   `file` ou `license`), complétée immédiatement à l'achat sans confirmation
+ *   humaine ni tentative réseau ; sinon la ligne reste `pending`, l'admin livre
+ *   puis marque la commande (`POST /api/admin/purchases/:id/fulfill`) ;
  * - `chariow_free_checkout` : appel `POST /v1/checkout` sur un produit Chariow
  *   DUPLIQUÉ en modèle « Gratuit » (`chariow_product_id`) ;
  * - `chariow_discount_checkout` (méthode recommandée) : appel `POST /v1/checkout`
@@ -387,6 +392,43 @@ export async function fulfillPurchase(
       purchaseStatus: purchase.status,
       error: null,
     };
+  }
+
+  /** Succès : livraison effective → fulfillment `completed`, purchase `fulfilled`.
+   *  Si le produit est `delivery_kind = 'license'`, la clé est générée dans le
+   *  même lot (idempotent : rejouer ne crée pas de seconde clé). */
+  const succeed = async (reference: string | null): Promise<FulfillmentOutcome> => {
+    const licenseStatements = await licenseStatementsIfApplicable(db, {
+      purchaseId: purchase.id,
+      userId: purchase.user_id,
+      productId: purchase.product_id,
+    });
+    await db.batch([
+      completeFulfillmentStatement(db, fulfillment, {
+        provider,
+        providerReference: reference,
+        countAttempt: true,
+        now,
+      }),
+      markPurchaseFulfilledStatement(db, purchase.id, now),
+      ...licenseStatements,
+    ]);
+    return {
+      attempted: true,
+      exhausted: false,
+      status: "completed",
+      provider,
+      purchaseStatus: "fulfilled",
+      error: null,
+    };
+  };
+
+  // Livraison AUTONOME (fichier hébergé par Arsenal, ou clé de licence générée
+  // par Arsenal) : la livraison est effective dès l'achat — aucune confirmation
+  // humaine, aucune tentative réseau. La clé de licence éventuelle est générée
+  // dans `succeed()` (même lot idempotent).
+  if (method === "manual" && (product?.delivery_kind === "file" || product?.delivery_kind === "license")) {
+    return succeed(null);
   }
 
   // Méthode manuelle : livraison humaine, aucune action serveur.
@@ -477,35 +519,6 @@ export async function fulfillPurchase(
     arsenalPurchase: purchase.id,
     arsenalUser: purchase.user_id,
   });
-
-  /** Succès : livraison effective → fulfillment `completed`, purchase `fulfilled`.
-   *  Si le produit est `delivery_kind = 'license'`, la clé est générée dans le
-   *  même lot (idempotent : rejouer ne crée pas de seconde clé). */
-  const succeed = async (reference: string | null): Promise<FulfillmentOutcome> => {
-    const licenseStatements = await licenseStatementsIfApplicable(db, {
-      purchaseId: purchase.id,
-      userId: purchase.user_id,
-      productId: purchase.product_id,
-    });
-    await db.batch([
-      completeFulfillmentStatement(db, fulfillment, {
-        provider,
-        providerReference: reference,
-        countAttempt: true,
-        now,
-      }),
-      markPurchaseFulfilledStatement(db, purchase.id, now),
-      ...licenseStatements,
-    ]);
-    return {
-      attempted: true,
-      exhausted: false,
-      status: "completed",
-      provider,
-      purchaseStatus: "fulfilled",
-      error: null,
-    };
-  };
 
   if (result.status === "completed") {
     return succeed(result.purchaseId ?? result.transactionId ?? null);
