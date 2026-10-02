@@ -21,6 +21,8 @@ import { adminCampaignRoutes } from "./routes/admin-campaigns";
 import { adminFileRoutes } from "./routes/product-files";
 import { downloadRoutes } from "./routes/downloads";
 import { licenseVerifyRoutes, licenseUserRoutes, licenseAdminRoutes } from "./routes/licenses";
+import { adminUserRoutes } from "./routes/admin-users";
+import { legalRoutes } from "./routes/legal";
 import { PURCHASE_MAX_PER_MIN_DEFAULT, readPurchaseMaxPerMin } from "../src/lib/server/purchases";
 import { rateLimit } from "./middleware/rate-limit";
 
@@ -128,6 +130,10 @@ app.route("/", downloadRoutes);
 app.route("/", licenseVerifyRoutes);
 app.route("/", licenseUserRoutes);
 app.route("/", licenseAdminRoutes);
+/** Onglet admin « Utilisateurs » (profil + historique d'activité par compte). */
+app.route("/", adminUserRoutes);
+/** Pages légales (contenu éditable depuis les Paramètres admin, public en lecture). */
+app.route("/", legalRoutes);
 
 app.notFound((c) => c.json({ ok: false, error: "Route introuvable." }, 404));
 
