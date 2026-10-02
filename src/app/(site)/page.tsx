@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ProductCard } from "@/components/product-card";
 import { useCatalog } from "@/hooks/use-catalog";
+import { apiFetch } from "@/lib/api";
 import { trackVisit } from "@/lib/track";
 import { fmt } from "@/lib/format";
 import {
@@ -30,9 +31,26 @@ export default function CatalogPage() {
   const { products, initialLoaded, source } = useCatalog();
   const [filters, setFilters] = useState<ProductFilters>(DEFAULT_FILTERS);
   const searchRef = useRef<HTMLInputElement>(null);
+  // Stats d'accueil pilotées depuis l'admin (Paramètres → Affichage). Défaut :
+  // affichées — API injoignable ou drapeau indisponible ⇒ comportement historique.
+  const [showStats, setShowStats] = useState<boolean | null>(null);
 
   useEffect(() => {
     trackVisit();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch<{ showHomeStats?: boolean }>("/api/site-config", { timeoutMs: 4000 })
+      .then((res) => {
+        if (!cancelled) setShowStats(res.showHomeStats !== false);
+      })
+      .catch(() => {
+        if (!cancelled) setShowStats(true);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Raccourci Ctrl+K / Cmd+K → focus recherche
@@ -91,11 +109,14 @@ export default function CatalogPage() {
             SaaS, applications desktop, PWA mobiles, e-books et packs d&rsquo;automations — triés
             par popularité réelle, testés par la communauté.
           </p>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <HeroStat value={fmt(total)} label="outils au catalogue" />
-            <HeroStat value={fmt(freeCount)} label="gratuits" />
-            <HeroStat value={fmt(totalClicks)} label="clics cumulés" />
-          </div>
+          {/* Stats d'accueil — masquables depuis Paramètres → Affichage (défaut : visibles) */}
+          {showStats !== false && (
+            <div className="mt-6 flex flex-wrap gap-3">
+              <HeroStat value={fmt(total)} label="outils au catalogue" />
+              <HeroStat value={fmt(freeCount)} label="gratuits" />
+              <HeroStat value={fmt(totalClicks)} label="clics cumulés" />
+            </div>
+          )}
         </div>
       </section>
 

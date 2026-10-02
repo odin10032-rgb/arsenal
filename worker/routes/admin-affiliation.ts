@@ -59,6 +59,8 @@ import { readChariowApiKey } from "../../src/lib/server/chariow-checkout";
 import { isPurchaseSettingKey, readPurchaseMaxPerMin, writePurchaseSetting } from "../../src/lib/server/purchases";
 // Chantier B — pages légales : clés et validation partagées avec la route publique GET /api/legal.
 import { LEGAL_SETTING_KEYS, isLegalSettingKey } from "./legal";
+// Affichage du site public : clés et normalisation partagées avec GET /api/site-config.
+import { SITE_SETTING_KEYS, isSiteSettingKey, normalizeSiteSetting } from "./site-config";
 import type { App, Env } from "../env";
 
 /* --------------------------------- Utilitaires --------------------------------- */
@@ -204,7 +206,7 @@ function paymentToJson(row: AdminPaymentRow) {
  * (défaut "" tant que l'admin ne les a pas renseignés).
  */
 async function settingsJson(db: D1Database) {
-  const [settings, secret, apiKey, purchaseMaxPerMin, legalPrivacy, legalTerms, legalNotice] =
+  const [settings, secret, apiKey, purchaseMaxPerMin, legalPrivacy, legalTerms, legalNotice, homeShowStats] =
     await Promise.all([
       readAffiliateSettings(db),
       readChariowWebhookSecret(db),
@@ -213,6 +215,7 @@ async function settingsJson(db: D1Database) {
       getSetting(db, LEGAL_SETTING_KEYS.privacy),
       getSetting(db, LEGAL_SETTING_KEYS.terms),
       getSetting(db, LEGAL_SETTING_KEYS.notice),
+      getSetting(db, SITE_SETTING_KEYS.homeShowStats),
     ]);
   return {
     ...settings,
@@ -226,6 +229,8 @@ async function settingsJson(db: D1Database) {
     legal_privacy: legalPrivacy ?? "",
     legal_terms: legalTerms ?? "",
     legal_notice: legalNotice ?? "",
+    // Affichage public : « 1 » (défaut) = statistiques visibles sur l'accueil.
+    home_show_stats: homeShowStats ?? "1",
   };
 }
 
@@ -782,7 +787,8 @@ export const adminAffiliationRoutes: App = new Hono<{ Bindings: Env }>()
         !isAffiliateSettingKey(key) &&
         key !== CHARIOW_WEBHOOK_SECRET_KEY &&
         !isPurchaseSettingKey(key) &&
-        !isLegalSettingKey(key)
+        !isLegalSettingKey(key) &&
+        !isSiteSettingKey(key)
       ) {
         return badRequest(`Réglage inconnu : ${key}.`);
       }
@@ -809,6 +815,13 @@ export const adminAffiliationRoutes: App = new Hono<{ Bindings: Env }>()
           return badRequest(`Le contenu de « ${key} » doit être une chaîne.`);
         }
         await setSetting(c.env.DB, key, value);
+      } else if (isSiteSettingKey(key)) {
+        // Affichage public : « 1 »/« 0 » uniquement (booléens tolérés côté client).
+        const normalized = normalizeSiteSetting(key, value);
+        if (normalized === null) {
+          return badRequest(`Valeur invalide pour « ${key} » (attendu : 1 ou 0).`);
+        }
+        await setSetting(c.env.DB, key, normalized);
       } else if (isAffiliateSettingKey(key)) {
         await writeAffiliateSetting(c.env.DB, key, value);
       }

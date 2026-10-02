@@ -495,6 +495,11 @@ export interface AdminSettings {
   legal_privacy?: string;
   legal_terms?: string;
   legal_notice?: string;
+  /**
+   * Affichage de la page d'accueil : « 1 » (défaut) = rangée de statistiques
+   * (outils, gratuits, clics) visible ; « 0 » = masquée.
+   */
+  home_show_stats?: string;
 }
 
 export async function fetchAdminSettings(): Promise<AdminSettings> {
@@ -517,6 +522,7 @@ export async function fetchAdminSettings(): Promise<AdminSettings> {
     legal_privacy: legalText(settings.legal_privacy),
     legal_terms: legalText(settings.legal_terms),
     legal_notice: legalText(settings.legal_notice),
+    home_show_stats: legalText(settings.home_show_stats),
   };
 }
 

@@ -132,11 +132,24 @@ export function AdminDashboard({
   onLogout: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("products");
+  // Onglets DÉJÀ OUVERTS maintenus montés (cachés) : un retour sur un onglet est
+  // instantané — pas de re-fetch ni de flash de chargement, et l'état local est
+  // conservé (recherche, sélection, position). Chaque onglet ne charge qu'à sa
+  // PREMIÈRE ouverture.
+  const [opened, setOpened] = useState<ReadonlySet<Tab>>(() => new Set<Tab>(["products"]));
+  const selectTab = (id: Tab) => {
+    setTab(id);
+    setOpened((prev) => (prev.has(id) ? prev : new Set(prev).add(id)));
+  };
 
   const logout = () => {
     clearAdminToken();
     onLogout();
   };
+
+  /** Panneau d'onglet : monté après la première ouverture, masqué sinon. */
+  const pane = (id: Tab, node: React.ReactNode) =>
+    opened.has(id) ? <div className={tab === id ? "" : "hidden"}>{node}</div> : null;
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -206,7 +219,7 @@ export function AdminDashboard({
             <button
               key={t.id}
               type="button"
-              onClick={() => setTab(t.id)}
+              onClick={() => selectTab(t.id)}
               className={`relative inline-flex items-center gap-2 whitespace-nowrap px-4 py-3 text-[0.86rem] font-semibold transition-colors ${
                 tab === t.id ? "text-[#4fb3a1]" : "text-[#666] hover:text-[#a0a0a0]"
               }`}
@@ -223,20 +236,18 @@ export function AdminDashboard({
         </nav>
       </header>
 
-      {/* Corps */}
+      {/* Corps — panneaux maintenus montés après première ouverture (voir `pane`) */}
       <main className="flex-1">
         <div className="container-arsenal flex flex-col gap-5 py-6">
-          {tab === "products" && <ProductsTab products={products} apiAvailable={apiAvailable} reload={reload} />}
-          {tab === "media" && <MediaTab products={products} apiAvailable={apiAvailable} />}
-          {tab === "analytics" && <AnalyticsTab apiAvailable={apiAvailable} />}
-          {tab === "affiliates" && (
-            <AffiliatesTab apiAvailable={apiAvailable} products={products} />
-          )}
-          {tab === "users" && <UsersTab apiAvailable={apiAvailable} />}
-          {tab === "campaigns" && <CampaignsTab apiAvailable={apiAvailable} products={products} />}
-          {tab === "purchases" && <PurchasesTab apiAvailable={apiAvailable} />}
-          {tab === "chariow" && <ChariowTab apiAvailable={apiAvailable} products={products} />}
-          {tab === "settings" && <SettingsTab apiAvailable={apiAvailable} onLogout={logout} />}
+          {pane("products", <ProductsTab products={products} apiAvailable={apiAvailable} reload={reload} />)}
+          {pane("media", <MediaTab products={products} apiAvailable={apiAvailable} />)}
+          {pane("analytics", <AnalyticsTab apiAvailable={apiAvailable} />)}
+          {pane("affiliates", <AffiliatesTab apiAvailable={apiAvailable} products={products} />)}
+          {pane("users", <UsersTab apiAvailable={apiAvailable} />)}
+          {pane("campaigns", <CampaignsTab apiAvailable={apiAvailable} products={products} />)}
+          {pane("purchases", <PurchasesTab apiAvailable={apiAvailable} />)}
+          {pane("chariow", <ChariowTab apiAvailable={apiAvailable} products={products} />)}
+          {pane("settings", <SettingsTab apiAvailable={apiAvailable} onLogout={logout} />)}
         </div>
       </main>
 

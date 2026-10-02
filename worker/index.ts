@@ -23,6 +23,7 @@ import { downloadRoutes } from "./routes/downloads";
 import { licenseVerifyRoutes, licenseUserRoutes, licenseAdminRoutes } from "./routes/licenses";
 import { adminUserRoutes } from "./routes/admin-users";
 import { legalRoutes } from "./routes/legal";
+import { siteConfigRoutes } from "./routes/site-config";
 import { PURCHASE_MAX_PER_MIN_DEFAULT, readPurchaseMaxPerMin } from "../src/lib/server/purchases";
 import { rateLimit } from "./middleware/rate-limit";
 
@@ -134,6 +135,8 @@ app.route("/", licenseAdminRoutes);
 app.route("/", adminUserRoutes);
 /** Pages légales (contenu éditable depuis les Paramètres admin, public en lecture). */
 app.route("/", legalRoutes);
+/** Affichage public (statistiques d'accueil pilotées depuis Paramètres → Affichage). */
+app.route("/", siteConfigRoutes);
 
 app.notFound((c) => c.json({ ok: false, error: "Route introuvable." }, 404));
 

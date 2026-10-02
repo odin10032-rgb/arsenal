@@ -35,11 +35,92 @@ export function SettingsTab({
     <section className="flex max-w-2xl flex-col gap-5">
       <GithubCard />
       <ChariowCard apiAvailable={apiAvailable} />
+      <AppearanceCard apiAvailable={apiAvailable} />
       <LegalCard apiAvailable={apiAvailable} />
       <SecurityCard apiAvailable={apiAvailable} onLogout={onLogout} />
       <DataCard />
       <AboutCard apiAvailable={apiAvailable} />
     </section>
+  );
+}
+
+/* ---------------- Affichage (page d'accueil) ---------------- */
+
+/**
+ * Réglages d'affichage de la page d'accueil publique. Actuellement : la rangée
+ * de statistiques (outils au catalogue / gratuits / clics cumulés), affichée
+ * par défaut et masquable d'un clic. Stocké en « 1 »/« 0 » (`home_show_stats`),
+ * lu publiquement par GET /api/site-config — la page publique suit au
+ * rechargement suivant, sans redéploiement.
+ */
+function AppearanceCard({ apiAvailable }: { apiAvailable: boolean }) {
+  const [showStats, setShowStats] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!apiAvailable) return;
+    let cancelled = false;
+    fetchAdminSettings()
+      .then((settings) => {
+        if (!cancelled) setShowStats((settings.home_show_stats ?? "1") !== "0");
+      })
+      .catch(() => {
+        if (!cancelled) setShowStats(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiAvailable]);
+
+  const apply = async (next: boolean) => {
+    if (busy) return;
+    if (!apiAvailable) {
+      return toast("Enregistrement possible uniquement avec le backend connecté.", "error");
+    }
+    setBusy(true);
+    try {
+      await saveAdminSetting("home_show_stats", next ? "1" : "0");
+      setShowStats(next);
+      toast(
+        next ? "Statistiques visibles sur l'accueil." : "Statistiques masquées sur l'accueil.",
+        "success",
+      );
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Enregistrement impossible.", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <SettingsCard
+      icon={
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      }
+      title="Affichage"
+      subtitle="Ce que voit le public sur la page d'accueil — suivi au rechargement, sans redéploiement."
+    >
+      <label className="flex cursor-pointer items-center justify-between gap-3">
+        <span className="flex flex-col">
+          <span className="text-[0.84rem] font-semibold">Statistiques d&apos;accueil</span>
+          <span className="mt-0.5 text-[0.74rem] leading-relaxed text-[#666]">
+            La rangée « outils au catalogue · gratuits · clics cumulés » affichée avant le
+            catalogue.
+          </span>
+        </span>
+        <input
+          type="checkbox"
+          checked={showStats === true}
+          disabled={busy || showStats === null || !apiAvailable}
+          onChange={(e) => void apply(e.target.checked)}
+          className="h-5 w-5 flex-shrink-0 accent-[#e63946]"
+          aria-label="Afficher les statistiques sur la page d'accueil"
+        />
+      </label>
+    </SettingsCard>
   );
 }
 
