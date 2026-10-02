@@ -16,7 +16,10 @@
     "FRONT_ORIGINS": "https://arsenal-tools.pages.dev,https://arsenal-v3-preview.pages.dev",
     "GITHUB_REPO_OWNER": "odin10032-rgb",
     "GITHUB_REPO_NAME": "arsenal-produits",
-    "GITHUB_BRANCH": "main"
+    "GITHUB_BRANCH": "main",
+    "GITHUB_MEDIA_REPO_OWNER": "odin10032-rgb",
+    "GITHUB_MEDIA_REPO_NAME": "arsenal-data",
+    "GITHUB_MEDIA_BRANCH": "main"
   },
   "observability": {
     "enabled": true

@@ -89,9 +89,12 @@ async function handleUpload(c: any): Promise<Response> {
 
   const buffer = await file.arrayBuffer();
   const githubToken = c.env.GITHUB_TOKEN || c.req.header("X-GitHub-Token");
-  const githubOwner = c.env.GITHUB_REPO_OWNER || c.req.header("X-GitHub-Repo")?.split("/")[0];
-  const githubRepo = c.env.GITHUB_REPO_NAME || c.req.header("X-GitHub-Repo")?.split("/")[1];
-  const githubBranch = c.env.GITHUB_BRANCH || c.req.header("X-GitHub-Branch") || "main";
+  // Médias = dépôt PUBLIC dédié (GITHUB_MEDIA_REPO_*) : leurs URL sont affichées
+  // par le site public — le dépôt privé des produits répondrait 404 sans token.
+  const githubOwner =
+    c.env.GITHUB_MEDIA_REPO_OWNER || c.req.header("X-GitHub-Repo")?.split("/")[0];
+  const githubRepo = c.env.GITHUB_MEDIA_REPO_NAME || c.req.header("X-GitHub-Repo")?.split("/")[1];
+  const githubBranch = c.env.GITHUB_MEDIA_BRANCH || c.req.header("X-GitHub-Branch") || "main";
 
   let item: MediaItem;
   if (githubToken && githubOwner && githubRepo) {
