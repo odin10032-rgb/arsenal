@@ -32,7 +32,7 @@ export function SettingsTab({
   onLogout: () => void;
 }) {
   return (
-    <section className="flex max-w-2xl flex-col gap-5">
+    <section className="mx-auto flex w-full max-w-3xl flex-col gap-5">
       <GithubCard />
       <ChariowCard apiAvailable={apiAvailable} />
       <AppearanceCard apiAvailable={apiAvailable} />
