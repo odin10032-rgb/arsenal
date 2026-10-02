@@ -84,7 +84,7 @@ export function UserAvatar({
         y="20.5"
         textAnchor="middle"
         dominantBaseline="central"
-        fontSize="17"
+        fontSize="23"
         fontWeight="700"
         className="font-display"
         fill="#f0d98c"

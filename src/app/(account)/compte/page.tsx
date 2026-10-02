@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { CoinA } from "@/components/account/coin-a";
+import { UserAvatar } from "@/components/account/user-avatar";
 import { useUser } from "@/hooks/use-user";
 import { fmt } from "@/lib/format";
 import type { UserRole } from "@/lib/user-auth";
@@ -66,7 +67,7 @@ export default function ComptePage() {
         <div className="mt-6 rounded-2xl border border-[#333] bg-[#141414] p-6 sm:p-8">
           {/* Identité */}
           <div className="flex items-center gap-4">
-            <CoinA size={54} />
+            <UserAvatar pseudo={user.pseudo} seed={user.id} size={54} />
             <div className="min-w-0">
               <p className="truncate font-display text-[1.2rem] font-bold leading-tight">
                 {user.pseudo}

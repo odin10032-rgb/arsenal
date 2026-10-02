@@ -28,6 +28,7 @@ import {
 import { getUnlock, markUnlockSeen, type UnlockStatus as UnlockStatusValue } from "@/lib/unlock";
 import { UnlockAnimation } from "@/components/unlock-animation";
 import { CoinA } from "@/components/account/coin-a";
+import { UserAvatar } from "@/components/account/user-avatar";
 import { useUser } from "@/hooks/use-user";
 import { ApiError } from "@/lib/api";
 import { applyToAffiliate, fetchAffiliateMe, type Affiliate, type AffiliateStats } from "@/lib/affiliate";
@@ -187,6 +188,7 @@ export default function AffiliePage() {
           <ActiveView
             affiliate={affiliate}
             pseudo={user.pseudo}
+            userId={user.id}
             balanceA={user.balanceA}
             superProgress={superProgress}
             campaigns={campaigns}
@@ -308,6 +310,7 @@ function PendingCard({ affiliate }: { affiliate: Affiliate }) {
 function ActiveView({
   affiliate,
   pseudo,
+  userId,
   balanceA,
   superProgress,
   campaigns,
@@ -315,6 +318,7 @@ function ActiveView({
 }: {
   affiliate: Affiliate;
   pseudo: string;
+  userId: string;
   balanceA: number;
   superProgress: SuperProgress | null;
   campaigns: AffiliateCampaign[] | null;
@@ -325,7 +329,7 @@ function ActiveView({
       {/* Identité */}
       <div className="mt-6 rounded-2xl border border-[#333] bg-[#141414] p-6 sm:p-8">
         <div className="flex items-center gap-4">
-          <CoinA size={54} />
+          <UserAvatar pseudo={pseudo} seed={userId} size={54} />
           <div className="min-w-0">
             <p className="truncate font-display text-[1.2rem] font-bold leading-tight">{pseudo}</p>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
