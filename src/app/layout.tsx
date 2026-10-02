@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import { BRAND_FAVICON } from "@/components/brand-logo";
+import { LanguageProvider } from "@/lib/i18n";
 import "./globals.css";
 
 const inter = Inter({
@@ -43,7 +44,8 @@ export default function RootLayout({
       className={`${inter.variable} ${jetbrains.variable} ${spaceGrotesk.variable}`}
     >
       <body className="font-sans antialiased">
-        {children}
+        {/* Provider i18n côté client : le rendu initial reste FR (anti-hydratation) */}
+        <LanguageProvider>{children}</LanguageProvider>
       </body>
     </html>
   );
