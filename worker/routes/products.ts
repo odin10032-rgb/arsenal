@@ -34,7 +34,6 @@ function normalize(body: Record<string, unknown>): { errors: string[]; data: Par
   if (!ACTION_TYPES.includes(actionType)) errors.push("Type d'action invalide.");
 
   const actionUrl = sanitizeUrl(body.actionUrl);
-  if (actionType !== "chariow" && !actionUrl) errors.push("L'URL d'action est requise.");
 
   const badges = Array.isArray(body.badges)
     ? (body.badges as unknown[]).map(String).filter((b) => BADGES.includes(b))
@@ -59,6 +58,11 @@ function normalize(body: Record<string, unknown>): { errors: string[]; data: Par
     ...normalizePurchaseFields(body, errors),
   };
   if (!data.imageUrl) errors.push("Une image de couverture est requise.");
+  // L'URL est requise sauf produit 100 % A : type « chariow » ET vendable en A
+  // (sans tunnel externe, le produit n'aurait aucun canal de vente).
+  if (!actionUrl && !(data.actionType === "chariow" && data.purchasable === true)) {
+    errors.push("L'URL d'action est requise (ou activez la vente en A pour un produit sans tunnel externe).");
+  }
   return { errors, data };
 }
 
@@ -304,6 +308,11 @@ export const productRoutes: App = new Hono<{ Bindings: Env }>()
       ...purchaseFields,
       updatedAt: Date.now(),
     };
+
+    // Même garde « au moins un canal de vente » qu'à la création (autorité serveur).
+    if (!updated.actionUrl && !(updated.actionType === "chariow" && updated.purchasable === true)) {
+      return c.json({ ok: false, error: "L'URL d'action est requise (ou activez la vente en A pour un produit sans tunnel externe)." }, 400);
+    }
 
     products[index] = updated;
     await saveProducts(c.env.DB, products);

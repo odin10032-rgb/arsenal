@@ -165,7 +165,10 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
     const errors: string[] = [];
     if (title.trim().length < 2) errors.push("titre (2 caractères min.)");
     if (!short.trim()) errors.push("description courte");
-    if (!safeUrl(actionUrl)) errors.push(actionType === "chariow" ? "URL du tunnel Chariow" : "URL d'action");
+    // URL requise sauf pour un produit 100 % A (type « chariow », vendable en A, sans tunnel externe)
+    if (!safeUrl(actionUrl) && !(actionType === "chariow" && purchasable)) {
+      errors.push(actionType === "chariow" ? "URL du tunnel Chariow" : "URL d'action");
+    }
     if (!safeUrl(imageUrl)) errors.push("image de couverture");
     // Vente en A : prix > 0 requis, et identifiants Chariow pour le fulfillment automatique
     const priceANum = Math.trunc(Number(priceA));
@@ -227,7 +230,9 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
 
   const fieldHint =
     actionType === "chariow"
-      ? "Lien du tunnel de vente ou de la page d'abonnement (Chariow)."
+      ? purchasable
+        ? "Facultatif : laissez vide pour un produit vendu uniquement en A (aucun tunnel externe)."
+        : "Lien du tunnel de vente ou de la page d'abonnement (Chariow)."
       : actionType === "terminal"
         ? "URL du dépôt GitHub (la commande peut être définie ci-dessous)."
         : "Lien direct vers le fichier APK.";
@@ -347,7 +352,7 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
             />
           </Field>
 
-          <Field label="URL de l'action" required hint={fieldHint}>
+          <Field label="URL de l'action" required={!(actionType === "chariow" && purchasable)} hint={fieldHint}>
             <input
               className="input-arsenal font-mono text-[0.8rem]"
               value={actionUrl}

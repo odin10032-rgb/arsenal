@@ -180,23 +180,24 @@ export function ActionBlock({ product }: { product: Product }) {
     return <MobileBlock product={product} />;
   }
 
+  // Produit 100 % A (aucun tunnel externe) : aucune action ni note « Chariow » à afficher.
+  if (!ctaUrl) return null;
+
   const isFree = product.badges.includes("gratuit") || /gratuit/i.test(product.price);
   return (
     <div className="flex flex-col gap-2">
-      {ctaUrl && (
-        <a
-          href={ctaUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => trackClick(product.id, "chariow")}
-          className="btn-arsenal btn-primary"
-        >
-          {isFree ? "Accéder gratuitement" : `Obtenir l'accès — ${product.price}`}
-          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
-            <path d="M5 12h14M12 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </a>
-      )}
+      <a
+        href={ctaUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() => trackClick(product.id, "chariow")}
+        className="btn-arsenal btn-primary"
+      >
+        {isFree ? "Accéder gratuitement" : `Obtenir l'accès — ${product.price}`}
+        <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+          <path d="M5 12h14M12 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </a>
       <p className="font-mono text-[0.72rem] text-[#666]">
         {isFree
           ? "Accès direct, sans carte bancaire."
