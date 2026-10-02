@@ -3,13 +3,16 @@
 /**
  * Médiathèque — uploads backend + médias déduits des produits.
  * Filtres type, recherche, copie du lien, lecteur vidéo clic-pour-charger.
+ * Retrait d'un média TÉLÉVERSÉ de la bibliothèque uniquement (le fichier et
+ * son lien restent intacts — tout usage de l'URL continue de fonctionner).
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { fetchUploads, MediaItem } from "@/lib/admin";
+import { deleteAdminMedia, fetchUploads, MediaItem } from "@/lib/admin";
 import { Product } from "@/lib/products";
 import { parseVideoUrl, ParsedVideo } from "@/lib/video";
 import { toast } from "@/lib/toast";
+import { ConfirmDialog } from "./confirm-dialog";
 
 type Filter = "all" | "image" | "video";
 
@@ -19,6 +22,10 @@ interface Entry {
   source: "produit" | "upload";
   label?: string;
   video?: ParsedVideo;
+  /** Nom du média en bibliothèque (uploads uniquement) — clé du retrait. */
+  name?: string;
+  /** Média hébergé hors base (GitHub) : retirable sans casser le lien. */
+  removable?: boolean;
 }
 
 export function MediaTab({
@@ -33,6 +40,8 @@ export function MediaTab({
   const [query, setQuery] = useState("");
   const [playing, setPlaying] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [removing, setRemoving] = useState<Entry | null>(null);
+  const [removingBusy, setRemovingBusy] = useState(false);
 
   useEffect(() => {
     if (!apiAvailable) return;
@@ -50,6 +59,10 @@ export function MediaTab({
         kind: v ? "video" : "image",
         source: "upload",
         video: v || undefined,
+        name: u.filename,
+        // `hosted: false` = stocké dans la base : le retirer effacerait le
+        // fichier — le bouton n'est pas proposé (le serveur refuse aussi).
+        removable: u.filename ? u.hosted !== false : false,
       });
     }
     for (const p of products) {
@@ -81,6 +94,22 @@ export function MediaTab({
       setTimeout(() => setCopied(null), 2000);
     } catch {
       toast("Copie impossible.", "error");
+    }
+  };
+
+  /** Retrait de la bibliothèque : la ligne part, le fichier et son lien restent. */
+  const doRemove = async () => {
+    if (!removing?.name || removingBusy) return;
+    setRemovingBusy(true);
+    try {
+      await deleteAdminMedia(removing.name);
+      setUploads((prev) => prev.filter((u) => u.filename !== removing.name));
+      toast("Média retiré de la bibliothèque — le fichier et son lien restent intacts.", "success");
+      setRemoving(null);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Retrait impossible.", "error");
+    } finally {
+      setRemovingBusy(false);
     }
   };
 
@@ -169,13 +198,25 @@ export function MediaTab({
               <p className="max-h-[3em] overflow-hidden break-all rounded-md border border-[#333] bg-[rgba(8,8,8,0.6)] p-1.5 font-mono text-[0.62rem] leading-relaxed text-[#666]">
                 {e.url}
               </p>
-              <button
-                type="button"
-                onClick={() => copy(e.url)}
-                className="btn-arsenal btn-ghost btn-sm w-full justify-center font-mono"
-              >
-                {copied === e.url ? "Copié !" : "Copier le lien"}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => copy(e.url)}
+                  className="btn-arsenal btn-ghost btn-sm flex-1 justify-center font-mono"
+                >
+                  {copied === e.url ? "Copié !" : "Copier le lien"}
+                </button>
+                {e.removable && (
+                  <button
+                    type="button"
+                    onClick={() => setRemoving(e)}
+                    className="btn-arsenal btn-ghost btn-sm font-mono text-[#fda4af]"
+                    title="Retirer de la bibliothèque — le fichier et son lien restent intacts"
+                  >
+                    Retirer
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -185,6 +226,17 @@ export function MediaTab({
         <p className="py-10 text-center font-mono text-[0.85rem] text-[#666]">
           Aucun média ne correspond.
         </p>
+      )}
+
+      {removing && (
+        <ConfirmDialog
+          title="Retirer ce média de la bibliothèque ?"
+          message="Il disparaît de cette liste, mais le fichier et son lien ne sont pas touchés : tout élément qui l'utilise (couverture produit, etc.) continue de fonctionner."
+          confirmLabel="Retirer de la bibliothèque"
+          busy={removingBusy}
+          onCancel={() => setRemoving(null)}
+          onConfirm={() => void doRemove()}
+        />
       )}
     </section>
   );

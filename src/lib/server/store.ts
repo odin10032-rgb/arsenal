@@ -284,6 +284,17 @@ export async function getMediaItem(db: D1Database, name: string): Promise<MediaI
   };
 }
 
+/**
+ * Retire une ligne de la bibliothèque média. Le stockage sous-jacent n'est
+ * JAMAIS touché (blob GitHub conservé, lien toujours servi) : l'appelant
+ * (route admin) refuse les médias hébergés en base, pour qui la ligne EST
+ * le stockage.
+ */
+export async function deleteMedia(db: D1Database, name: string): Promise<boolean> {
+  const res = await db.prepare("DELETE FROM media WHERE name = ?").bind(name).run();
+  return Number(res.meta?.changes ?? 0) > 0;
+}
+
 /* -------------------------------- Settings -------------------------------- */
 
 /** Table `settings` (clé/valeur) — remplace l'ancienne table `config`. */

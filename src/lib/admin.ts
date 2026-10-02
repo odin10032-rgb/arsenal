@@ -96,6 +96,19 @@ export async function fetchUploads(): Promise<MediaItem[]> {
 }
 
 /**
+ * DELETE /api/admin/media/:name — retire le média de la BIBLIOTHÈQUE.
+ * Le fichier et son lien ne sont pas touchés (le blob GitHub reste en ligne) ;
+ * les médias stockés en base sont refusés par le serveur (409).
+ */
+export async function deleteAdminMedia(name: string): Promise<void> {
+  await apiFetch(`/api/admin/media/${encodeURIComponent(name)}`, {
+    method: "DELETE",
+    auth: true,
+    timeoutMs: 6000,
+  });
+}
+
+/**
  * Upload d'image : POST /api/media (multipart) → { url }
  * Repli local : compression canvas → data URL (jamais d'échec bloquant)
  */

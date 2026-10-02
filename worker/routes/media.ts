@@ -1,6 +1,7 @@
 import { Hono } from "hono";
-import { getMedia, addMedia, getMediaItem } from "../../src/lib/server/store";
-import { isAdmin, unauthorized } from "../../src/lib/server/auth";
+import { getMedia, addMedia, getMediaItem, deleteMedia } from "../../src/lib/server/store";
+import { isAdmin, unauthorized, sha256hex } from "../../src/lib/server/auth";
+import { securityEventStatement } from "../../src/lib/server/user-auth";
 import { uploadToGitHub } from "../../src/lib/server/github";
 import type { MediaItem } from "../../src/lib/server/types";
 import type { App, Env } from "../env";
@@ -172,4 +173,43 @@ export const mediaRoutes: App = new Hono<{ Bindings: Env }>()
       });
     }
     return c.redirect(media.url, 301);
+  })
+
+  /**
+   * DELETE /api/admin/media/:name (admin) — retire le média de la BIBLIOTHÈQUE.
+   * Le fichier et son lien ne sont pas touchés : tout élément qui utilise
+   * l'URL (couverture produit, etc.) continue de fonctionner.
+   * - hébergé GitHub → la ligne est supprimée, le blob reste en ligne ;
+   * - stocké en base (repli D1) → 409 : la ligne EST le stockage, la retirer
+   *   effacerait le média et casserait son lien.
+   */
+  .delete("/api/admin/media/:name", async (c) => {
+    if (!(await isAdmin(c.req.raw, c.env))) return unauthorized();
+    const name = safeMediaName(c.req.param("name"));
+    if (!name || name.startsWith(".") || name.includes("..")) {
+      return c.json({ ok: false, error: "Nom de fichier invalide." }, 400);
+    }
+    const media = await getMediaItem(c.env.DB, name);
+    if (!media) {
+      return c.json({ ok: false, error: "Média introuvable." }, 404);
+    }
+    if (media.hosted !== "github") {
+      return c.json(
+        {
+          ok: false,
+          error:
+            "Média stocké dans la base (repli sans GitHub) : le retirer effacerait le fichier " +
+            "et son lien. Il est conservé.",
+        },
+        409
+      );
+    }
+    await deleteMedia(c.env.DB, name);
+    await securityEventStatement(c.env.DB, {
+      actor: "admin",
+      action: "admin_media_delete",
+      ipHash: sha256hex(c.req.header("cf-connecting-ip") || "unknown"),
+      meta: { name },
+    }).run();
+    return c.json({ ok: true, deleted: name });
   });
