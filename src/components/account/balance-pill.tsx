@@ -1,12 +1,13 @@
 "use client";
 
 /**
- * Pastille de solde A — discrète, intégrée au header (rien de fixe en overlay, pas de HUD).
- * Connecté : pièce A + solde → /compte. Déconnecté : lien « Connexion » discret → /connexion.
+ * Pastille compte — discrète, intégrée au header (rien de fixe en overlay, pas de HUD).
+ * Connecté : AVATAR utilisateur (jamais la pièce A, réservée à la monnaie) + solde → /compte.
+ * Déconnecté : lien « Connexion » discret → /connexion.
  */
 
 import Link from "next/link";
-import { CoinA } from "./coin-a";
+import { UserAvatar } from "./user-avatar";
 import { useUser } from "@/hooks/use-user";
 
 export function BalancePill() {
@@ -33,8 +34,8 @@ export function BalancePill() {
       aria-label={`Compte de ${user.pseudo} — solde ${user.balanceA} A`}
       className="relative flex h-[38px] flex-shrink-0 items-center gap-1.5 rounded-xl border border-[#333] bg-[#141414] px-2.5 transition-colors after:absolute after:inset-x-0 after:top-1/2 after:h-11 after:-translate-y-1/2 after:content-[''] hover:border-[#444] hover:bg-[#1a1a1a] sm:px-3"
     >
-      <CoinA size={19} />
-      {/* Compacte sur mobile : la pièce seule, le montant apparaît dès sm */}
+      <UserAvatar pseudo={user.pseudo} seed={user.id} size={22} />
+      {/* Compacte sur mobile : l'avatar seul, le solde apparaît dès sm */}
       <span className="hidden whitespace-nowrap font-mono text-[0.8rem] tabular-nums text-[#f0f0f0] sm:inline">
         {user.balanceA.toLocaleString("fr-FR")}
         <span className="ml-1 text-gold">A</span>

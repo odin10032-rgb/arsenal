@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Shell du dashboard admin — header + 7 onglets + déconnexion
+ * Shell du dashboard admin — header compact + 8 onglets + déconnexion
  */
 
 import Link from "next/link";
@@ -127,20 +127,21 @@ export function AdminDashboard({
 
   return (
     <div className="flex min-h-dvh flex-col">
-      {/* Header */}
+      {/* Header — une seule ligne même sur mobile : badge visible dès sm,
+          libellés des actions masqués au profit de leurs icônes (accessibles). */}
       <header className="sticky top-0 z-50 border-b border-[#333] bg-[rgba(10,10,10,0.95)]">
-        <div className="container-arsenal flex flex-wrap items-center gap-3 py-2.5">
-          <Link href="/admin" className="flex items-center gap-2">
+        <div className="container-arsenal flex flex-wrap items-center gap-x-2.5 gap-y-2 py-2.5">
+          <Link href="/admin" className="flex flex-shrink-0 items-center gap-2">
             <BrandLogo size={28} />
             <span className="text-[0.95rem] font-bold tracking-wide">
               Arsenal <span className="text-[#e63946]">Tools</span>
             </span>
           </Link>
-          <span className="rounded-full border border-[rgba(230,57,70,0.45)] bg-[rgba(230,57,70,0.1)] px-2.5 py-1 font-mono text-[0.62rem] uppercase tracking-[0.1em] text-[#f0808a]">
+          <span className="hidden rounded-full border border-[rgba(230,57,70,0.45)] bg-[rgba(230,57,70,0.1)] px-2.5 py-1 font-mono text-[0.62rem] uppercase tracking-[0.1em] text-[#f0808a] sm:inline-block">
             Dashboard Admin
           </span>
           <span
-            className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 font-mono text-[0.64rem]"
+            className="inline-flex h-[26px] items-center gap-1.5 rounded-full border px-2.5 font-mono text-[0.64rem] sm:py-1"
             style={
               apiAvailable
                 ? { color: "#56b8a8", borderColor: "rgba(42,157,143,0.4)", background: "rgba(42,157,143,0.07)" }
@@ -151,20 +152,36 @@ export function AdminDashboard({
                 ? "Données partagées entre tous les visiteurs"
                 : "API injoignable — modifications stockées localement"
             }
+            aria-label={apiAvailable ? "Backend connecté" : "Mode local"}
           >
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: "currentColor" }} />
-            {apiAvailable ? "Backend connecté" : "Mode local"}
+            <span className="hidden sm:inline">{apiAvailable ? "Backend connecté" : "Mode local"}</span>
           </span>
 
-          <div className="ml-auto flex items-center gap-2">
-            <Link href="/" className="btn-arsenal btn-ghost btn-sm" target="_blank">
-              Voir le site
+          <div className="ml-auto flex flex-shrink-0 items-center gap-1.5 sm:gap-2">
+            <Link
+              href="/"
+              className="btn-arsenal btn-ghost btn-sm"
+              target="_blank"
+              title="Voir le site"
+              aria-label="Voir le site"
+            >
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+              </svg>
+              <span className="hidden sm:inline">Voir le site</span>
             </Link>
-            <button type="button" onClick={logout} className="btn-arsenal btn-danger btn-sm">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <button
+              type="button"
+              onClick={logout}
+              className="btn-arsenal btn-danger btn-sm"
+              title="Déconnexion"
+              aria-label="Déconnexion"
+            >
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
               </svg>
-              Déconnexion
+              <span className="hidden sm:inline">Déconnexion</span>
             </button>
           </div>
         </div>
