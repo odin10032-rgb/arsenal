@@ -1012,7 +1012,10 @@ export function purchaseToJson(row: PurchaseJoinRow, viewer: { email: string }):
           category: row.product_category ?? "",
           // Mode de livraison Arsenal — le client s'en sert pour afficher le
           // bouton de téléchargement (fichier) ou la clé de licence.
-          deliveryKind: row.product_delivery_kind ?? null,
+          deliveryKind:
+            row.product_delivery_kind === "file" || row.product_delivery_kind === "license"
+              ? row.product_delivery_kind
+              : null,
         }
       : null,
     fulfillment: row.fulfillment_id
