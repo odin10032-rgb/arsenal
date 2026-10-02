@@ -14,7 +14,11 @@ import {
   uniqueViolationColumn,
   verifyPassword,
 } from "../../src/lib/server/user-auth";
-import { aBalance, welcomeRewardStatement, WELCOME_A } from "../../src/lib/server/ledger";
+// Note : la récompense de bienvenue (`welcomeRewardStatement`) n'est PLUS versée
+// à l'inscription — la monnaie A est réservée aux membres du programme
+// (décision propriétaire du 03/10/2026). L'helper reste dans le ledger pour
+// d'éventuels usages ciblés (migration/octroi manuel).
+import { aBalance } from "../../src/lib/server/ledger";
 import { sha256hex } from "../../src/lib/server/auth";
 import type { App, Env } from "../env";
 
@@ -70,11 +74,14 @@ export const userAuthRoutes: App = new Hono<{ Bindings: Env }>()
     const token = generateSessionToken();
 
     try {
-      // Inscription ATOMIQUE : user + récompense de bienvenue + session +
-      // security_event en un seul batch D1 (tout ou rien).
+      // Inscription ATOMIQUE : user + session + security_event en un seul batch D1.
+      // ⚠️ AUCUNE récompense de bienvenue : un nouvel inscrit est un simple
+      // UTILISATEUR (membership « none »), sans accès à la monnaie A. La monnaie
+      // A, le portefeuille et les récompenses sont réservés aux MEMBRES du
+      // programme (décision propriétaire du 03/10/2026, option A) — rejoindre le
+      // programme est un acte volontaire, distinct de la création de compte.
       await c.env.DB.batch([
         insertUserStatement(c.env.DB, { id: userId, pseudo, email, passwordHash, now }),
-        welcomeRewardStatement(c.env.DB, userId),
         sessionStatement(c.env.DB, userId, token),
         securityEventStatement(c.env.DB, {
           actor: userId,
@@ -96,8 +103,17 @@ export const userAuthRoutes: App = new Hono<{ Bindings: Env }>()
         ok: true,
         token,
         user: toPublicUser(
-          { id: userId, pseudo, email, password_hash: passwordHash, role: "user", created_at: now, updated_at: now },
-          WELCOME_A
+          {
+            id: userId,
+            pseudo,
+            email,
+            password_hash: passwordHash,
+            role: "user",
+            membership: "none",
+            created_at: now,
+            updated_at: now,
+          },
+          0
         ),
       },
       201

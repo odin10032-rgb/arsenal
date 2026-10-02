@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { requireAuth } from "./me";
+import { isMember } from "../../src/lib/server/user-auth";
 import { aBalance } from "../../src/lib/server/ledger";
 import { isUniqueViolation } from "../../src/lib/server/affiliation";
 import { FULFILLMENT_MAX_ATTEMPTS, canAttemptFulfillment, fulfillPurchase, getFulfillmentByPurchase } from "../../src/lib/server/fulfillment";
@@ -60,6 +61,15 @@ export const purchaseRoutes: AuthedApp = new Hono<AuthedEnv>()
   /** Achat avec ses A : 400 non achetable, 402 solde insuffisant, 409 déjà possédé. */
   .post("/api/purchases", requireAuth, async (c) => {
     const { user } = c.get("authUser");
+    // Monnaie A réservée aux MEMBRES du programme (décision propriétaire du
+    // 03/10/2026) : un simple utilisateur n'a pas de portefeuille, donc pas
+    // d'achat en A. La couche A est additive — le canal FCFA reste inchangé.
+    if (!isMember(user)) {
+      return c.json(
+        { ok: false, error: "L'achat en A est réservé aux membres du programme." },
+        403
+      );
+    }
     let body: Record<string, unknown>;
     try {
       body = (await c.req.json()) as Record<string, unknown>;

@@ -1,0 +1,17 @@
+-- Arsenal — migration 0008 : statut d'adhésion au programme.
+--
+-- Objectif (décision propriétaire du 03/10/2026, option A) : la MONNAIE A, le
+-- portefeuille et les récompenses deviennent réservés aux MEMBRES du programme.
+-- « Créer un compte » et « rejoindre le programme » sont deux événements
+-- distincts (cahier des charges d'affiliation §26) : `users.role` continue de
+-- porter le rôle technique (user | affiliate | super_affiliate | admin), et
+-- cette colonne porte l'ADHÉSION.
+--
+-- Valeurs : 'none' (défaut, simple utilisateur) | 'member' (adhésion acceptée).
+-- Les comptes EXISTANTS sont migrés en 'member' (ils détiennent déjà des A —
+-- un utilisateur ne doit jamais perdre un solde) : voir 0008b.
+--
+-- Additive et rétrocompatible : colonne nullable à défaut 'none'.
+--
+-- ⚠️ ORDRE DE DÉPLOIEMENT : appliquer AVANT de déployer le code qui la lit.
+ALTER TABLE users ADD COLUMN membership TEXT NOT NULL DEFAULT 'none';

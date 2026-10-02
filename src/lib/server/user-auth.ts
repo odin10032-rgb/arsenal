@@ -32,6 +32,12 @@ export interface UserRow {
   email: string;
   password_hash: string;
   role: string;
+  /**
+   * Adhésion au programme (migration 0008) : `none` (simple utilisateur) ou
+   * `member`. C'est l'adhésion — et non le rôle — qui ouvre la monnaie A, le
+   * portefeuille et les récompenses (décision propriétaire du 03/10/2026).
+   */
+  membership?: string | null;
   created_at: number;
   updated_at: number;
 }
@@ -57,8 +63,26 @@ export interface PublicUser {
   pseudo: string;
   email: string;
   role: string; // "user" | "affiliate" | "super_affiliate" | "admin"
+  /** Adhésion au programme : ouvre la monnaie A et le portefeuille. */
+  membership: Membership;
   balanceA: number;
   createdAt: number;
+}
+
+/* ------------------------------- Adhésion ------------------------------- */
+
+export type Membership = "none" | "member";
+
+export const MEMBERSHIPS: readonly Membership[] = ["none", "member"];
+
+/** Normalisation défensive : toute valeur inconnue retombe sur « none ». */
+export function normalizeMembership(raw: unknown): Membership {
+  return raw === "member" ? "member" : "none";
+}
+
+/** L'utilisateur a-t-il accès à la monnaie A ? (adhésion, jamais le rôle). */
+export function isMember(user: { membership?: string | null }): boolean {
+  return normalizeMembership(user.membership) === "member";
 }
 
 export type SecurityEventAction =
@@ -293,6 +317,7 @@ export function toPublicUser(user: UserRow, balanceA: number): PublicUser {
     pseudo: user.pseudo,
     email: user.email,
     role: user.role,
+    membership: normalizeMembership(user.membership),
     balanceA: Math.trunc(Number(balanceA)),
     createdAt: Number(user.created_at),
   };

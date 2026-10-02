@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { Context, Next } from "hono";
-import { bearerToken, getAuthContext, toPublicUser } from "../../src/lib/server/user-auth";
+import { bearerToken, getAuthContext, isMember, toPublicUser } from "../../src/lib/server/user-auth";
 import { aBalance, listTransactions } from "../../src/lib/server/ledger";
 import {
   markUnlockSeenStatement,
@@ -47,11 +47,16 @@ function parseClampedInt(raw: string | undefined, fallback: number, min: number,
 export const meRoutes: AuthedApp = new Hono<AuthedEnv>()
   .get("/api/me", requireAuth, async (c) => {
     const { user } = c.get("authUser");
-    const balanceA = await aBalance(c.env.DB, user.id);
+    // Monnaie A réservée aux MEMBRES (décision propriétaire du 03/10/2026) :
+    // un simple utilisateur reçoit un solde à 0, sans même lire le ledger —
+    // son portefeuille n'existe pas tant qu'il n'a pas rejoint le programme.
+    const balanceA = isMember(user) ? await aBalance(c.env.DB, user.id) : 0;
     return c.json({ ok: true, user: toPublicUser(user, balanceA) });
   })
   .get("/api/me/transactions", requireAuth, async (c) => {
     const { user } = c.get("authUser");
+    // Non-membre : aucun historique (200 vide, jamais d'erreur côté client).
+    if (!isMember(user)) return c.json({ ok: true, total: 0, transactions: [] });
     const limit = parseClampedInt(c.req.query("limit"), DEFAULT_TX_LIMIT, 1, MAX_TX_LIMIT);
     const offset = parseClampedInt(c.req.query("offset"), 0, 0, Number.MAX_SAFE_INTEGER);
     const { total, transactions } = await listTransactions(c.env.DB, user.id, limit, offset);
