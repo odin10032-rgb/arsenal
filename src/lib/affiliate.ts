@@ -28,14 +28,22 @@ export interface AffiliateStats {
   conversion: number;
   /** Récompenses A cumulées (transactions `reward`) */
   aEarned: number;
-  /** Commissions hors `cancelled` */
+  /**
+   * Commissions en FCFA (ventes externes / saisie admin) hors `cancelled`.
+   * ⚠️ Indépendant de `commissionA` : les deux monnaies ne se cumulent jamais
+   * et ne se convertissent pas (décision propriétaire du 03/10/2026).
+   */
   commissionTotal: number;
-  /** Commissions `pending` + `validated` */
+  /** Commissions `pending` + `validated` (FCFA) */
   pending: number;
-  /** Commissions `payable` */
+  /** Commissions `payable` (FCFA) */
   payable: number;
-  /** Commissions `paid` */
+  /** Commissions `paid` (FCFA) */
   paid: number;
+  /** Commissions gagnées en A (achats réglés avec la monnaie interne). */
+  commissionA: number;
+  /** Part A encore en attente (`pending`/`validated`). */
+  aPending: number;
 }
 
 /** `affiliate` de GET /api/affiliate/me — null si l'utilisateur n'a jamais candidaté */
@@ -89,6 +97,8 @@ function normalizeStats(raw: Partial<AffiliateStats> | null | undefined): Affili
     pending: num(raw?.pending),
     payable: num(raw?.payable),
     paid: num(raw?.paid),
+    commissionA: num(raw?.commissionA),
+    aPending: num(raw?.aPending),
   };
 }
 

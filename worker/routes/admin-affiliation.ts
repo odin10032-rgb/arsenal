@@ -110,6 +110,8 @@ const EMPTY_STATS: AffiliateStats = {
   pending: 0,
   payable: 0,
   paid: 0,
+  commissionA: 0,
+  aPending: 0,
 };
 
 /* ------------------------------- Sérialisation ------------------------------- */

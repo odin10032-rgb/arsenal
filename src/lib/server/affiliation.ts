@@ -58,10 +58,20 @@ export interface AffiliateStats {
   sales: number;
   conversion: number;
   aEarned: number;
+  /**
+   * Commissions en FCFA (ventes externes Chariow / saisie administrateur).
+   * ⚠️ Ne JAMAIS additionner avec `commissionA` : deux monnaies distinctes,
+   * sans aucune conversion (décision propriétaire du 03/10/2026 — le constat
+   * C4 de l'audit mélangeait les devises dans un même total).
+   */
   commissionTotal: number;
   pending: number;
   payable: number;
   paid: number;
+  /** Commissions gagnées en A (achats réglés avec la monnaie interne). */
+  commissionA: number;
+  /** Part des commissions A encore en attente (pending/validated). */
+  aPending: number;
 }
 
 /** Objet `affiliate` du contrat (GET /api/affiliate/me). */
@@ -570,8 +580,18 @@ interface CommissionTotals {
   total: number;
 }
 
+/** Totaux des commissions libellées en A (monnaie interne) — jamais mélangés aux FCFA. */
+interface CommissionTotalsA {
+  pending: number;
+  total: number;
+}
+
 function emptyCommissionTotals(): CommissionTotals {
   return { pending: 0, payable: 0, paid: 0, total: 0 };
+}
+
+function emptyCommissionTotalsA(): CommissionTotalsA {
+  return { pending: 0, total: 0 };
 }
 
 /** Agrège les commissions par état (les `cancelled` sont exclues des montants). */
@@ -583,11 +603,19 @@ function addCommissionState(totals: CommissionTotals, state: string, amount: num
   else if (state === "paid") totals.paid = round2(totals.paid + amount);
 }
 
+/** Même agrégation, restreinte aux commissions en A (pas de payable/paid : la monnaie A n'est pas « versée »). */
+function addCommissionStateA(totals: CommissionTotalsA, state: string, amount: number): void {
+  if (state === "cancelled") return;
+  totals.total = round2(totals.total + amount);
+  if (state === "pending" || state === "validated") totals.pending = round2(totals.pending + amount);
+}
+
 function buildStats(
   clicks: number,
   sales: number,
   aEarned: number,
-  totals: CommissionTotals
+  totals: CommissionTotals,
+  totalsA: CommissionTotalsA = emptyCommissionTotalsA()
 ): AffiliateStats {
   return {
     clicks,
@@ -598,6 +626,8 @@ function buildStats(
     pending: totals.pending,
     payable: totals.payable,
     paid: totals.paid,
+    commissionA: totalsA.total,
+    aPending: totalsA.pending,
   };
 }
 
@@ -620,20 +650,32 @@ export async function computeAffiliateStats(
       .bind(affiliate.user_id)
       .first<{ total: number }>(),
     db
-      .prepare("SELECT state, COALESCE(SUM(amount), 0) AS total FROM commissions WHERE affiliate_id = ? GROUP BY state")
+      .prepare(
+        "SELECT state, currency, COALESCE(SUM(amount), 0) AS total FROM commissions WHERE affiliate_id = ? GROUP BY state, currency"
+      )
       .bind(affiliate.id)
-      .all<{ state: string; total: number }>(),
+      .all<{ state: string; currency: string | null; total: number }>(),
   ]);
 
+  // Deux monnaies, deux totaux : les commissions en A (monnaie interne) ne sont
+  // JAMAIS additionnées aux FCFA (décision propriétaire — aucun cumul, aucune
+  // conversion). Une devise absente/illisible compte comme FCFA (défaut du schéma).
   const totals = emptyCommissionTotals();
+  const totalsA = emptyCommissionTotalsA();
   for (const row of commissionRows.results || []) {
-    addCommissionState(totals, row.state, Number(row.total) || 0);
+    const amount = Number(row.total) || 0;
+    if (String(row.currency ?? "").toUpperCase() === "A") {
+      addCommissionStateA(totalsA, row.state, amount);
+    } else {
+      addCommissionState(totals, row.state, amount);
+    }
   }
   return buildStats(
     Math.trunc(Number(clicksRow?.n ?? 0)),
     Math.trunc(Number(salesRow?.n ?? 0)),
     Number(rewardRow?.total ?? 0),
-    totals
+    totals,
+    totalsA
   );
 }
 
@@ -669,10 +711,10 @@ export async function affiliateStatsMap(
       .all<{ user_id: string; total: number }>(),
     db
       .prepare(
-        `SELECT affiliate_id, state, COALESCE(SUM(amount), 0) AS total FROM commissions WHERE affiliate_id IN (${idPlaceholders}) GROUP BY affiliate_id, state`
+        `SELECT affiliate_id, state, currency, COALESCE(SUM(amount), 0) AS total FROM commissions WHERE affiliate_id IN (${idPlaceholders}) GROUP BY affiliate_id, state, currency`
       )
       .bind(...ids)
-      .all<{ affiliate_id: string; state: string; total: number }>(),
+      .all<{ affiliate_id: string; state: string; currency: string | null; total: number }>(),
   ]);
 
   const clicks = new Map<string, number>();
@@ -681,11 +723,20 @@ export async function affiliateStatsMap(
   for (const row of salesRes.results || []) sales.set(row.affiliate_id, Math.trunc(Number(row.n) || 0));
   const rewards = new Map<string, number>();
   for (const row of rewardRes.results || []) rewards.set(row.user_id, Number(row.total) || 0);
+  // Deux devises séparées : A (monnaie interne) et FCFA — jamais additionnées.
   const totals = new Map<string, CommissionTotals>();
+  const totalsA = new Map<string, CommissionTotalsA>();
   for (const row of commissionRes.results || []) {
-    const current = totals.get(row.affiliate_id) ?? emptyCommissionTotals();
-    addCommissionState(current, row.state, Number(row.total) || 0);
-    totals.set(row.affiliate_id, current);
+    const amount = Number(row.total) || 0;
+    if (String(row.currency ?? "").toUpperCase() === "A") {
+      const currentA = totalsA.get(row.affiliate_id) ?? emptyCommissionTotalsA();
+      addCommissionStateA(currentA, row.state, amount);
+      totalsA.set(row.affiliate_id, currentA);
+    } else {
+      const current = totals.get(row.affiliate_id) ?? emptyCommissionTotals();
+      addCommissionState(current, row.state, amount);
+      totals.set(row.affiliate_id, current);
+    }
   }
 
   for (const affiliate of affiliates) {
@@ -695,7 +746,8 @@ export async function affiliateStatsMap(
         clicks.get(affiliate.id) ?? 0,
         sales.get(affiliate.id) ?? 0,
         rewards.get(affiliate.user_id) ?? 0,
-        totals.get(affiliate.id) ?? emptyCommissionTotals()
+        totals.get(affiliate.id) ?? emptyCommissionTotals(),
+        totalsA.get(affiliate.id) ?? emptyCommissionTotalsA()
       )
     );
   }
