@@ -36,20 +36,15 @@ export function AdminLogin({ onLogin }: { onLogin: (token: string) => void }) {
     <div className="flex flex-1 items-center justify-center p-6">
       <form
         onSubmit={submit}
-        className="flex w-full max-w-[400px] flex-col gap-4 rounded-2xl border border-[#333] bg-[#141414] p-8 text-center"
+        className="flex w-full max-w-[400px] flex-col gap-5 rounded-2xl border border-[#333] bg-[#141414] p-8 text-center"
       >
         <div className="flex justify-center">
           {/* Le logo ramène à l'accueil du site public (cohérence avec les autres headers) */}
           <Link href="/" aria-label="Arsenal Tools — retour à l'accueil" className="transition-opacity hover:opacity-80">
-            <BrandLogo size={46} />
+            <BrandLogo size={40} />
           </Link>
         </div>
-        <div>
-          <h1 className="font-display text-[1.35rem] font-bold">Zone administrateur</h1>
-          <p className="mt-1 text-[0.84rem] text-[#a0a0a0]">
-            Arsenal Tools — Dashboard &amp; médiathèque.
-          </p>
-        </div>
+        <h1 className="font-display text-[1.25rem] font-bold tracking-wide">Administration</h1>
 
         {error && (
           <p className="rounded-lg border border-[rgba(230,57,70,0.4)] bg-[rgba(230,57,70,0.1)] px-3 py-2 text-[0.8rem] text-[#fda4af]" role="alert">
@@ -68,6 +63,7 @@ export function AdminLogin({ onLogin }: { onLogin: (token: string) => void }) {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••••••"
             autoComplete="current-password"
+            autoFocus
             className="input-arsenal pr-11"
           />
           <button
@@ -91,12 +87,8 @@ export function AdminLogin({ onLogin }: { onLogin: (token: string) => void }) {
 
         <button type="submit" disabled={busy || !password} className="btn-arsenal btn-primary">
           {busy && <span className="spin" />}
-          Déverrouiller le dashboard
+          Entrer
         </button>
-
-        <p className="border-t border-dashed border-[#333] pt-3 text-[0.72rem] leading-relaxed text-[#666]">
-          Modifiable dans <em>Paramètres → Sécurité</em> une fois connecté.
-        </p>
       </form>
     </div>
   );
