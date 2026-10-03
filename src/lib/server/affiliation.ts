@@ -679,8 +679,14 @@ export function effectiveLimits(
   };
 }
 
-/** true si l'affilié peut encore activer un lien (plafond non atteint ou illimité). */
-export function canActivateMoreLinks(limits: AffiliateLimits): boolean {
+/**
+ * true si l'affilié peut encore activer un lien.
+ * `campaignExempt` = le lien visé relève d'une campagne REJOINTE : il ne
+ * consomme pas le plafond (règle propriétaire du 03/10/2026), donc l'activation
+ * est toujours permise — même à 3 liens normaux actifs.
+ */
+export function canActivateMoreLinks(limits: AffiliateLimits, campaignExempt = false): boolean {
+  if (campaignExempt) return true;
   if (limits.maxActiveLinks === 0) return true; // 0 = illimité (Super)
   return limits.activeCount < limits.maxActiveLinks;
 }
@@ -718,7 +724,25 @@ export async function activateAffiliateLink(
   if (existing && normalizeLinkStatus(existing.status) === "active") {
     return { ok: true, link: existing, reason: "idempotent", limits, activeLinks: [] };
   }
-  if (!canActivateMoreLinks(limits)) {
+  // Ce produit relève-t-il d'une campagne que l'affilié a REJOINTE ? Si oui, le
+  // lien est HORS PLAFOND et peut toujours être activé (règle propriétaire).
+  const campaignIds = await readParticipatingCampaignIds(db, affiliate.id);
+  let campaignExempt = false;
+  if (campaignIds.length) {
+    const placeholders = campaignIds.map(() => "?").join(", ");
+    try {
+      const row = await db
+        .prepare(
+          `SELECT 1 AS ok FROM campaigns WHERE product_id = ? AND id IN (${placeholders}) LIMIT 1`
+        )
+        .bind(product.id, ...campaignIds)
+        .first<{ ok: number }>();
+      campaignExempt = Boolean(row);
+    } catch {
+      /* lecture impossible : on retombe sur la règle normale */
+    }
+  }
+  if (!canActivateMoreLinks(limits, campaignExempt)) {
     return {
       ok: false,
       link: null,
