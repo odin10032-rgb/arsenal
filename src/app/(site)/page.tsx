@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ProductCard } from "@/components/product-card";
 import { useCatalog } from "@/hooks/use-catalog";
+import { useUser } from "@/hooks/use-user";
 import { apiFetch } from "@/lib/api";
 import { trackVisit } from "@/lib/track";
 import { fmt } from "@/lib/format";
@@ -30,6 +31,7 @@ const SKELETONS = [0, 1, 2, 3];
 
 export default function CatalogPage() {
   const { products, initialLoaded, source } = useCatalog();
+  const { user } = useUser();
   const [filters, setFilters] = useState<ProductFilters>(DEFAULT_FILTERS);
   const searchRef = useRef<HTMLInputElement>(null);
   // Stats d'accueil pilotées depuis l'admin (Paramètres → Affichage). Défaut :
@@ -329,7 +331,13 @@ export default function CatalogPage() {
       </section>
 
       {/* ---------- Bloc de découverte : programme d'affiliation ---------- */}
-      {/* Ajout isolé en fin de JSX (vague 3 « panier » modifie aussi ce fichier). */}
+      {/*
+        Masqué dès que la session est AFFILIÉE (ou Super) : un affilié n'a plus
+        besoin qu'on lui vante le programme — c'était redondant et donnait
+        l'impression que le site ne tenait pas compte de son statut. Visible pour
+        un visiteur ou un simple utilisateur, qui sont les vraies cibles.
+      */}
+      {user?.role !== "affiliate" && user?.role !== "super_affiliate" && (
       <section className="container-arsenal pb-14">
         <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-[#333] bg-[#141414] p-6 sm:flex-row sm:items-center sm:p-7">
           <div className="min-w-0">
@@ -349,6 +357,7 @@ export default function CatalogPage() {
           </Link>
         </div>
       </section>
+      )}
     </>
   );
 }
