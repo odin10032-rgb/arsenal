@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { requireAuth } from "./me";
 import { isMember } from "../../src/lib/server/user-auth";
 import { aBalance } from "../../src/lib/server/ledger";
-import { isUniqueViolation } from "../../src/lib/server/affiliation";
+import { isUniqueViolation, readAffiliateSettings } from "../../src/lib/server/affiliation";
 import { FULFILLMENT_MAX_ATTEMPTS, canAttemptFulfillment, fulfillPurchase, getFulfillmentByPurchase } from "../../src/lib/server/fulfillment";
 import {
   computePurchaseCommission,
@@ -115,6 +115,8 @@ export const purchaseRoutes: AuthedApp = new Hono<AuthedEnv>()
         product,
         attribution,
         commission,
+        // Plafond de ventes par lien (vague 4) : le lien saturé cesse d'attribuer.
+        maxSalesPerLink: (await readAffiliateSettings(db)).maxSalesPerLink,
       });
     } catch (err) {
       // Course entre deux achats simultanés : l'index unique annule tout le batch

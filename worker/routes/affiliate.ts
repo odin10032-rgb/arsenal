@@ -1,19 +1,27 @@
 import { Hono } from "hono";
 import { requireAuth } from "./me";
 import {
+  activateAffiliateLink,
   computeAffiliateStats,
+  countActiveLinks,
   createAffiliate,
+  deactivateAffiliateLink,
+  effectiveLimits,
   getAffiliateByUserId,
-  getOrCreateAffiliateLink,
+  getAffiliateLink,
   getProductById,
   isSuperAffiliate,
   isUniqueViolation,
   linkUrl,
   listEligibleProducts,
+  listLinksByAffiliate,
+  normalizeLinkStatus,
   productPerformanceMap,
   readAffiliateSettings,
   toPublicAffiliate,
 } from "../../src/lib/server/affiliation";
+import type { AffiliateLinkRow, AffiliateLimits } from "../../src/lib/server/affiliation";
+import { createProductRequest } from "../../src/lib/server/product-requests";
 import { getActiveCampaign, resolveCommissionRule } from "../../src/lib/server/commissions";
 import {
   isEligible,
@@ -34,12 +42,40 @@ function forbidden(error: string): Response {
   return Response.json({ ok: false, error }, { status: 403 });
 }
 
+/** Lien d'affiliation sérialisé pour le front (état réel + URl/ code). */
+function linkToJson(link: AffiliateLinkRow | null) {
+  if (!link) return null;
+  return {
+    id: link.id,
+    productId: link.product_id,
+    link: linkUrl(link.code),
+    linkCode: link.code,
+    status: normalizeLinkStatus(link.status),
+    salesCount: Math.trunc(Number(link.sales_count) || 0),
+    createdAt: Number(link.created_at ?? 0),
+  };
+}
+
+/** Plafonds sérialisés (camelCase) pour le front. */
+function limitsToJson(limits: AffiliateLimits) {
+  return {
+    maxActiveLinks: limits.maxActiveLinks,
+    maxSalesPerLink: limits.maxSalesPerLink,
+    activeCount: limits.activeCount,
+    isSuper: limits.isSuper,
+  };
+}
+
 /**
  * Phase 2 — espace affilié (Bearer requis, `requireAuth` de me.ts) :
  * - POST /api/affiliate/apply                     → 201 {ok, affiliate} (statut pending)
  * - GET  /api/affiliate/me                        → {ok, affiliate|null} (état + statistiques)
- * - GET  /api/affiliate/me/products               → {ok, products} (produits éligibles + performance)
- * - POST /api/affiliate/me/products/:id/link      → {ok, link, linkCode} (lien (re)généré, idempotent)
+ * - GET  /api/affiliate/me/products               → {ok, products, limits} (état réel, SANS création)
+ * - POST /api/affiliate/me/products/:productId/link      → (re)génère le lien (régénération)
+ * - POST /api/affiliate/me/products/:productId/activate  → active/réactive (plafonds appliqués)
+ * - POST /api/affiliate/me/links/:linkId/deactivate      → désactive (libère un emplacement)
+ * - POST /api/affiliate/me/products/:productId/request   → demande produit (Super uniquement)
+ * - POST /api/affiliate/me/withdraw                      → retrait volontaire du programme
  *
  * Toutes les lectures sont scopées par l'utilisateur de la SESSION (`authUser`) :
  * aucun identifiant d'affilié ne provient du client. Le rôle `affiliate` n'est pas
@@ -262,20 +298,23 @@ export const affiliateRoutes: AuthedApp = new Hono<AuthedEnv>()
     if (affiliate.status === "suspended") return c.json({ ok: true, products: [] });
     if (affiliate.status !== "active") return forbidden("Espace affilié réservé aux affiliés actifs.");
 
-    const [products, settings, performance] = await Promise.all([
+    const [products, settings, performance, links, activeCount] = await Promise.all([
       listEligibleProducts(c.env.DB),
       readAffiliateSettings(c.env.DB),
       productPerformanceMap(c.env.DB, affiliate.id),
+      listLinksByAffiliate(c.env.DB, affiliate.id),
+      countActiveLinks(c.env.DB, affiliate.id),
     ]);
+    const linksByProduct = new Map(links.map((l) => [l.product_id, l]));
+    const isSuper = isSuperAffiliate(user.role, await computeAffiliateStats(c.env.DB, affiliate), settings);
+    const limits = effectiveLimits(settings, isSuper, activeCount);
 
     const entries = await Promise.all(
       products.map(async (product) => {
-        const [campaign, link] = await Promise.all([
-          getActiveCampaign(c.env.DB, product.id),
-          getOrCreateAffiliateLink(c.env.DB, affiliate, product),
-        ]);
+        const campaign = await getActiveCampaign(c.env.DB, product.id);
         const rule = resolveCommissionRule(product, campaign, settings);
         const stats = performance.get(product.id);
+        const link = linksByProduct.get(product.id) ?? null;
         return {
           id: product.id,
           title: product.title,
@@ -287,13 +326,211 @@ export const affiliateRoutes: AuthedApp = new Hono<AuthedEnv>()
           clicks: stats?.clicks ?? 0,
           sales: stats?.sales ?? 0,
           conversion: stats?.conversion ?? 0,
-          link: linkUrl(link.code),
-          linkCode: link.code,
+          // ⚠️ AUCUNE création de lien ici : la simple consultation n'attribue rien.
+          // `link` n'est renseigné que si un lien existe DÉJÀ pour ce produit.
+          link: link ? linkUrl(link.code) : "",
+          linkCode: link?.code ?? "",
+          linkId: link?.id ?? null,
+          linkStatus: link ? normalizeLinkStatus(link.status) : null,
+          salesCount: Math.trunc(Number(link?.sales_count) || 0),
         };
       })
     );
 
-    return c.json({ ok: true, products: entries });
+    return c.json({ ok: true, products: entries, limits: limitsToJson(limits) });
+  })
+  /**
+   * Activation (ou réactivation) du lien d'un produit — acte VOLONTAIRE.
+   * Ordre de vérification serveur : affilié actif ; produit éligible ; lien déjà
+   * actif → idempotent ; plafond de liens actifs atteint → 409 avec la liste des
+   * liens actifs (le front propose : désactiver lequel, ou abandonner) ;
+   * sinon activation. Le serveur décide, le front ne choisit pas à sa place.
+   */
+  .post("/api/affiliate/me/products/:productId/activate", requireAuth, async (c) => {
+    const { user } = c.get("authUser");
+    const affiliate = await getAffiliateByUserId(c.env.DB, user.id);
+    if (!affiliate || affiliate.status !== "active") {
+      return forbidden("Espace affilié réservé aux affiliés actifs.");
+    }
+
+    const productId = String(c.req.param("productId") ?? "");
+    const product = await getProductById(c.env.DB, productId);
+    if (!product) return c.json({ ok: false, error: "Produit introuvable." }, 404);
+    if (Number(product.affiliate_enabled ?? 0) !== 1) {
+      return forbidden("Produit non éligible à l'affiliation.");
+    }
+
+    const [settings, activeCount, stats] = await Promise.all([
+      readAffiliateSettings(c.env.DB),
+      countActiveLinks(c.env.DB, affiliate.id),
+      computeAffiliateStats(c.env.DB, affiliate),
+    ]);
+    const isSuper = isSuperAffiliate(user.role, stats, settings);
+    const limits = effectiveLimits(settings, isSuper, activeCount);
+
+    const outcome = await activateAffiliateLink(c.env.DB, affiliate, product, limits);
+    if (!outcome.ok) {
+      // 409 : le front doit proposer un CHOIX (désactiver quel lien, ou abandonner).
+      return c.json(
+        {
+          ok: false,
+          error: "Plafond de liens actifs atteint.",
+          reason: "limit",
+          limits: limitsToJson(outcome.limits),
+          activeLinks: outcome.activeLinks.map((l) => linkToJson(l)),
+        },
+        409
+      );
+    }
+    return c.json({ ok: true, link: linkToJson(outcome.link), limits: limitsToJson(outcome.limits) });
+  })
+  /** Désactivation d'un lien (libère un emplacement) — propriété vérifiée. */
+  .post("/api/affiliate/me/links/:linkId/deactivate", requireAuth, async (c) => {
+    const { user } = c.get("authUser");
+    const affiliate = await getAffiliateByUserId(c.env.DB, user.id);
+    if (!affiliate || affiliate.status !== "active") {
+      return forbidden("Espace affilié réservé aux affiliés actifs.");
+    }
+
+    const linkId = String(c.req.param("linkId") ?? "");
+    // Propriété : le lien doit appartenir à CET affilié (jamais d'id d'affilié client).
+    const link = await c.env.DB
+      .prepare("SELECT * FROM affiliate_links WHERE id = ? AND affiliate_id = ?")
+      .bind(linkId, affiliate.id)
+      .first<AffiliateLinkRow>();
+    if (!link) return c.json({ ok: false, error: "Lien introuvable." }, 404);
+
+    const changed = await deactivateAffiliateLink(c.env.DB, link.id);
+    if (!changed) {
+      // Déjà inactif/saturé : idempotent côté client, on renvoie l'état courant.
+      const refreshed = await getAffiliateLink(c.env.DB, affiliate.id, link.product_id);
+      return c.json({ ok: true, link: linkToJson(refreshed) });
+    }
+    const refreshed = await getAffiliateLink(c.env.DB, affiliate.id, link.product_id);
+    return c.json({ ok: true, link: linkToJson(refreshed) });
+  })
+  /**
+   * Demande de disponibilité produit — RÉSERVÉE au Super-affilié.
+   * Idempotente : une seule demande `pending` par (affilié, produit).
+   */
+  .post("/api/affiliate/me/products/:productId/request", requireAuth, async (c) => {
+    const { user } = c.get("authUser");
+    const affiliate = await getAffiliateByUserId(c.env.DB, user.id);
+    if (!affiliate || affiliate.status !== "active") {
+      return forbidden("Espace affilié réservé aux affiliés actifs.");
+    }
+
+    const [settings, stats] = await Promise.all([
+      readAffiliateSettings(c.env.DB),
+      computeAffiliateStats(c.env.DB, affiliate),
+    ]);
+    if (!isSuperAffiliate(user.role, stats, settings)) {
+      return forbidden("Réservé au Super-affilié.");
+    }
+
+    const productId = String(c.req.param("productId") ?? "");
+    const product = await getProductById(c.env.DB, productId);
+    if (!product) return c.json({ ok: false, error: "Produit introuvable." }, 404);
+    if (Number(product.affiliate_enabled ?? 0) === 1) {
+      return c.json({ ok: false, error: "Ce produit est déjà ouvert à l'affiliation." }, 409);
+    }
+
+    let note: string | null = null;
+    try {
+      const body = (await c.req.json()) as { note?: unknown };
+      note = typeof body?.note === "string" ? body.note : null;
+    } catch {
+      note = null;
+    }
+
+    const { request, created } = await createProductRequest(c.env.DB, {
+      affiliateId: affiliate.id,
+      userId: user.id,
+      productId: product.id,
+      note,
+    });
+    if (created) {
+      // Journalisation directe : l'union `SecurityEventAction` (user-auth.ts, hors
+      // périmètre de cette vague) n'expose pas encore d'action dédiée aux demandes
+      // de produit non-admin. On écrit donc l'événement avec le même format de table.
+      await c.env.DB
+        .prepare(
+          "INSERT INTO security_events (id, at, actor, action, ip_hash, meta) VALUES (?, ?, ?, ?, ?, ?)"
+        )
+        .bind(
+          crypto.randomUUID(),
+          Date.now(),
+          user.id,
+          "product_request_create",
+          null,
+          JSON.stringify({ affiliateId: affiliate.id, productId: product.id, requestId: request.id })
+        )
+        .run();
+    }
+    return c.json(
+      {
+        ok: true,
+        created,
+        request: {
+          id: request.id,
+          productId: request.product_id,
+          status: request.status,
+          createdAt: Number(request.created_at),
+        },
+      },
+      created ? 201 : 200
+    );
+  })
+  /**
+   * Retrait volontaire du programme d'affiliation — état `withdrawn` (distinct
+   * d'une sanction `suspended`). Le rôle `users.role` redevient `user` ;
+   * `membership` est CONSERVÉ (la monnaie A ne dépend pas de l'affiliation).
+   */
+  .post("/api/affiliate/me/withdraw", requireAuth, async (c) => {
+    const { user } = c.get("authUser");
+    const affiliate = await getAffiliateByUserId(c.env.DB, user.id);
+    if (!affiliate) return forbidden("Vous n'êtes pas affilié.");
+    if (affiliate.status === "withdrawn") {
+      return c.json({ ok: true, status: "withdrawn" });
+    }
+
+    const now = Date.now();
+    await c.env.DB.batch([
+      // Statut de l'affilié + libération des emplacements (tous les liens actifs
+      // du retraité cessent d'attribuer — les ventes acquises restent comptées).
+      c.env.DB
+        .prepare("UPDATE affiliates SET status = 'withdrawn', updated_at = ? WHERE id = ?")
+        .bind(now, affiliate.id),
+      c.env.DB
+        .prepare("UPDATE affiliate_links SET status = 'inactive' WHERE affiliate_id = ? AND status = 'active'")
+        .bind(affiliate.id),
+      // Le rôle redevient `user` (jamais depuis admin) — membership NON touché.
+      c.env.DB
+        .prepare("UPDATE users SET role = 'user', updated_at = ? WHERE id = ? AND role = 'affiliate'")
+        .bind(now, user.id),
+      statusHistoryStatement(c.env.DB, {
+        userId: user.id,
+        fromRole: user.role,
+        toRole: "user",
+        reason: "withdraw",
+        now,
+      }),
+      // Même remarque que pour la demande de produit : action non whitelistée,
+      // insérée directement au format de `security_events`.
+      c.env.DB
+        .prepare(
+          "INSERT INTO security_events (id, at, actor, action, ip_hash, meta) VALUES (?, ?, ?, ?, ?, ?)"
+        )
+        .bind(
+          crypto.randomUUID(),
+          now,
+          user.id,
+          "affiliate_withdraw",
+          null,
+          JSON.stringify({ affiliateId: affiliate.id })
+        ),
+    ]);
+    return c.json({ ok: true, status: "withdrawn" });
   })
   .post("/api/affiliate/me/products/:productId/link", requireAuth, async (c) => {
     const { user } = c.get("authUser");
@@ -309,12 +546,34 @@ export const affiliateRoutes: AuthedApp = new Hono<AuthedEnv>()
       return forbidden("Produit non éligible à l'affiliation.");
     }
 
-    const link = await getOrCreateAffiliateLink(c.env.DB, affiliate, product);
+    // ⚠️ Cette route historique crée/renvoie le lien SANS appliquer le plafond :
+    // elle est conservée pour compatibilité (régénération), mais l'activation
+    // officielle passe par `…/activate`. On délègue donc à l'activation idempotente
+    // pour ne pas laisser un moyen de contourner les plafonds.
+    const [settings, activeCount, stats] = await Promise.all([
+      readAffiliateSettings(c.env.DB),
+      countActiveLinks(c.env.DB, affiliate.id),
+      computeAffiliateStats(c.env.DB, affiliate),
+    ]);
+    const limits = effectiveLimits(settings, isSuperAffiliate(user.role, stats, settings), activeCount);
+    const outcome = await activateAffiliateLink(c.env.DB, affiliate, product, limits);
+    if (!outcome.ok || !outcome.link) {
+      return c.json(
+        {
+          ok: false,
+          error: "Plafond de liens actifs atteint.",
+          reason: "limit",
+          limits: limitsToJson(outcome.limits),
+          activeLinks: outcome.activeLinks.map((l) => linkToJson(l)),
+        },
+        409
+      );
+    }
     return c.json({
       ok: true,
       // Format du contrat : `link` = URL publique (même format que dans la liste des produits).
-      link: linkUrl(link.code),
-      linkCode: link.code,
+      link: linkUrl(outcome.link.code),
+      linkCode: outcome.link.code,
       productId: product.id,
     });
   });

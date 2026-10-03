@@ -97,7 +97,9 @@ export type SecurityEventAction =
   /** Phase 2.6 : un affilié a tenté d'acheter avec son propre code. */
   | "self_affiliation_blocked"
   /** Phase 3 : demande de promotion Super Affiliate. */
-  | "super_upgrade_request";
+  | "super_upgrade_request"
+  /** Vague 2 : transfert de A entre membres (traçabilité). */
+  | "a_transfer";
 
 export interface SecurityEventInput {
   /** user_id, "admin" ou null. */

@@ -10,11 +10,38 @@
  * d'un lien (`"https://…"` ou `{ link, linkCode }`).
  */
 
-import { apiFetch } from "./api";
+import { ApiError, apiFetch } from "./api";
 
 /* ---------- Types du contrat ---------- */
 
+/**
+ * Statuts du CONTRAT admin (Phase 2) : pending | active | suspended. Conservé
+ * tel quel car l'écran admin (`affiliates-tab`) s'y indexe. Les deux états de
+ * sortie de la vague 4 (`rejected`, `withdrawn`) ne concernent que l'AFFILIÉ
+ * lui-même → voir `AffiliateAccountStatus`.
+ */
 export type AffiliateStatus = "pending" | "active" | "suspended";
+
+/**
+ * Statut réel du dossier d'affiliation côté affilié (vague 4) : ajoute
+ * `rejected` (candidature refusée) et `withdrawn` (retrait volontaire).
+ */
+export type AffiliateAccountStatus = AffiliateStatus | "rejected" | "withdrawn";
+
+/** État d'un lien affilié (vague 4) : actif, désactivé, ou saturé (plafond de ventes). */
+export type AffiliateLinkStatus = "active" | "inactive" | "saturated";
+
+/** Plafonds effectifs d'un affilié (GET /api/affiliate/me/products → `limits`). */
+export interface AffiliateLimits {
+  /** Plafond de liens ACTIFS (0 = illimité, cas Super-affilié). */
+  maxActiveLinks: number;
+  /** Plafond de ventes par lien avant saturation. */
+  maxSalesPerLink: number;
+  /** Nombre de liens actuellement actifs. */
+  activeCount: number;
+  /** L'affilié est-il Super (donc sans plafond de liens) ? */
+  isSuper: boolean;
+}
 
 export type CommissionType = "percent" | "fixed";
 
@@ -49,7 +76,10 @@ export interface AffiliateStats {
 /** `affiliate` de GET /api/affiliate/me — null si l'utilisateur n'a jamais candidaté */
 export interface Affiliate {
   code: string;
+  /** Statut du contrat (3 valeurs) — conservé pour les écrans existants. */
   status: AffiliateStatus;
+  /** Statut réel COMPLET (ajoute `rejected`, `withdrawn`) — lu par l'espace affilié. */
+  accountStatus: AffiliateAccountStatus;
   appliedAt: number;
   /** null tant que la candidature n'est pas validée */
   activatedAt: number | null;
@@ -71,15 +101,42 @@ export interface AffiliateProduct {
   clicks: number;
   sales: number;
   conversion: number;
-  /** URL publique de suivi (…/r/CODE-PRODUIT) */
+  /** URL publique de suivi (…/r/CODE-PRODUIT) — vide si aucun lien n'existe encore. */
+  link: string;
+  linkCode: string;
+  /** Id du lien (nécessaire pour désactiver) — null si aucun lien. */
+  linkId: string | null;
+  /** État réel du lien — null si aucun lien n'existe pour ce produit. */
+  linkStatus: AffiliateLinkStatus | null;
+  /** Ventes attribuées à CE lien (plafond maxSalesPerLink). */
+  salesCount: number;
+}
+
+/** Lien d'affiliation d'un produit (réponse de POST …/link et …/activate) */
+export interface AffiliateLink {
   link: string;
   linkCode: string;
 }
 
-/** Lien d'affiliation d'un produit (réponse de POST …/link) */
-export interface AffiliateLink {
+/** Lien renvoyé par les routes d'activation/désactivation (état réel). */
+export interface AffiliateLinkState {
+  id: string;
+  productId: string;
   link: string;
   linkCode: string;
+  status: AffiliateLinkStatus;
+  salesCount: number;
+  createdAt: number;
+}
+
+/**
+ * Refus d'activation pour plafond atteint (409) : le front doit proposer un
+ * CHOIX (désactiver un lien actif de la liste, ou abandonner).
+ */
+export interface LinkLimitConflict {
+  error: string;
+  limits: AffiliateLimits;
+  activeLinks: AffiliateLinkState[];
 }
 
 /* ---------- Normalisations défensives (aucune valeur inventée) ---------- */
@@ -102,14 +159,29 @@ function normalizeStats(raw: Partial<AffiliateStats> | null | undefined): Affili
   };
 }
 
+function normalizeAccountStatus(raw: unknown): AffiliateAccountStatus {
+  return raw === "active" ||
+    raw === "suspended" ||
+    raw === "rejected" ||
+    raw === "withdrawn"
+    ? raw
+    : "pending";
+}
+
+/** Statut étroit (contrat 3 valeurs) : tout état de sortie retombe sur `pending`. */
 function normalizeStatus(raw: unknown): AffiliateStatus {
   return raw === "active" || raw === "suspended" ? raw : "pending";
+}
+
+function normalizeLinkStatus(raw: unknown): AffiliateLinkStatus | null {
+  return raw === "active" || raw === "inactive" || raw === "saturated" ? raw : null;
 }
 
 function normalizeAffiliate(raw: Affiliate): Affiliate {
   return {
     code: str(raw?.code),
     status: normalizeStatus(raw?.status),
+    accountStatus: normalizeAccountStatus(raw?.status),
     appliedAt: num(raw?.appliedAt),
     activatedAt: typeof raw?.activatedAt === "number" ? raw.activatedAt : null,
     isSuper: raw?.isSuper === true,
@@ -131,6 +203,9 @@ function normalizeProduct(raw: AffiliateProduct): AffiliateProduct {
     conversion: num(raw?.conversion),
     link: str(raw?.link),
     linkCode: str(raw?.linkCode) || codeFromLink(str(raw?.link)),
+    linkId: typeof raw?.linkId === "string" && raw.linkId ? raw.linkId : null,
+    linkStatus: normalizeLinkStatus(raw?.linkStatus),
+    salesCount: num(raw?.salesCount),
   };
 }
 
@@ -224,16 +299,37 @@ export interface StatusHistoryEntry {
   createdAt: number;
 }
 
+/** Réponse de GET /api/affiliate/me/products (produits + plafonds). */
+export interface AffiliateProductsResponse {
+  products: AffiliateProduct[];
+  limits: AffiliateLimits;
+}
+
+function normalizeLimits(raw: unknown): AffiliateLimits {
+  const l = (raw || {}) as Record<string, unknown>;
+  return {
+    maxActiveLinks: num(l.maxActiveLinks),
+    maxSalesPerLink: num(l.maxSalesPerLink),
+    activeCount: num(l.activeCount),
+    isSuper: l.isSuper === true,
+  };
+}
+
 /**
- * GET /api/affiliate/me/products — produits éligibles + performance.
- * Un affilié `suspended` reçoit une liste vide (contrat).
+ * GET /api/affiliate/me/products — produits éligibles + performance + plafonds.
+ * Un affilié `suspended` reçoit une liste vide (contrat). ⚠️ La consultation
+ * NE crée AUCUN lien : `link` n'est renseigné que si un lien existe déjà, et
+ * `linkStatus`/`salesCount` décrivent son état réel.
  */
-export async function fetchAffiliateProducts(): Promise<AffiliateProduct[]> {
-  const res = await apiFetch<{ ok: boolean; products?: AffiliateProduct[] }>(
+export async function fetchAffiliateProducts(): Promise<AffiliateProductsResponse> {
+  const res = await apiFetch<{ ok: boolean; products?: AffiliateProduct[]; limits?: unknown }>(
     "/api/affiliate/me/products",
     { bearer: true, timeoutMs: 6000 },
   );
-  return (res.products || []).map(normalizeProduct);
+  return {
+    products: (res.products || []).map(normalizeProduct),
+    limits: normalizeLimits(res.limits),
+  };
 }
 
 /** POST /api/affiliate/me/products/:productId/link — (re)générer le lien d'un produit */
@@ -250,6 +346,88 @@ export async function createAffiliateLink(productId: string): Promise<AffiliateL
     link,
     linkCode: str(obj.linkCode) || str(obj.code) || codeFromLink(link),
   };
+}
+
+/* ---------------- Vague 4 — activation explicite, plafonds, sorties ---------------- */
+
+function normalizeLinkState(raw: unknown): AffiliateLinkState {
+  const s = (raw || {}) as Record<string, unknown>;
+  const link = str(s.link);
+  return {
+    id: str(s.id),
+    productId: str(s.productId),
+    link,
+    linkCode: str(s.linkCode) || codeFromLink(link),
+    status: normalizeLinkStatus(s.status) ?? "inactive",
+    salesCount: num(s.salesCount),
+    createdAt: num(s.createdAt),
+  };
+}
+
+/**
+ * POST …/activate — active (ou réactive) le lien d'un produit.
+ * En cas de plafond atteint, l'API répond 409 : on lève une `ApiError` dont
+ * `data` contient `{ limits, activeLinks }` — le front peut alors proposer un
+ * choix (« désactiver tel lien » ou « abandonner »).
+ */
+export async function activateAffiliateProductLink(
+  productId: string,
+): Promise<{ link: AffiliateLinkState; limits: AffiliateLimits }> {
+  const res = await apiFetch<{ ok: boolean; link: unknown; limits?: unknown }>(
+    `/api/affiliate/me/products/${encodeURIComponent(productId)}/activate`,
+    { method: "POST", body: {}, bearer: true, timeoutMs: 8000 },
+  );
+  return { link: normalizeLinkState(res.link), limits: normalizeLimits(res.limits) };
+}
+
+/** POST …/links/:linkId/deactivate — désactive un lien (libère un emplacement). */
+export async function deactivateAffiliateLink(linkId: string): Promise<AffiliateLinkState> {
+  const res = await apiFetch<{ ok: boolean; link: unknown }>(
+    `/api/affiliate/me/links/${encodeURIComponent(linkId)}/deactivate`,
+    { method: "POST", body: {}, bearer: true, timeoutMs: 8000 },
+  );
+  return normalizeLinkState(res.link);
+}
+
+/** Analyse d'une `ApiError` 409 de plafond : renvoie le conflit exploitable, sinon null. */
+export function asLinkLimitConflict(err: unknown): LinkLimitConflict | null {
+  if (!(err instanceof ApiError) || err.status !== 409) return null;
+  const data = err.data || {};
+  if (data.reason !== "limit" && !Array.isArray(data.activeLinks)) return null;
+  return {
+    error: typeof data.error === "string" ? data.error : "Plafond de liens actifs atteint.",
+    limits: normalizeLimits(data.limits),
+    activeLinks: Array.isArray(data.activeLinks)
+      ? (data.activeLinks as unknown[]).map(normalizeLinkState)
+      : [],
+  };
+}
+
+/**
+ * POST …/products/:productId/request — demande de disponibilité (Super uniquement).
+ * 403 si non Super, 409 si le produit est déjà ouvert à l'affiliation.
+ */
+export async function requestProductAvailability(
+  productId: string,
+  note?: string,
+): Promise<{ created: boolean }> {
+  const trimmed = (note || "").trim();
+  const res = await apiFetch<{ ok: boolean; created?: boolean }>(
+    `/api/affiliate/me/products/${encodeURIComponent(productId)}/request`,
+    { method: "POST", body: trimmed ? { note: trimmed } : {}, bearer: true, timeoutMs: 8000 },
+  );
+  return { created: res.created === true };
+}
+
+/** POST /api/affiliate/me/withdraw — retrait volontaire du programme d'affiliation. */
+export async function withdrawFromAffiliate(): Promise<{ status: AffiliateAccountStatus }> {
+  const res = await apiFetch<{ ok: boolean; status?: unknown }>("/api/affiliate/me/withdraw", {
+    method: "POST",
+    body: {},
+    bearer: true,
+    timeoutMs: 8000,
+  });
+  return { status: normalizeAccountStatus(res.status) };
 }
 
 /* ---------- Route publique — tracking d'un clic ---------- */

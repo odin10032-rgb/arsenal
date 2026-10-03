@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * /affilie/produits — « Mes produits » (contrat Phase 2)
+ * /affilie/produits — « Mes produits » (contrat Phase 2 + plafonds vague 4)
  *
- * GET /api/affiliate/me/products : produits éligibles (affiliate_enabled = 1) + performance
- * et lien de suivi (créé à la volée côté serveur, idempotent par couple affilié/produit).
- * Lien toujours en font-mono + bouton « Copier » (retour visuel « Copié ! » ~1,5 s).
- * POST …/:productId/link permet de (re)générer un lien — confirmation explicite,
- * l'ancien lien pouvant cesser de fonctionner.
+ * GET /api/affiliate/me/products : produits éligibles + performance + plafonds.
+ * ⚠️ La CONSULTATION ne crée plus aucun lien : l'activation est un acte VOLONTAIRE
+ * (bouton « Activer le lien »). Les plafonds (3 liens actifs / 20 ventes par lien
+ * pour un affilié normal) sont affichés ; en cas de plafond atteint l'API répond
+ * 409 et le front propose un CHOIX (désactiver un lien actif, ou abandonner).
  *
  * Garde : non connecté → /connexion ; connecté non affilié actif → accès refusé.
  */
@@ -19,17 +19,37 @@ import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { useUser } from "@/hooks/use-user";
 import { ApiError } from "@/lib/api";
 import {
+  activateAffiliateProductLink,
+  asLinkLimitConflict,
   createAffiliateLink,
+  deactivateAffiliateLink,
   fetchAffiliateMe,
   fetchAffiliateProducts,
   type Affiliate,
+  type AffiliateLimits,
+  type AffiliateLinkState,
   type AffiliateProduct,
+  type LinkLimitConflict,
 } from "@/lib/affiliate";
 import { fmt } from "@/lib/format";
 import { logout } from "@/lib/user-auth";
 
 /** Devise affichée pour une commission fixe (défaut du schéma : FCFA) */
 const CURRENCY = "FCFA";
+
+/** Plafonds par défaut si l'API n'a pas encore ces champs (tolérant). */
+const DEFAULT_LIMITS: AffiliateLimits = {
+  maxActiveLinks: 3,
+  maxSalesPerLink: 20,
+  activeCount: 0,
+  isSuper: false,
+};
+
+/** « 3/3 liens actifs » ou « illimité » pour un Super. */
+function activeLinksLabel(limits: AffiliateLimits): string {
+  if (limits.maxActiveLinks === 0) return `${fmt(limits.activeCount)} / illimité`;
+  return `${fmt(limits.activeCount)}/${limits.maxActiveLinks}`;
+}
 
 /** « 30 % » ou « 5 000 FCFA » — valeur toujours fournie par l'API */
 function commissionLabel(p: AffiliateProduct): string {
@@ -68,6 +88,7 @@ export default function AffiliateProductsPage() {
   const router = useRouter();
   const [affiliate, setAffiliate] = useState<Affiliate | null>(null);
   const [products, setProducts] = useState<AffiliateProduct[]>([]);
+  const [limits, setLimits] = useState<AffiliateLimits>(DEFAULT_LIMITS);
   const [pageLoading, setPageLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
@@ -75,6 +96,11 @@ export default function AffiliateProductsPage() {
   const [notice, setNotice] = useState("");
   const [regenerating, setRegenerating] = useState<AffiliateProduct | null>(null);
   const [busyRegenerate, setBusyRegenerate] = useState(false);
+  /** Produit en cours d'activation (désactive le bouton pendant l'appel). */
+  const [activatingId, setActivatingId] = useState<string | null>(null);
+  /** Conflit de plafond : le front propose un CHOIX (désactiver lequel / abandonner). */
+  const [conflict, setConflict] = useState<{ product: AffiliateProduct; info: LinkLimitConflict } | null>(null);
+  const [busyDeactivate, setBusyDeactivate] = useState(false);
   const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -101,7 +127,13 @@ export default function AffiliateProductsPage() {
       try {
         const me = await fetchAffiliateMe();
         setAffiliate(me);
-        setProducts(me && me.status === "active" ? await fetchAffiliateProducts() : []);
+        if (me && me.status === "active") {
+          const data = await fetchAffiliateProducts();
+          setProducts(data.products);
+          setLimits(data.limits);
+        } else {
+          setProducts([]);
+        }
         setError("");
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
@@ -138,6 +170,75 @@ export default function AffiliateProductsPage() {
 
   const copyLink = async (p: AffiliateProduct) => {
     flash(p.id, await copyText(p.link));
+  };
+
+  /** Applique un lien (état réel) au produit correspondant dans la liste. */
+  const applyLinkState = useCallback((productId: string, link: AffiliateLinkState) => {
+    setProducts((prev) =>
+      prev.map((p) =>
+        p.id === productId
+          ? {
+              ...p,
+              link: link.link,
+              linkCode: link.linkCode,
+              linkId: link.id,
+              linkStatus: link.status,
+              salesCount: link.salesCount,
+            }
+          : p,
+      ),
+    );
+  }, []);
+
+  /**
+   * Activation volontaire d'un produit. Sur 409 « plafond atteint », on ouvre le
+   * panneau de choix au lieu d'afficher une impasse : le serveur reste décideur
+   * (il renvoie la liste des liens actifs et la vraie décision est rejouée après
+   * désactivation).
+   */
+  const activate = async (p: AffiliateProduct) => {
+    if (activatingId) return;
+    setActivatingId(p.id);
+    setError("");
+    try {
+      const res = await activateAffiliateProductLink(p.id);
+      applyLinkState(p.id, res.link);
+      setLimits(res.limits);
+      flashNotice("Lien activé.");
+    } catch (err) {
+      const conflictInfo = asLinkLimitConflict(err);
+      if (conflictInfo) {
+        setLimits(conflictInfo.limits);
+        setConflict({ product: p, info: conflictInfo });
+      } else {
+        setError(err instanceof Error ? err.message : "Activation impossible.");
+      }
+    } finally {
+      setActivatingId(null);
+    }
+  };
+
+  /** Désactive un lien actif — libère un emplacement pour l'activation en attente. */
+  const confirmDeactivate = async (link: AffiliateLinkState) => {
+    if (busyDeactivate) return;
+    setBusyDeactivate(true);
+    setError("");
+    try {
+      const updated = await deactivateAffiliateLink(link.id);
+      applyLinkState(updated.productId || link.productId, updated);
+      const me = await fetchAffiliateMe();
+      setAffiliate(me);
+      // Le conflit est résolu : on relance l'activation du produit initialement demandé.
+      const target = conflict?.product ?? null;
+      setConflict(null);
+      setLimits((prev) => ({ ...prev, activeCount: Math.max(0, prev.activeCount - 1) }));
+      flashNotice("Lien désactivé.");
+      if (target) await activate(target);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Désactivation impossible.");
+    } finally {
+      setBusyDeactivate(false);
+    }
   };
 
   const confirmRegenerate = async () => {
@@ -246,14 +347,22 @@ export default function AffiliateProductsPage() {
         ) : affiliate.status !== "active" ? (
           <AccessCard
             title={
-              affiliate.status === "suspended"
+              affiliate.accountStatus === "suspended"
                 ? "Compte affilié suspendu"
-                : "Candidature en attente de validation"
+                : affiliate.accountStatus === "rejected"
+                  ? "Candidature refusée"
+                  : affiliate.accountStatus === "withdrawn"
+                    ? "Retiré du programme d'affiliation"
+                    : "Candidature en attente de validation"
             }
             message={
-              affiliate.status === "suspended"
+              affiliate.accountStatus === "suspended"
                 ? "Vos liens ne sont plus actifs. Vos produits réapparaîtront ici dès le rétablissement de votre compte."
-                : "Vos produits et vos liens seront disponibles dès la validation de votre candidature par l'équipe."
+                : affiliate.accountStatus === "rejected"
+                  ? "Votre candidature n'a pas été retenue : aucun lien ne peut être activé. Vous conservez votre compte et votre solde A."
+                  : affiliate.accountStatus === "withdrawn"
+                    ? "Vous vous êtes retiré du programme : vos liens sont désactivés. Une nouvelle candidature reste possible depuis votre espace affilié."
+                    : "Vos produits et vos liens seront disponibles dès la validation de votre candidature par l'équipe."
             }
             ctaLabel="Voir mon espace affilié"
             ctaHref="/affilie"
@@ -268,7 +377,27 @@ export default function AffiliateProductsPage() {
           </div>
         ) : (
           <>
-            <p className="mt-5 font-mono text-[0.74rem] text-[#666]">
+            {/* Plafonds (vague 4) : liens actifs + ventes par lien */}
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-[#333] bg-[#1a1a1a] px-2.5 py-1 font-mono text-[0.74rem] text-[#a0a0a0]">
+                <span className="text-[#666]">Liens actifs</span>
+                <span className="font-semibold tabular-nums text-[#f0f0f0]">
+                  {activeLinksLabel(limits)}
+                </span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-[#333] bg-[#1a1a1a] px-2.5 py-1 font-mono text-[0.74rem] text-[#a0a0a0]">
+                <span className="text-[#666]">Plafond par lien</span>
+                <span className="font-semibold tabular-nums text-[#f0f0f0]">
+                  {limits.maxSalesPerLink > 0 ? fmt(limits.maxSalesPerLink) : "illimité"} ventes
+                </span>
+              </span>
+              {limits.isSuper && (
+                <span className="rounded-md border border-[rgba(42,157,143,0.4)] bg-[rgba(42,157,143,0.08)] px-2.5 py-1 font-mono text-[0.74rem] font-semibold text-[#4fb3a1]">
+                  Super affilié — sans plafond
+                </span>
+              )}
+            </div>
+            <p className="mt-2 font-mono text-[0.74rem] text-[#666]">
               {products.length} produit{products.length > 1 ? "s" : ""} éligible
               {products.length > 1 ? "s" : ""}
             </p>
@@ -277,9 +406,12 @@ export default function AffiliateProductsPage() {
                 <ProductCard
                   key={p.id}
                   product={p}
+                  maxSalesPerLink={limits.maxSalesPerLink}
+                  activating={activatingId === p.id}
                   copied={copied}
                   onCopy={() => void copyLink(p)}
                   onRegenerate={() => setRegenerating(p)}
+                  onActivate={() => void activate(p)}
                 />
               ))}
             </div>
@@ -296,6 +428,69 @@ export default function AffiliateProductsPage() {
           onCancel={() => setRegenerating(null)}
           onConfirm={() => void confirmRegenerate()}
         />
+      )}
+
+      {/* Panneau de CHOIX en cas de plafond atteint : désactiver un lien, ou abandonner */}
+      {conflict && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-[480px] rounded-2xl border border-[#333] bg-[#141414] p-6">
+            <h2 className="font-display text-[1.05rem] font-bold">Plafond de liens atteint</h2>
+            <p className="mt-2 text-[0.84rem] leading-relaxed text-[#a0a0a0]">
+              Vous avez déjà {fmt(conflict.info.limits.activeCount)} lien
+              {conflict.info.limits.activeCount > 1 ? "s" : ""} actif
+              {conflict.info.limits.activeCount > 1 ? "s" : ""} sur un maximum de{" "}
+              {conflict.info.limits.maxActiveLinks === 0
+                ? "illimité"
+                : fmt(conflict.info.limits.maxActiveLinks)}
+              . Pour activer « {conflict.product.title} », désactivez un lien : son emplacement se
+              libérera. Les ventes déjà acquises sur le lien désactivé sont conservées.
+            </p>
+            <ul className="mt-4 flex flex-col gap-2">
+              {conflict.info.activeLinks.length === 0 ? (
+                <li className="text-[0.82rem] text-[#f4a261]">
+                  Aucun lien actif renvoyé par le serveur — actualisez la page.
+                </li>
+              ) : (
+                conflict.info.activeLinks.map((l) => (
+                  <li
+                    key={l.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-[#333] bg-[rgba(255,255,255,0.02)] px-3 py-2"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate font-mono text-[0.76rem] text-[#a0a0a0]">
+                        {l.linkCode}
+                      </span>
+                      <span className="block font-mono text-[0.68rem] tabular-nums text-[#666]">
+                        {fmt(l.salesCount)} /{" "}
+                        {conflict.info.limits.maxSalesPerLink > 0
+                          ? fmt(conflict.info.limits.maxSalesPerLink)
+                          : "∞"}{" "}
+                        ventes
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void confirmDeactivate(l)}
+                      disabled={busyDeactivate}
+                      className="btn-arsenal btn-ghost flex-shrink-0"
+                    >
+                      {busyDeactivate && <span className="spin" />}
+                      Désactiver
+                    </button>
+                  </li>
+                ))
+              )}
+            </ul>
+            <button
+              type="button"
+              onClick={() => setConflict(null)}
+              disabled={busyDeactivate}
+              className="btn-arsenal btn-ghost mt-4 w-full"
+            >
+              Abandonner
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -327,16 +522,27 @@ function AccessCard({
 
 function ProductCard({
   product,
+  maxSalesPerLink,
+  activating,
   copied,
   onCopy,
   onRegenerate,
+  onActivate,
 }: {
   product: AffiliateProduct;
+  maxSalesPerLink: number;
+  activating: boolean;
   copied: { id: string; ok: boolean } | null;
   onCopy: () => void;
   onRegenerate: () => void;
+  onActivate: () => void;
 }) {
   const isCopied = copied?.id === product.id;
+  const status = product.linkStatus;
+  const isActive = status === "active";
+  const isSaturated = status === "saturated";
+  const isInactive = status === "inactive";
+  const neverActivated = product.linkId === null;
 
   return (
     <article className="flex flex-col overflow-hidden rounded-2xl border border-[#333] bg-[#141414] transition-colors duration-200 hover:border-[#444]">
@@ -353,7 +559,22 @@ function ProductCard({
       </div>
 
       <div className="flex flex-1 flex-col p-5">
-        <h3 className="font-display text-[1rem] font-bold leading-snug">{product.title}</h3>
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="font-display text-[1rem] font-bold leading-snug">{product.title}</h3>
+          {isSaturated ? (
+            <span className="flex-shrink-0 rounded-md border border-[rgba(230,57,70,0.45)] bg-[rgba(230,57,70,0.1)] px-2 py-0.5 font-mono text-[0.66rem] font-semibold uppercase text-[#fda4af]">
+              Saturé
+            </span>
+          ) : isActive ? (
+            <span className="flex-shrink-0 rounded-md border border-[rgba(42,157,143,0.45)] bg-[rgba(42,157,143,0.1)] px-2 py-0.5 font-mono text-[0.66rem] font-semibold uppercase text-[#7fd4cb]">
+              Actif
+            </span>
+          ) : isInactive ? (
+            <span className="flex-shrink-0 rounded-md border border-[#333] bg-[#1a1a1a] px-2 py-0.5 font-mono text-[0.66rem] font-semibold uppercase text-[#a0a0a0]">
+              Inactif
+            </span>
+          ) : null}
+        </div>
         {product.price && (
           <p className="mt-1.5 font-mono text-[0.82rem] text-[#f0808a]">{product.price}</p>
         )}
@@ -388,13 +609,23 @@ function ProductCard({
           ))}
         </dl>
 
-        {/* Lien de suivi */}
-        <div className="mt-auto pt-4">
-          <p className="font-mono text-[0.6rem] uppercase tracking-[0.1em] text-[#666]">
-            Lien de suivi
+        {/* Plafond de ventes du lien (si un lien existe) */}
+        {product.linkId && maxSalesPerLink > 0 && (
+          <p className="mt-3 font-mono text-[0.72rem] tabular-nums text-[#666]">
+            <span className={isSaturated ? "text-[#fda4af]" : "text-[#a0a0a0]"}>
+              {fmt(product.salesCount)} / {fmt(maxSalesPerLink)}
+            </span>{" "}
+            ventes sur ce lien
           </p>
-          {product.link ? (
+        )}
+
+        {/* Lien de suivi + actions */}
+        <div className="mt-auto pt-4">
+          {isActive ? (
             <>
+              <p className="font-mono text-[0.6rem] uppercase tracking-[0.1em] text-[#666]">
+                Lien de suivi
+              </p>
               <p className="mt-1.5 break-all rounded-lg border border-[#333] bg-[#111] px-3 py-2 font-mono text-[0.74rem] text-[#a0a0a0]">
                 {product.link}
               </p>
@@ -418,9 +649,27 @@ function ProductCard({
               </div>
             </>
           ) : (
-            <p className="mt-1.5 text-[0.78rem] text-[#f4a261]">
-              Lien indisponible pour le moment — régénérez-le.
-            </p>
+            <>
+              <p className="font-mono text-[0.6rem] uppercase tracking-[0.1em] text-[#666]">
+                Lien de suivi
+              </p>
+              <p className="mt-1.5 text-[0.78rem] leading-relaxed text-[#a0a0a0]">
+                {isSaturated
+                  ? "Ce lien a atteint son plafond de ventes et a été désactivé automatiquement. Vos ventes acquises sont conservées : activez-le pour repartir, ou choisissez un autre produit."
+                  : neverActivated
+                    ? "Aucun lien actif pour ce produit. Activez-le pour obtenir votre lien de suivi et commencer à partager."
+                    : "Ce lien est désactivé. Réactivez-le pour qu'il attribue de nouveau clics et ventes."}
+              </p>
+              <button
+                type="button"
+                onClick={onActivate}
+                disabled={activating}
+                className="btn-arsenal btn-primary mt-3 w-full"
+              >
+                {activating && <span className="spin" />}
+                {isSaturated || isInactive ? "Réactiver le lien" : "Activer le lien"}
+              </button>
+            </>
           )}
         </div>
       </div>

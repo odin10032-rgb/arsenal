@@ -18,15 +18,23 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  applyToAffiliate,
+  fetchAffiliateHistory,
+  fetchAffiliateMe,
   fetchAffiliateMeData,
   fetchMyCampaigns,
   joinCampaign,
+  requestProductAvailability,
   requestSuperUpgrade,
+  withdrawFromAffiliate,
+  type Affiliate,
   type AffiliateCampaign,
+  type AffiliateStats,
   type SuperProgress,
 } from "@/lib/affiliate";
 import { getUnlock, markUnlockSeen, type UnlockStatus as UnlockStatusValue } from "@/lib/unlock";
 import { UnlockAnimation } from "@/components/unlock-animation";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { CoinA } from "@/components/account/coin-a";
 import { UserAvatar } from "@/components/account/user-avatar";
 import {
@@ -35,7 +43,6 @@ import {
 } from "@/components/account/affiliate-status-history";
 import { useUser } from "@/hooks/use-user";
 import { ApiError } from "@/lib/api";
-import { applyToAffiliate, fetchAffiliateHistory, fetchAffiliateMe, type Affiliate, type AffiliateStats } from "@/lib/affiliate";
 import { fmt } from "@/lib/format";
 import { logout } from "@/lib/user-auth";
 
@@ -203,9 +210,14 @@ export default function AffiliePage() {
             superProgress={superProgress}
             campaigns={campaigns}
             onCampaignJoined={() => void loadCampaigns()}
+            onWithdrawn={() => void load()}
           />
         ) : affiliate.status === "suspended" ? (
           <SuspendedCard affiliate={affiliate} />
+        ) : affiliate.accountStatus === "rejected" ? (
+          <RejectedCard affiliate={affiliate} />
+        ) : affiliate.accountStatus === "withdrawn" ? (
+          <WithdrawnCard affiliate={affiliate} />
         ) : (
           <PendingCard affiliate={affiliate} />
         )}
@@ -334,6 +346,7 @@ function ActiveView({
   superProgress,
   campaigns,
   onCampaignJoined,
+  onWithdrawn,
 }: {
   affiliate: Affiliate;
   pseudo: string;
@@ -342,7 +355,28 @@ function ActiveView({
   superProgress: SuperProgress | null;
   campaigns: AffiliateCampaign[] | null;
   onCampaignJoined: () => void;
+  onWithdrawn: () => void;
 }) {
+  const [confirmWithdraw, setConfirmWithdraw] = useState(false);
+  const [busyWithdraw, setBusyWithdraw] = useState(false);
+  const [withdrawError, setWithdrawError] = useState("");
+
+  const withdraw = async () => {
+    if (busyWithdraw) return;
+    setBusyWithdraw(true);
+    setWithdrawError("");
+    try {
+      await withdrawFromAffiliate();
+      setConfirmWithdraw(false);
+      onWithdrawn();
+    } catch (err) {
+      setWithdrawError(err instanceof Error ? err.message : "Retrait impossible.");
+      setConfirmWithdraw(false);
+    } finally {
+      setBusyWithdraw(false);
+    }
+  };
+
   return (
     <>
       {/* Identité */}
@@ -401,6 +435,8 @@ function ActiveView({
         <SuperAffiliateCard progress={superProgress} pseudo={pseudo} />
       )}
 
+      {affiliate.isSuper && <ProductAvailabilityRequest />}
+
       <CampaignsSection campaigns={campaigns} onJoined={onCampaignJoined} />
 
       <div className="mt-4 flex flex-col gap-3">
@@ -408,7 +444,112 @@ function ActiveView({
           Voir le portefeuille A
         </Link>
       </div>
+
+      {/* Sortie : retrait volontaire du programme (confirmation obligatoire) */}
+      <div className="mt-4 rounded-2xl border border-[#333] bg-[#141414] p-6">
+        <h2 className="font-display text-[1rem] font-bold">Quitter le programme</h2>
+        <p className="mt-1 text-[0.78rem] leading-relaxed text-[#666]">
+          Le retrait désactive vos liens et vous rend le rôle standard. Vos ventes et commissions
+          déjà acquises sont conservées, ainsi que votre solde A et votre adhésion.
+        </p>
+        {withdrawError && <p className="mt-3 text-[0.8rem] text-[#e63946]">{withdrawError}</p>}
+        <button
+          type="button"
+          onClick={() => setConfirmWithdraw(true)}
+          className="btn-arsenal btn-ghost mt-4 w-full"
+          style={{ color: "#fda4af", borderColor: "rgba(230,57,70,0.45)" }}
+        >
+          Me retirer du programme
+        </button>
+      </div>
+
+      {confirmWithdraw && (
+        <ConfirmDialog
+          title="Quitter le programme d'affiliation ?"
+          message="Vos liens seront désactivés et vous ne serez plus affilié. Vos commissions déjà acquises et votre solde A sont conservés. Cette action peut être rejouée par une nouvelle candidature."
+          confirmLabel="Me retirer"
+          busy={busyWithdraw}
+          onCancel={() => setConfirmWithdraw(false)}
+          onConfirm={() => void withdraw()}
+        />
+      )}
     </>
+  );
+}
+
+/* -------- Vague 4 : demande de disponibilité produit (Super uniquement) -------- */
+
+function ProductAvailabilityRequest() {
+  const [productId, setProductId] = useState("");
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (busy) return;
+    const id = productId.trim();
+    if (!id) {
+      setError("Indiquez l'identifiant du produit souhaité.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    setMessage("");
+    try {
+      const { created } = await requestProductAvailability(id, note);
+      setMessage(
+        created
+          ? "Demande envoyée — l'équipe Arsenal l'examinera."
+          : "Une demande est déjà en attente pour ce produit.",
+      );
+      setProductId("");
+      setNote("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Demande impossible.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form onSubmit={submit} className="mt-4 rounded-2xl border border-[#333] bg-[#141414] p-6">
+      <h2 className="font-display text-[1rem] font-bold">Demander un produit</h2>
+      <p className="mt-1 text-[0.78rem] leading-relaxed text-[#666]">
+        En tant que Super affilié, proposez un produit du catalogue à rendre éligible à
+        l&apos;affiliation : l&apos;équipe validera son ouverture.
+      </p>
+      <label htmlFor="req-product" className="mt-4 mb-1.5 block text-[0.78rem] text-[#a0a0a0]">
+        Identifiant du produit
+      </label>
+      <input
+        id="req-product"
+        value={productId}
+        onChange={(e) => setProductId(e.target.value)}
+        maxLength={120}
+        placeholder="ex. arsenal-pro-annual"
+        className="input-arsenal"
+      />
+      <label htmlFor="req-note" className="mt-3 mb-1.5 block text-[0.78rem] text-[#a0a0a0]">
+        Motif <span className="text-[#666]">(optionnel)</span>
+      </label>
+      <textarea
+        id="req-note"
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        maxLength={500}
+        rows={3}
+        placeholder="Pourquoi ce produit mérite-t-il d'être ouvert à l'affiliation ?"
+        className="input-arsenal min-h-[80px] resize-y"
+      />
+      {error && <p className="mt-3 text-[0.8rem] text-[#e63946]">{error}</p>}
+      {message && <p className="mt-3 text-[0.8rem] text-[#4fb3a1]">{message}</p>}
+      <button type="submit" disabled={busy} className="btn-arsenal btn-primary mt-4 w-full">
+        {busy && <span className="spin" />}
+        Envoyer la demande
+      </button>
+    </form>
   );
 }
 
@@ -683,6 +824,57 @@ function SuspendedCard({ affiliate }: { affiliate: Affiliate }) {
       <p className="mt-3 text-[0.86rem] leading-relaxed text-[#a0a0a0]">
         Vos commissions déjà acquises restent enregistrées. Contactez l&apos;équipe pour rétablir
         votre compte.
+      </p>
+      <div className="mt-6 flex flex-col gap-3 border-t border-dashed border-[#333] pt-6">
+        <Link href="/compte" className="btn-arsenal btn-ghost w-full">
+          Retour à mon compte
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- État 5 : candidature refusée ---------------- */
+
+function RejectedCard({ affiliate }: { affiliate: Affiliate }) {
+  return (
+    <div className="mt-6 rounded-2xl border border-[rgba(230,57,70,0.45)] bg-[#141414] p-6 sm:p-8">
+      <span className="inline-flex items-center gap-2 rounded-md border border-[rgba(230,57,70,0.45)] bg-[rgba(230,57,70,0.1)] px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-wide text-[#fda4af]">
+        <span className="h-1.5 w-1.5 rounded-full bg-current" />
+        Candidature refusée
+      </span>
+      <h2 className="mt-4 font-display text-[1.05rem] font-bold">Candidature non retenue</h2>
+      <p className="mt-2 text-[0.86rem] leading-relaxed text-[#a0a0a0]">
+        Votre candidature du {formatDate(affiliate.appliedAt)} n&apos;a pas été retenue. Vous
+        conservez votre compte utilisateur et votre solde A ; seul l&apos;accès au programme
+        d&apos;affiliation est fermé.
+      </p>
+      <div className="mt-6 flex flex-col gap-3 border-t border-dashed border-[#333] pt-6">
+        <Link href="/compte" className="btn-arsenal btn-ghost w-full">
+          Retour à mon compte
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- État 6 : retrait volontaire ---------------- */
+
+function WithdrawnCard({ affiliate }: { affiliate: Affiliate }) {
+  return (
+    <div className="mt-6 rounded-2xl border border-[#333] bg-[#141414] p-6 sm:p-8">
+      <span className="inline-flex items-center gap-2 rounded-md border border-[#333] bg-[#1a1a1a] px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-wide text-[#a0a0a0]">
+        <span className="h-1.5 w-1.5 rounded-full bg-current" />
+        Retiré du programme
+      </span>
+      <h2 className="mt-4 font-display text-[1.05rem] font-bold">Vous avez quitté l&apos;affiliation</h2>
+      <p className="mt-2 text-[0.86rem] leading-relaxed text-[#a0a0a0]">
+        Vous vous êtes retiré du programme d&apos;affiliation
+        {affiliate.code ? ` (code ${affiliate.code})` : ""}. Vos liens sont désactivés. Vos
+        commissions déjà acquises, votre solde A et votre adhésion sont conservés.
+      </p>
+      <p className="mt-3 text-[0.86rem] leading-relaxed text-[#a0a0a0]">
+        Vous souhaitez revenir ? Une nouvelle candidature est possible depuis cette page.
       </p>
       <div className="mt-6 flex flex-col gap-3 border-t border-dashed border-[#333] pt-6">
         <Link href="/compte" className="btn-arsenal btn-ghost w-full">

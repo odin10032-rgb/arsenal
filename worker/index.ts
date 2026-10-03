@@ -26,6 +26,7 @@ import { legalRoutes } from "./routes/legal";
 import { siteConfigRoutes } from "./routes/site-config";
 import { meTransferRoutes } from "./routes/me-transfers";
 import { cartRoutes } from "./routes/cart";
+import { adminProductRequestRoutes } from "./routes/admin-product-requests";
 import { PURCHASE_MAX_PER_MIN_DEFAULT, readPurchaseMaxPerMin } from "../src/lib/server/purchases";
 import { rateLimit } from "./middleware/rate-limit";
 
@@ -143,6 +144,8 @@ app.route("/", siteConfigRoutes);
 app.route("/", meTransferRoutes);
 /** Vague 3 — panier (visiteurs ET comptes) : public, le porteur identifie le panier. */
 app.route("/", cartRoutes);
+/** Vague 4 — demandes de disponibilité produit (Super) : décision admin. */
+app.route("/", adminProductRequestRoutes);
 
 app.notFound((c) => c.json({ ok: false, error: "Route introuvable." }, 404));
 

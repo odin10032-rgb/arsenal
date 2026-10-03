@@ -112,6 +112,9 @@ export const chariowWebhookRoutes: App = new Hono<{ Bindings: Env }>().post(
         : null;
     // Un affilié non actif ne peut pas générer de commission ni de récompense.
     if (affiliate && affiliate.status !== "active") affiliate = null;
+    // Vague 4 : un lien INACTIF ou SATURÉ (plafond de ventes atteint) n'attribue
+    // plus rien — la vente reste enregistrée, mais non attribuée (visible admin).
+    if (link && link.status && link.status !== "active") affiliate = null;
 
     let product: AffiliateProductRow | null = null;
     if (link) product = await getProductById(db, link.product_id);
@@ -125,6 +128,9 @@ export const chariowWebhookRoutes: App = new Hono<{ Bindings: Env }>().post(
     const occurredAt = pulse.occurredAt ?? Date.now();
 
     let commission: { amount: number; ratePercent: number | null; rewardA: number } | null = null;
+    // Seuil de saturation par lien (vague 4) — lu même sans affilié attribué,
+    // pour rester dans la même requête que la règle de commission.
+    let maxSalesPerLink = 0;
     if (affiliate) {
       const [campaign, settings] = await Promise.all([
         getActiveCampaign(db, productId),
@@ -136,6 +142,7 @@ export const chariowWebhookRoutes: App = new Hono<{ Bindings: Env }>().post(
         settings
       );
       commission = { ...computeCommissionAmount(amount, rule), rewardA: rule.rewardA };
+      maxSalesPerLink = Math.max(0, Math.trunc(Number(settings.maxSalesPerLink) || 0));
     }
 
     try {
@@ -143,7 +150,8 @@ export const chariowWebhookRoutes: App = new Hono<{ Bindings: Env }>().post(
         saleRef,
         productId,
         affiliateId: affiliate?.id ?? null,
-        linkId: link?.id ?? null,
+        // Le lien ne compte que si la vente est réellement attribuée.
+        linkId: affiliate ? link?.id ?? null : null,
         source: "chariow_webhook",
         amount,
         currency,
@@ -151,6 +159,7 @@ export const chariowWebhookRoutes: App = new Hono<{ Bindings: Env }>().post(
         commission,
         rewardUserId: affiliate?.user_id ?? null,
         confirmedBy: "chariow_webhook",
+        maxSalesPerLink,
       });
       return c.json({
         ok: true,

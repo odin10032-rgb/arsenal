@@ -327,6 +327,11 @@ export interface NewSaleInput {
   /** Destinataire de la récompense A (= `affiliates.user_id`). */
   rewardUserId?: string | null;
   confirmedBy?: string | null;
+  /**
+   * Plafond de ventes par lien (vague 4) : au-delà, le lien est marqué
+   * `saturated` et cesse d'attribuer (sa place se libère). `0` = illimité.
+   */
+  maxSalesPerLink?: number;
   now?: number;
 }
 
@@ -406,6 +411,24 @@ export function saleStatements(db: D1Database, input: NewSaleInput): SaleStateme
         })
       );
     }
+  }
+
+  // Plafond de ventes par lien (vague 4) : incrémente le compteur du lien
+  // attribué et le marque `saturated` au seuil — il cessera alors d'attribuer
+  // (sa place se libère). Dans le MÊME batch que la vente : soit tout, soit rien.
+  // `maxSalesPerLink = 0` ⇒ illimité (aucune saturation).
+  if (input.linkId) {
+    const maxSales = Math.max(0, Math.trunc(Number(input.maxSalesPerLink) || 0));
+    statements.push(
+      db
+        .prepare(
+          `UPDATE affiliate_links
+              SET sales_count = sales_count + 1,
+                  status = CASE WHEN ? > 0 AND sales_count + 1 >= ? THEN 'saturated' ELSE status END
+            WHERE id = ?`
+        )
+        .bind(maxSales, maxSales, input.linkId)
+    );
   }
 
   return { saleId, commissionId, rewardA, statements };

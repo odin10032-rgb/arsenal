@@ -14,8 +14,24 @@ import { sha256hex } from "./auth";
 
 /* ---------------------------------- Types ---------------------------------- */
 
-export type AffiliateStatus = "pending" | "active" | "suspended";
-export const AFFILIATE_STATUSES: readonly AffiliateStatus[] = ["pending", "active", "suspended"];
+/**
+ * Statuts d'affilié. Vague 4 : deux états de SORTIE s'ajoutent aux trois états
+ * du contrat Phase 2 :
+ *   • `rejected`  → candidature refusée par l'admin (le rôle reste `user`) ;
+ *   • `withdrawn` → retrait volontaire du programme d'affiliation (choix du
+ *     propriétaire : un état DÉDIÉ plutôt que `suspended`, sémantiquement
+ *     distinct — une suspension est une sanction admin, un retrait est un acte
+ *     volontaire. Le rôle `users.role` redevient `user`, `membership` est CONSERVÉ :
+ *     quitter l'affiliation ne retire pas la monnaie A, ce sont deux choses).
+ */
+export type AffiliateStatus = "pending" | "active" | "suspended" | "rejected" | "withdrawn";
+export const AFFILIATE_STATUSES: readonly AffiliateStatus[] = [
+  "pending",
+  "active",
+  "suspended",
+  "rejected",
+  "withdrawn",
+];
 
 /** Rôles `users.role` (Phase 1 : le rôle `affiliate` n'est posé qu'à l'activation). */
 export type UserRole = "user" | "affiliate" | "super_affiliate" | "admin";
@@ -31,6 +47,19 @@ export interface AffiliateRow {
   updated_at: number;
 }
 
+/**
+ * État d'un lien affilié (migration 0011) :
+ *   active    → occupe un emplacement, attribue clics/ventes ;
+ *   inactive  → désactivé (par l'affilié ou l'admin) : n'attribue plus ;
+ *   saturated → plafond de ventes atteint : désactivé automatiquement.
+ */
+export type AffiliateLinkStatus = "active" | "inactive" | "saturated";
+export const AFFILIATE_LINK_STATUSES: readonly AffiliateLinkStatus[] = [
+  "active",
+  "inactive",
+  "saturated",
+];
+
 export interface AffiliateLinkRow {
   id: string;
   affiliate_id: string;
@@ -38,6 +67,10 @@ export interface AffiliateLinkRow {
   code: string;
   campaign_id: string | null;
   created_at: number;
+  /** État du lien (migration 0011 ; absent en base pré-0011 → `active`). */
+  status: string;
+  /** Ventes attribuées à CE lien (compteur dénormalisé, plafond max_sales_per_link). */
+  sales_count: number;
 }
 
 /** Produit tel que stocké (colonnes d'affiliation ajoutées par la migration 0003). */
@@ -102,6 +135,16 @@ export const AFFILIATE_SETTING_DEFAULTS = {
   reward_share_a: 5,
   reward_click_a: 1,
   share_max_per_day: 50,
+  /**
+   * Vague 4 — plafonds de liens (décisions propriétaire). Whitelistés
+   * automatiquement (`isAffiliateSettingKey` dérive de ces défauts).
+   *   max_active_links      : liens ACTIFS maximum pour un affilié normal (3) ;
+   *   max_sales_per_link    : ventes maximum par lien avant saturation (20) ;
+   *   super_max_active_links : plafond du Super-affilié — 0 = ILLIMITÉ (défaut).
+   */
+  max_active_links: 3,
+  max_sales_per_link: 20,
+  super_max_active_links: 0,
 } as const;
 
 export type AffiliateSettingKey = keyof typeof AFFILIATE_SETTING_DEFAULTS;
@@ -123,6 +166,12 @@ export interface AffiliateSettings {
   rewardClickA: number;
   /** Plafond de partages par jour (défaut 50). */
   shareMaxPerDay: number;
+  /** Liens ACTIFS maximum pour un affilié normal (défaut 3). */
+  maxActiveLinks: number;
+  /** Ventes maximum par lien avant saturation automatique (défaut 20). */
+  maxSalesPerLink: number;
+  /** Plafond du Super-affilié (0 = illimité, défaut). */
+  superMaxActiveLinks: number;
 }
 
 export function isAffiliateSettingKey(key: string): key is AffiliateSettingKey {
@@ -161,6 +210,9 @@ export async function readAffiliateSettings(db: D1Database): Promise<AffiliateSe
     rewardShareA: read("reward_share_a"),
     rewardClickA: read("reward_click_a"),
     shareMaxPerDay: read("share_max_per_day"),
+    maxActiveLinks: read("max_active_links"),
+    maxSalesPerLink: read("max_sales_per_link"),
+    superMaxActiveLinks: read("super_max_active_links"),
   };
 }
 
@@ -230,6 +282,17 @@ export async function generateAffiliateCode(db: D1Database, pseudo: string): Pro
 export function isUniqueViolation(err: unknown): boolean {
   const message = err instanceof Error ? err.message : String(err);
   return /unique constraint failed/i.test(message);
+}
+
+/**
+ * Nombre de lignes modifiées par un `D1Result` (utile aux UPDATE conditionnels).
+ * Dupliqué depuis `commissions.ts` (dont le module importe déjà `affiliation` —
+ * un import inverse créerait un cycle).
+ */
+function changesOf(result: unknown): number {
+  const meta = (result as { meta?: { changes?: unknown } } | null)?.meta;
+  const n = Number(meta?.changes ?? 0);
+  return Number.isFinite(n) ? n : 0;
 }
 
 /* ------------------------------- Affiliés (lecture) ------------------------------- */
@@ -415,18 +478,34 @@ function insertLinkStatement(
 ): D1PreparedStatement {
   return db
     .prepare(
-      `INSERT INTO affiliate_links (id, affiliate_id, product_id, code, campaign_id, created_at)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO affiliate_links (id, affiliate_id, product_id, code, campaign_id, created_at, status, sales_count)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     )
-    .bind(link.id, link.affiliate_id, link.product_id, link.code, link.campaign_id, link.created_at);
+    .bind(
+      link.id,
+      link.affiliate_id,
+      link.product_id,
+      link.code,
+      link.campaign_id,
+      link.created_at,
+      link.status,
+      link.sales_count
+    );
+}
+
+/** Normalise l'état d'un lien lu en base (défaut sûr : `active` si absente/inconnue). */
+export function normalizeLinkStatus(raw: unknown): AffiliateLinkStatus {
+  return typeof raw === "string" && (AFFILIATE_LINK_STATUSES as readonly string[]).includes(raw)
+    ? (raw as AffiliateLinkStatus)
+    : "active";
 }
 
 /**
- * Lien d'un couple (affilié, produit) — idempotent : le code est déterministe
- * (`CODE-AFFILIE-PRODUIT`), donc la contrainte UNIQUE(code) suffit à empêcher
- * les doublons même sous concurrence ; on relit la ligne en cas de collision.
- * En cas de collision avec un AUTRE produit (titres identiques), un suffixe
- * aléatoire est ajouté.
+ * Conserve la signature historique (régénération depuis la route `POST …/link`)
+ * mais l'état du lien n'ôte plus l'éligibilité : un lien déjà existant est
+ * renvoyé TEL QUEL (y compris `inactive`/`saturated`) — la RÉACTIVATION est un
+ * acte volontaire distinct (`activateAffiliateLink`). Un lien nouvellement créé
+ * naît `active` avec `sales_count = 0`.
  */
 export async function getOrCreateAffiliateLink(
   db: D1Database,
@@ -447,6 +526,8 @@ export async function getOrCreateAffiliateLink(
       code,
       campaign_id: campaignId,
       created_at: Date.now(),
+      status: "active",
+      sales_count: 0,
     };
     try {
       await insertLinkStatement(db, link).run();
@@ -461,6 +542,146 @@ export async function getOrCreateAffiliateLink(
     }
   }
   throw new Error("Impossible de générer un code de lien affilié unique.");
+}
+
+/* ------------------- Plafonds et état des liens (vague 4) ------------------- */
+
+/** Nombre de liens ACTIFS d'un affilié (plafond `max_active_links`). */
+export async function countActiveLinks(db: D1Database, affiliateId: string): Promise<number> {
+  const row = await db
+    .prepare("SELECT COUNT(*) AS n FROM affiliate_links WHERE affiliate_id = ? AND status = 'active'")
+    .bind(affiliateId)
+    .first<{ n: number }>();
+  return Math.trunc(Number(row?.n) || 0);
+}
+
+/** Liens ACTIFS d'un affilié (sert la liste de choix en cas de plafond atteint). */
+export async function listActiveLinks(db: D1Database, affiliateId: string): Promise<AffiliateLinkRow[]> {
+  const { results = [] } = await db
+    .prepare(
+      `SELECT * FROM affiliate_links WHERE affiliate_id = ? AND status = 'active'
+        ORDER BY created_at ASC, id ASC`
+    )
+    .bind(affiliateId)
+    .all<AffiliateLinkRow>();
+  return results || [];
+}
+
+/** Liens (tous états) de plusieurs produits pour un affilié — lecture de la liste produits. */
+export async function listLinksByAffiliate(
+  db: D1Database,
+  affiliateId: string
+): Promise<AffiliateLinkRow[]> {
+  const { results = [] } = await db
+    .prepare("SELECT * FROM affiliate_links WHERE affiliate_id = ?")
+    .bind(affiliateId)
+    .all<AffiliateLinkRow>();
+  return results || [];
+}
+
+/**
+ * Plafonds EFFECTIFS d'un affilié. `maxActiveLinks` vaut le plafond Super (0 =
+ * illimité) pour un Super-affilié, sinon le plafond normal. `isSuper` est décidé
+ * par l'appelant (rôle ou seuils — voir `isSuperAffiliate`).
+ */
+export interface AffiliateLimits {
+  /** Nombre de liens actuellement ACTIFS (tous produits). */
+  activeCount: number;
+  /** Plafond de liens actifs effectif (0 = illimité, cas Super). */
+  maxActiveLinks: number;
+  /** Plafond de ventes par lien avant saturation. */
+  maxSalesPerLink: number;
+  /** L'affilié est-il Super (donc sans plafond de liens) ? */
+  isSuper: boolean;
+}
+
+export function effectiveLimits(
+  settings: AffiliateSettings,
+  isSuper: boolean,
+  activeCount: number
+): AffiliateLimits {
+  const max = isSuper ? settings.superMaxActiveLinks : settings.maxActiveLinks;
+  return {
+    activeCount,
+    maxActiveLinks: Math.max(0, Math.trunc(max)),
+    maxSalesPerLink: Math.max(0, Math.trunc(settings.maxSalesPerLink)),
+    isSuper,
+  };
+}
+
+/** true si l'affilié peut encore activer un lien (plafond non atteint ou illimité). */
+export function canActivateMoreLinks(limits: AffiliateLimits): boolean {
+  if (limits.maxActiveLinks === 0) return true; // 0 = illimité (Super)
+  return limits.activeCount < limits.maxActiveLinks;
+}
+
+/** Résultat d'une tentative d'activation : le lien + si un emplacement reste libre. */
+export interface ActivationOutcome {
+  ok: boolean;
+  /** Lien concerné (existant ou créé) si l'activation a pu se faire. */
+  link: AffiliateLinkRow | null;
+  /** Raison du refus (`idempotent` = déjà actif ; `limit` = plafond atteint). */
+  reason?: "idempotent" | "limit";
+  limits: AffiliateLimits;
+  /** Liens actifs, renvoyés en cas de plafond atteint pour proposer un choix. */
+  activeLinks: AffiliateLinkRow[];
+}
+
+/**
+ * Active (ou réactive) le lien d'un couple (affilié, produit). Décision SERVEUR :
+ * le front ne choisit jamais à la place du serveur.
+ *  1. un lien déjà `active` → idempotent (on renvoie l'existant, aucun décompte) ;
+ *  2. sinon, si le plafond de liens ACTIFS est atteint (et non Super) → refus
+ *     `limit` avec la liste des liens actifs (le front propose : désactiver lequel
+ *     ou abandonner) ;
+ *  3. sinon on (re)met le lien en `active` (créé s'il n'existe pas encore).
+ * Le compteur de ventes (`sales_count`) n'est PAS remis à zéro à la réactivation :
+ * les ventes déjà acquises restent comptées (décision propriétaire).
+ */
+export async function activateAffiliateLink(
+  db: D1Database,
+  affiliate: AffiliateRow,
+  product: { id: string; title: string },
+  limits: AffiliateLimits
+): Promise<ActivationOutcome> {
+  const existing = await getAffiliateLink(db, affiliate.id, product.id);
+  if (existing && normalizeLinkStatus(existing.status) === "active") {
+    return { ok: true, link: existing, reason: "idempotent", limits, activeLinks: [] };
+  }
+  if (!canActivateMoreLinks(limits)) {
+    return {
+      ok: false,
+      link: null,
+      reason: "limit",
+      limits,
+      activeLinks: await listActiveLinks(db, affiliate.id),
+    };
+  }
+
+  // Lien existant → réactivation ; sinon création (idempotente par UNIQUE(code)).
+  if (existing) {
+    await db
+      .prepare("UPDATE affiliate_links SET status = 'active' WHERE id = ? AND status != 'active'")
+      .bind(existing.id)
+      .run();
+    const refreshed = (await getAffiliateLink(db, affiliate.id, product.id)) ?? existing;
+    return { ok: true, link: refreshed, limits, activeLinks: [] };
+  }
+  const link = await getOrCreateAffiliateLink(db, affiliate, product);
+  return { ok: true, link, limits, activeLinks: [] };
+}
+
+/**
+ * Désactive un lien (passe en `inactive`) — libère un emplacement.
+ * La PROPRIÉTÉ est vérifiée par l'appelant ; ici on garantit seulement qu'on ne
+ * touche jamais à un lien déjà `saturated` (son état porte une information).
+ */
+export async function deactivateAffiliateLink(db: D1Database, linkId: string): Promise<boolean> {
+  const res = await db
+    .prepare("UPDATE affiliate_links SET status = 'inactive' WHERE id = ? AND status = 'active'")
+    .bind(linkId)
+    .run();
+  return changesOf(res) > 0;
 }
 
 export interface AffiliateLinkTarget {

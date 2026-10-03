@@ -65,6 +65,12 @@ export const affiliateTrackRoutes: App = new Hono<{ Bindings: Env }>().post(
     }
     // Destination : URL du tunnel externe, sinon page produit du site (`/produit?id=…`,
     // format du catalogue) — repli pour un produit 100 % A, promouvable sans tunnel.
+    // Vague 4 : un lien INACTIF ou SATURÉ n'accepte plus de clic (le plafond de
+    // ventes ou la désactivation volontaire l'ont retiré du circuit).
+    if (target.link.status && target.link.status !== "active") {
+      return c.json({ ok: false, error: "Ce lien affilié n'est plus actif." }, 409);
+    }
+
     const url = (target.product.action_url || "").trim();
     const origin = firstValidFrontOrigin(c.env.FRONT_ORIGINS);
     const destination =

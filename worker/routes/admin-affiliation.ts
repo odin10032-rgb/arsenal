@@ -236,9 +236,10 @@ async function settingsJson(db: D1Database) {
   };
 }
 
-/** Transitions administrables du contrat : pending→active, active→suspended, suspended→active. */
+/** Transitions administrables du contrat : pending→active, active→suspended, suspended→active.
+ *  Vague 4 : `pending → rejected` (refus de candidature — le rôle reste `user`). */
 const AFFILIATE_TRANSITIONS: Record<string, string[]> = {
-  pending: ["active"],
+  pending: ["active", "rejected"],
   active: ["suspended"],
   suspended: ["active"],
 };
@@ -354,8 +355,8 @@ export const adminAffiliationRoutes: App = new Hono<{ Bindings: Env }>()
       typeof body.reason === "string" && body.reason.trim()
         ? body.reason.trim().slice(0, 300)
         : null;
-    if (target !== "active" && target !== "suspended") {
-      return badRequest("Statut cible invalide (active ou suspended).");
+    if (target !== "active" && target !== "suspended" && target !== "rejected") {
+      return badRequest("Statut cible invalide (active, suspended ou rejected).");
     }
 
     const db = c.env.DB;
@@ -402,8 +403,10 @@ export const adminAffiliationRoutes: App = new Hono<{ Bindings: Env }>()
         .bind(
           crypto.randomUUID(),
           affiliate.user_id,
-          activating ? affiliate.status : "affiliate",
-          activating ? "affiliate" : "suspended",
+          // Historique : depuis l'activation le statut devient un RÔLE (« affiliate ») ;
+          // un refus (pending→rejected) reste un STATUT (départ = statut réel).
+          activating ? affiliate.status : target === "rejected" ? affiliate.status : "affiliate",
+          activating ? "affiliate" : target,
           reason,
           now
         )

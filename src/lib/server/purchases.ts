@@ -507,6 +507,9 @@ export async function resolvePurchaseAttribution(
 
   const affiliate = await getAffiliateById(db, link.affiliate_id);
   if (!affiliate || affiliate.status !== "active") return null;
+  // Vague 4 : un lien INACTIF ou SATURÉ (plafond de ventes atteint) n'attribue
+  // plus — l'achat reste valide, simplement non attribué.
+  if (link.status && link.status !== "active") return null;
 
   // C5 — l'acheteur ne peut pas s'attribuer sa propre commission : même
   // traitement qu'un code invalide (silencieux), mais TRACÉ.
@@ -564,6 +567,12 @@ export interface NewPurchaseInput {
   attribution?: PurchaseAttribution | null;
   /** Commission calculée (requise si `attribution` est fournie). */
   commission?: PurchaseCommission | null;
+  /**
+   * Plafond de ventes par lien (vague 4) : au-delà, le lien est marqué
+   * `saturated` et cesse d'attribuer. `0` = illimité. Lu par la route via les
+   * réglages d'affiliation et transmis ici (jamais deviné dans le batch).
+   */
+  maxSalesPerLink?: number;
   now?: number;
 }
 
@@ -602,6 +611,7 @@ export function purchaseStatements(db: D1Database, input: NewPurchaseInput): Pur
   // par le fournisseur `chariow` — source unique : fulfillmentProviderForMethod.
   const provider = fulfillmentProviderForMethod(method);
   const attribution = input.attribution ?? null;
+  const maxSalesPerLink = Math.max(0, Math.trunc(Number(input.maxSalesPerLink) || 0));
 
   const purchase: PurchaseRow = {
     id: purchaseId,
@@ -715,6 +725,22 @@ export function purchaseStatements(db: D1Database, input: NewPurchaseInput): Pur
           debit.idempotencyKey
         )
     );
+    // Vague 4 : compteur de ventes du lien + saturation automatique au seuil
+    // (`max_sales_per_link`). Gardé par le débit (même batch que la vente) :
+    // jamais de compteur incrémenté pour un achat non payé.
+    if (attribution.linkId) {
+      statements.push(
+        db
+          .prepare(
+            `UPDATE affiliate_links
+                SET sales_count = sales_count + 1,
+                    status = CASE WHEN ? > 0 AND sales_count + 1 >= ? THEN 'saturated' ELSE status END
+              WHERE id = ? AND ${transactionExistsSql()}`
+          )
+          .bind(maxSalesPerLink, maxSalesPerLink, attribution.linkId, debit.idempotencyKey)
+      );
+    }
+
     if (commission.rewardA > 0) {
       statements.push(
         aTransactionStatement(db, {
