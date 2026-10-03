@@ -134,6 +134,8 @@ export const AFFILIATE_SETTING_DEFAULTS = {
    */
   reward_share_a: 5,
   reward_click_a: 1,
+  /** Récompense A versée à l'affilié qui a FAIT CRÉER LE COMPTE, au 1er achat du filleul (0 = désactivé). */
+  reward_recruitment_a: 50,
   share_max_per_day: 50,
   /**
    * Vague 4 — plafonds de liens (décisions propriétaire). Whitelistés
@@ -172,6 +174,8 @@ export interface AffiliateSettings {
   maxSalesPerLink: number;
   /** Plafond du Super-affilié (0 = illimité, défaut). */
   superMaxActiveLinks: number;
+  /** Récompense A de recrutement (au 1er achat du filleul). */
+  rewardRecruitmentA: number;
 }
 
 export function isAffiliateSettingKey(key: string): key is AffiliateSettingKey {
@@ -209,6 +213,7 @@ export async function readAffiliateSettings(db: D1Database): Promise<AffiliateSe
     defaultRewardA: read("default_reward_a"),
     rewardShareA: read("reward_share_a"),
     rewardClickA: read("reward_click_a"),
+    rewardRecruitmentA: read("reward_recruitment_a"),
     shareMaxPerDay: read("share_max_per_day"),
     maxActiveLinks: read("max_active_links"),
     maxSalesPerLink: read("max_sales_per_link"),
@@ -460,6 +465,16 @@ export async function getAffiliateLink(
   const row = await db
     .prepare("SELECT * FROM affiliate_links WHERE affiliate_id = ? AND product_id = ? LIMIT 1")
     .bind(affiliateId, productId)
+    .first<AffiliateLinkRow>();
+  return row ?? null;
+}
+
+/** Lien par son identifiant (pont de tracking : la session porte le `link_id`). */
+export async function getLinkById(db: D1Database, id: string): Promise<AffiliateLinkRow | null> {
+  if (!id) return null;
+  const row = await db
+    .prepare("SELECT * FROM affiliate_links WHERE id = ? LIMIT 1")
+    .bind(id)
     .first<AffiliateLinkRow>();
   return row ?? null;
 }

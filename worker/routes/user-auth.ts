@@ -39,9 +39,40 @@ function ipHashOf(header: string | undefined): string {
  *   (identifiant = email OU pseudo ; ⚠️ POST /api/auth/login reste le login ADMIN)
  * - DELETE /api/auth/session   (Bearer)                  → 200 {ok} (idempotent)
  */
+/**
+ * PARRAINAGE : si le visiteur arrive avec un jeton de suivi (pont `/r/<code>`),
+ * on lie SON COMPTE à l'affilié d'origine — une seule fois, jamais écrasé.
+ *
+ * C'est ce qui rend l'attribution portable entre appareils (le compte survit,
+ * le localStorage non). Best-effort : un échec ici ne doit JAMAIS faire échouer
+ * une inscription ou une connexion.
+ */
+async function linkReferralFromToken(
+  db: D1Database,
+  userId: string,
+  trackingToken: unknown
+): Promise<void> {
+  const token = typeof trackingToken === "string" ? trackingToken.trim() : "";
+  if (!token) return;
+  try {
+    const { readTrackingSession } = await import("../../src/lib/server/tracking");
+    const { linkReferralIfAbsent } = await import("../../src/lib/server/referrals");
+    const session = await readTrackingSession(db, token);
+    if (!session?.affiliate_id) return;
+    await linkReferralIfAbsent(db, {
+      userId,
+      affiliateId: session.affiliate_id,
+      linkId: session.link_id,
+      productId: session.product_id,
+    });
+  } catch {
+    /* jamais bloquant */
+  }
+}
+
 export const userAuthRoutes: App = new Hono<{ Bindings: Env }>()
   .post("/api/auth/register", async (c) => {
-    let body: { pseudo?: unknown; email?: unknown; password?: unknown };
+    let body: { pseudo?: unknown; email?: unknown; password?: unknown; trackingToken?: unknown };
     try {
       body = await c.req.json();
     } catch {
@@ -97,6 +128,10 @@ export const userAuthRoutes: App = new Hono<{ Bindings: Env }>()
       if (column === "email") return c.json({ ok: false, error: "Email déjà utilisé." }, 409);
       throw err;
     }
+
+    // Parrainage (pont de tracking) : lie le compte à l'affilié d'origine s'il
+    // est venu par un lien. Best-effort, une seule fois.
+    await linkReferralFromToken(c.env.DB, userId, body.trackingToken);
 
     return c.json(
       {

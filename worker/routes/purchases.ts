@@ -103,9 +103,11 @@ export const purchaseRoutes: AuthedApp = new Hono<AuthedEnv>()
     // Attribution affiliation : code de parrainage < 30 j, ignoré silencieusement
     // s'il est invalide — et refusée si l'acheteur est l'affilié lui-même (C5).
     const affiliateCode = typeof body?.affiliateCode === "string" ? body.affiliateCode : "";
+    // Pont de tracking : le jeton (serveur) prime sur le code (repli).
+    const trackingToken = typeof body?.trackingToken === "string" ? body.trackingToken : "";
     const attribution = await resolvePurchaseAttribution(db, affiliateCode, product.id, {
       buyerUserId: user.id,
-    });
+    }, trackingToken);
     const commission = attribution ? await computePurchaseCommission(db, product) : null;
 
     let attempt: Awaited<ReturnType<typeof createPurchase>>;
@@ -134,6 +136,26 @@ export const purchaseRoutes: AuthedApp = new Hono<AuthedEnv>()
       return insufficientA(await aBalance(db, user.id), priceA);
     }
     const created = attempt.creation;
+
+    // RÉCOMPENSE DE RECRUTEMENT (idée propriétaire) : si l'acheteur a été
+    // PARRAINÉ (il a créé son compte via le lien d'un affilié), ce PREMIER achat
+    // déclenche une récompense A au profit de l'affilié d'origine — une seule
+    // fois, et SANS commission de vente (celle-ci suit le dernier toucher, plus
+    // haut). Le montant vient du réglage `reward_recruitment_a`.
+    // Best-effort : un échec ici ne doit jamais faire échouer l'achat livré.
+    try {
+      const { recruitmentRewardStatements } = await import("../../src/lib/server/referrals");
+      const { readAffiliateSettings } = await import("../../src/lib/server/affiliation");
+      const settings = await readAffiliateSettings(db);
+      const recruitmentStatements = await recruitmentRewardStatements(db, {
+        userId: user.id,
+        purchaseId: created.purchase.id,
+        amountA: settings.rewardRecruitmentA,
+      });
+      if (recruitmentStatements.length) await db.batch(recruitmentStatements);
+    } catch (err) {
+      console.error("Récompense de recrutement:", err);
+    }
 
     // Fulfillment immédiat : le statut renvoyé reflète le résultat RÉEL
     // (aucune erreur de livraison ne doit faire perdre la réponse d'achat).

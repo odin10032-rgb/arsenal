@@ -228,9 +228,15 @@ export function resolveAccess(purchase: Purchase, sessionEmail = ""): PurchaseAc
  */
 export async function buyProduct(productId: string, affiliateCode?: string): Promise<Purchase> {
   const code = (affiliateCode || "").trim();
+  // Pont de tracking : le jeton serveur accompagne l'achat (il prime sur le code).
+  const trackingToken = readTrackingToken();
   const res = await apiFetch<{ ok: boolean; purchase?: unknown }>("/api/purchases", {
     method: "POST",
-    body: code ? { productId, affiliateCode: code } : { productId },
+    body: {
+      productId,
+      ...(code ? { affiliateCode: code } : {}),
+      ...(trackingToken ? { trackingToken } : {}),
+    },
     bearer: true,
     timeoutMs: 8000,
   });

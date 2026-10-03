@@ -23,9 +23,11 @@ import { CHARIOW_API_KEY_SETTING } from "./chariow-checkout";
 import {
   getAffiliateById,
   getAffiliateLinkByCode,
+  getLinkById,
   readAffiliateSettings,
   round2,
 } from "./affiliation";
+import { readTrackingSession } from "./tracking";
 import type { AffiliateProductRow } from "./affiliation";
 import { changesOf, computeCommissionAmount, getActiveCampaign, resolveCommissionRule } from "./commissions";
 import { createFulfillmentStatement, fulfillmentProviderForMethod, isChariowFulfillmentMethod, normalizeFulfillmentMethod } from "./fulfillment";
@@ -491,12 +493,80 @@ export interface PurchaseAttributionContext {
  * le lien doit être récent OU avoir reçu un clic récent (le client, lui, ne
  * transmet que le code — `localStorage.arsenal_affiliate_ref` filtre déjà < 30 j).
  */
+/**
+ * Attribution par le JETON de suivi : on lit la session, et si son DERNIER
+ * toucher vise bien ce produit (et que l'affilié est actif, le lien non saturé),
+ * on attribue. Retourne null pour laisser la main au repli par code.
+ */
+async function resolveAttributionByToken(
+  db: D1Database,
+  token: string,
+  productId: string,
+  context: PurchaseAttributionContext
+): Promise<PurchaseAttribution | null> {
+  const session = await readTrackingSession(db, token);
+  if (!session) return null;
+  if (!session.affiliate_id || !session.link_id) return null;
+  // Le parcours doit viser CE produit : sinon le jeton n'attribue pas (la vente
+  // reste non attribuée plutôt que d'aller à un affilié hors sujet).
+  if (session.product_id && session.product_id !== productId) return null;
+
+  const affiliate = await getAffiliateById(db, session.affiliate_id);
+  if (!affiliate || affiliate.status !== "active") return null;
+
+  const link = await getLinkById(db, session.link_id);
+  if (!link || link.product_id !== productId) return null;
+  if (link.status && link.status !== "active") return null;
+
+  const buyerUserId = context.buyerUserId ?? null;
+  // C5 — même garde que le repli : l'acheteur ne s'attribue pas sa commission.
+  if (buyerUserId && affiliate.user_id === buyerUserId) {
+    await recordSelfAffiliationBlocked(db, {
+      buyerUserId,
+      affiliateId: affiliate.id,
+      productId,
+      linkCode: link.code,
+    });
+    return null;
+  }
+  return {
+    affiliateId: affiliate.id,
+    affiliateUserId: affiliate.user_id,
+    linkId: link.id,
+    linkCode: link.code,
+  };
+}
+
+/**
+ * Attribution d'un achat
+/**
+ * Attribution d'un achat — DEUX SOURCES, dans cet ordre (pont de tracking) :
+ *
+ *  1. **Le JETON de suivi** (`trackingToken`) — le plus fiable : il est SERVEUR,
+ *     survit à un nettoyage du navigateur, et porte le DERNIER toucher affilié
+ *     du parcours. C'est la voie normale depuis le pont `/r/<code>`.
+ *  2. **Le CODE** (`affiliateCode`) — REPLI historique, conservé tel quel pour
+ *     ne rien casser (visiteurs d'avant le pont, jeton expiré, stockage vidé).
+ *
+ * Le code de repli ne s'applique QUE si le jeton est absent ou n'attribue pas ce
+ * produit — sinon un vieux code en localStorage pourrait voler l'attribution du
+ * parcours réel (injustice que le pont corrige).
+ */
 export async function resolvePurchaseAttribution(
   db: D1Database,
   code: string | null | undefined,
   productId: string,
-  context: PurchaseAttributionContext = {}
+  context: PurchaseAttributionContext = {},
+  trackingToken?: string | null
 ): Promise<PurchaseAttribution | null> {
+  // --- 1. Par le JETON (dernier toucher du parcours) ------------------------
+  const token = (trackingToken ?? "").trim();
+  if (token) {
+    const byToken = await resolveAttributionByToken(db, token, productId, context);
+    if (byToken) return byToken;
+  }
+
+  // --- 2. REPLI : par le code (mécanisme historique, inchangé) --------------
   const trimmed = (code ?? "").trim();
   if (!trimmed) return null;
   const now = context.now ?? Date.now();
