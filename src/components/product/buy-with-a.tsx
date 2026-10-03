@@ -18,6 +18,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { CoinA } from "@/components/account/coin-a";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { AddToCart } from "@/components/product/add-to-cart";
 import { useUser } from "@/hooks/use-user";
 import { ApiError } from "@/lib/api";
 import { fmt } from "@/lib/format";
@@ -33,7 +34,7 @@ import {
   resolveAccess,
   type Purchase,
 } from "@/lib/purchases";
-import { logout } from "@/lib/user-auth";
+import { logout, isMember } from "@/lib/user-auth";
 
 /* ---------------- Panneau d'accès (partagé avec « Mes produits ») ---------------- */
 
@@ -201,6 +202,41 @@ export function BuyWithA({ product }: { product: Product }) {
 
   const remainingA = user ? Math.max(0, user.balanceA - priceA) : 0;
 
+  /**
+   * Non-membre (connecté sans adhésion) : la monnaie A ne lui est PAS accessible.
+   * On n'affiche donc pas le bloc d'achat A, mais une invitation CONTEXTUELLE
+   * sobre vers le programme (jamais de popup, jamais répétitive). Un visiteur NON
+   * connecté, lui, garde l'écran « Se connecter pour acheter » ci-dessous : on ne
+   * lui impose pas le discours membre avant qu'il ait un compte.
+   */
+  if (user && !isMember(user)) {
+    return (
+      <div className="rounded-[10px] border border-[#333] bg-[#141414] p-4 sm:p-5">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <CoinA size={30} />
+          <div className="min-w-0">
+            <p className="font-mono text-[0.66rem] uppercase tracking-[0.12em] text-[#666]">
+              Paiement en A
+            </p>
+            <p className="font-display text-[1.05rem] font-bold leading-tight">
+              Réservé aux membres
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 flex flex-col gap-2.5 border-t border-dashed border-[#333] pt-4">
+          <p className="text-[0.84rem] leading-relaxed text-[#a0a0a0]">
+            L&apos;achat en A est réservé aux membres. Découvrez le programme pour gagner des A.
+          </p>
+          <Link href="/affiliation" className="btn-arsenal btn-ghost w-full">
+            Découvrir le programme
+          </Link>
+          {/* Le panier reste accessible : mettre de côté n'exige pas l'adhésion */}
+          <AddToCart productId={product.id} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-[10px] border border-[#333] bg-[#141414] p-4 sm:p-5">
       {/* En-tête : prix en A */}
@@ -305,6 +341,8 @@ export function BuyWithA({ product }: { product: Product }) {
           <p className="text-[0.76rem] leading-relaxed text-[#666]">
             L&apos;achat se règle avec votre solde A, sans carte bancaire.
           </p>
+          {/* Le panier reste ouvert à tous, même sans compte */}
+          <AddToCart productId={product.id} />
         </div>
       )}
 
@@ -323,6 +361,7 @@ export function BuyWithA({ product }: { product: Product }) {
             Débit immédiat de votre solde A. L&apos;accès est ouvert dès que la livraison est
             confirmée par le serveur.
           </p>
+          <AddToCart productId={product.id} />
         </div>
       )}
 

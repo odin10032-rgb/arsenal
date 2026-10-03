@@ -14,14 +14,28 @@ export const USER_CHANGED_EVENT = "arsenal-user-changed";
 
 export type UserRole = "user" | "affiliate" | "super_affiliate" | "admin";
 
+/** Adhésion au programme : `none` (simple utilisateur) | `member` (accès monnaie A). */
+export type Membership = "none" | "member";
+
 /** Objet user du contrat (définition unique, partagée avec le Worker) */
 export interface User {
   id: string;
   pseudo: string;
   email: string;
   role: UserRole;
+  /**
+   * Adhésion au programme (migration 0008). C'est ELLE — et non le rôle — qui
+   * ouvre la monnaie A. Le champ peut manquer d'un cache localStorage écrit
+   * avant son ajout : lire via `isMember()` (défensif).
+   */
+  membership?: Membership;
   balanceA: number;
   createdAt: number;
+}
+
+/** L'utilisateur a-t-il accès à la monnaie A ? (adhésion, jamais le rôle) */
+export function isMember(user: { membership?: Membership } | null | undefined): boolean {
+  return user?.membership === "member";
 }
 
 /* ---------- Token de session (localStorage) ---------- */
