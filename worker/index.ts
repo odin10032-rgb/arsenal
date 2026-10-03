@@ -24,6 +24,8 @@ import { licenseVerifyRoutes, licenseUserRoutes, licenseAdminRoutes } from "./ro
 import { adminUserRoutes } from "./routes/admin-users";
 import { legalRoutes } from "./routes/legal";
 import { siteConfigRoutes } from "./routes/site-config";
+import { meTransferRoutes } from "./routes/me-transfers";
+import { cartRoutes } from "./routes/cart";
 import { PURCHASE_MAX_PER_MIN_DEFAULT, readPurchaseMaxPerMin } from "../src/lib/server/purchases";
 import { rateLimit } from "./middleware/rate-limit";
 
@@ -137,6 +139,10 @@ app.route("/", adminUserRoutes);
 app.route("/", legalRoutes);
 /** Affichage public (statistiques d'accueil pilotées depuis Paramètres → Affichage). */
 app.route("/", siteConfigRoutes);
+/** Vague 2 — transferts de A entre membres + récompense de partage (Bearer requis). */
+app.route("/", meTransferRoutes);
+/** Vague 3 — panier (visiteurs ET comptes) : public, le porteur identifie le panier. */
+app.route("/", cartRoutes);
 
 app.notFound((c) => c.json({ ok: false, error: "Route introuvable." }, 404));
 
