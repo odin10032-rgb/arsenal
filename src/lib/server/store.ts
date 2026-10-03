@@ -335,13 +335,28 @@ export async function setSetting(db: D1Database, key: string, value: string): Pr
 
 /* ------------------------------- Divers ------------------------------- */
 
+/**
+ * Empreinte stable et courte de la chaîne de version (FNV-1a 32 bits).
+ * Indispensable : l'ancienne implémentation tronquait le base64 à 22 caractères,
+ * or l'UUID du premier produit en occupait déjà ~21 — les champs ajoutés PLUS
+ * LOIN dans la chaîne (image, prix) n'étaient donc JAMAIS pris en compte, et un
+ * changement d'image ne changeait pas la version (bug constaté le 03/10/2026 :
+ * couvertures modifiées dans l'admin, invisibles sur les autres appareils).
+ * Un hachage couvre la chaîne ENTIÈRE, quelle que soit sa longueur.
+ */
+function versionHash(input: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < input.length; i++) {
+    hash ^= input.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(36);
+}
+
 export function catalogVersion(products: Product[], tracked: Record<string, number>): string {
-  // La version inclut les CHAMPS dont une modification doit invalider le cache
-  // des visiteurs : notamment l'IMAGE et le prix. Sans eux, un produit dont
-  // seule la couverture changeait gardait la même version → les navigateurs
-  // servaient leur cache et l'ancienne image restait affichée (bug constaté le
-  // 03/10 : images changées dans l'admin, invisibles sur les autres appareils).
-  // Le contenu de la chaîne n'a pas d'importance — seul son CHANGEMENT compte.
+  // Inclut les champs dont une modification doit invalider le cache visiteur :
+  // image et prix notamment (voir `versionHash`). L'ordre est celui renvoyé par
+  // la requête (stable) — le contenu n'a pas d'importance, seul son CHANGEMENT.
   const view = products.map((p) => [
     p.id,
     p.updatedAt,
@@ -349,6 +364,7 @@ export function catalogVersion(products: Product[], tracked: Record<string, numb
     p.imageUrl,
     p.price,
     p.actionUrl,
+    p.title,
   ]);
-  return Buffer.from(JSON.stringify(view)).toString("base64").slice(0, 22);
+  return versionHash(JSON.stringify(view));
 }
