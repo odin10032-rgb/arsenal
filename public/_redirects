@@ -2,6 +2,7 @@
 # /produit/<id> sert la page produit ; l'id est lu depuis le hash (#<id>)
 # par la page elle-même (les rewrites Pages ne transmettent pas les query).
 /produit/* /produit/index.html 200
+/produit/:id /produit/index.html 200
 
 # Liens affiliés (contrat Phase 2) : /r/<linkCode> → page de redirection.
 #
@@ -13,3 +14,4 @@
 # Le code n'est donc plus transmis en query : la page /r le lit depuis le
 # CHEMIN (`/r/<code>`), ce qu'elle sait déjà faire.
 /r/* /r/index.html 200
+/r/:code /r/index.html 200
