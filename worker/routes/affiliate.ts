@@ -4,6 +4,7 @@ import {
   activateAffiliateLink,
   computeAffiliateStats,
   countActiveLinks,
+  countActiveLinksByKind,
   createAffiliate,
   deactivateAffiliateLink,
   effectiveLimits,
@@ -62,6 +63,8 @@ function limitsToJson(limits: AffiliateLimits) {
     maxActiveLinks: limits.maxActiveLinks,
     maxSalesPerLink: limits.maxSalesPerLink,
     activeCount: limits.activeCount,
+    // Liens issus de campagnes : HORS PLAFOND (règle propriétaire 03/10/2026).
+    campaignCount: limits.campaignCount ?? 0,
     isSuper: limits.isSuper,
   };
 }
@@ -298,16 +301,20 @@ export const affiliateRoutes: AuthedApp = new Hono<AuthedEnv>()
     if (affiliate.status === "suspended") return c.json({ ok: true, products: [] });
     if (affiliate.status !== "active") return forbidden("Espace affilié réservé aux affiliés actifs.");
 
-    const [products, settings, performance, links, activeCount] = await Promise.all([
+    const [products, settings, performance, links, activeByKind] = await Promise.all([
       listEligibleProducts(c.env.DB),
       readAffiliateSettings(c.env.DB),
       productPerformanceMap(c.env.DB, affiliate.id),
       listLinksByAffiliate(c.env.DB, affiliate.id),
-      countActiveLinks(c.env.DB, affiliate.id),
+      // Les liens de CAMPAGNE ne consomment pas le plafond : seul `normal` y compte.
+      countActiveLinksByKind(c.env.DB, affiliate.id),
     ]);
     const linksByProduct = new Map(links.map((l) => [l.product_id, l]));
     const isSuper = isSuperAffiliate(user.role, await computeAffiliateStats(c.env.DB, affiliate), settings);
-    const limits = effectiveLimits(settings, isSuper, activeCount);
+    const limits = {
+      ...effectiveLimits(settings, isSuper, activeByKind.normal),
+      campaignCount: activeByKind.campaign,
+    };
 
     const entries = await Promise.all(
       products.map(async (product) => {

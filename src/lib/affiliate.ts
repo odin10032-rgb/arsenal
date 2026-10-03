@@ -37,8 +37,13 @@ export interface AffiliateLimits {
   maxActiveLinks: number;
   /** Plafond de ventes par lien avant saturation. */
   maxSalesPerLink: number;
-  /** Nombre de liens actuellement actifs. */
+  /** Nombre de liens actifs HORS campagne (seuls comparés au plafond). */
   activeCount: number;
+  /**
+   * Liens actifs issus de CAMPAGNES rejointes — HORS PLAFOND (décision
+   * propriétaire 03/10/2026) : 3 liens normaux + 2 campagnes = 5 liens actifs.
+   */
+  campaignCount?: number;
   /** L'affilié est-il Super (donc sans plafond de liens) ? */
   isSuper: boolean;
 }

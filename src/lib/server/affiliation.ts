@@ -546,13 +546,81 @@ export async function getOrCreateAffiliateLink(
 
 /* ------------------- Plafonds et état des liens (vague 4) ------------------- */
 
-/** Nombre de liens ACTIFS d'un affilié (plafond `max_active_links`). */
+/**
+ * DEUX CATÉGORIES DE LIENS, DEUX COMPTEURS (décision propriétaire du 03/10/2026) :
+ *
+ *  • lien « normal » — un produit promu à l'initiative de l'affilié. Il consomme
+ *    le plafond `max_active_links` (3 par défaut).
+ *  • lien « de campagne » — un produit que l'affilié promeut parce qu'il
+ *    PARTICIPE à une campagne (`campaign_participants`). Ces liens sont **HORS
+ *    PLAFOND** : un affilié avec 3 liens normaux + 2 campagnes a bien 5 liens
+ *    actifs, sans jamais être bloqué.
+ *
+ * Le plafond de VENTES PAR LIEN (`max_sales_per_link`, 20) s'applique en
+ * revanche **aux deux** catégories : une campagne double le nombre de liens,
+ * pas le rendement de chacun.
+ *
+ * L'appartenance à une campagne est lue en direct depuis `campaign_participants`
+ * (source de vérité) : rejoindre/quitter une campagne reclasse automatiquement
+ * tous les liens de ses produits, sans migration ni risque de désynchronisation.
+ */
+
+/** Ids des campagnes auxquelles l'affilié participe (source de vérité). */
+export async function readParticipatingCampaignIds(
+  db: D1Database,
+  affiliateId: string
+): Promise<string[]> {
+  try {
+    const { results = [] } = await db
+      .prepare("SELECT campaign_id FROM campaign_participants WHERE affiliate_id = ?")
+      .bind(affiliateId)
+      .all<{ campaign_id: string }>();
+    return (results || []).map((r) => r.campaign_id).filter(Boolean);
+  } catch {
+    return []; // table absente : aucun lien de campagne (repli sûr)
+  }
+}
+
+/**
+ * Répartit les liens ACTIFS d'un affilié entre « campagne » et « normaux ».
+ * Un lien dont le PRODUIT est visé par une campagne rejointe est un lien de
+ * campagne, même si `campaign_id` n'a pas été renseigné à la création.
+ */
+export async function countActiveLinksByKind(
+  db: D1Database,
+  affiliateId: string
+): Promise<{ campaign: number; normal: number; total: number }> {
+  const campaignIds = await readParticipatingCampaignIds(db, affiliateId);
+  let campaignProducts = new Set<string>();
+  if (campaignIds.length) {
+    const placeholders = campaignIds.map(() => "?").join(", ");
+    try {
+      const { results = [] } = await db
+        .prepare(`SELECT DISTINCT product_id FROM campaigns WHERE id IN (${placeholders})`)
+        .bind(...campaignIds)
+        .all<{ product_id: string }>();
+      campaignProducts = new Set((results || []).map((r) => r.product_id).filter(Boolean));
+    } catch {
+      /* lecture impossible : aucun lien classé « campagne » */
+    }
+  }
+  const links = await listActiveLinks(db, affiliateId);
+  let campaign = 0;
+  for (const l of links) {
+    // Campagne rejointe (par produit) OU lien créé explicitement pour une campagne.
+    if (campaignProducts.has(l.product_id) || (l.campaign_id && campaignIds.includes(l.campaign_id))) {
+      campaign++;
+    }
+  }
+  return { campaign, normal: links.length - campaign, total: links.length };
+}
+
+/**
+ * Nombre de liens ACTIFS **hors campagne** d'un affilié — c'est CE chiffre qui
+ * est comparé à `max_active_links` (les liens de campagne ne consomment rien).
+ */
 export async function countActiveLinks(db: D1Database, affiliateId: string): Promise<number> {
-  const row = await db
-    .prepare("SELECT COUNT(*) AS n FROM affiliate_links WHERE affiliate_id = ? AND status = 'active'")
-    .bind(affiliateId)
-    .first<{ n: number }>();
-  return Math.trunc(Number(row?.n) || 0);
+  return (await countActiveLinksByKind(db, affiliateId)).normal;
 }
 
 /** Liens ACTIFS d'un affilié (sert la liste de choix en cas de plafond atteint). */
@@ -585,8 +653,10 @@ export async function listLinksByAffiliate(
  * par l'appelant (rôle ou seuils — voir `isSuperAffiliate`).
  */
 export interface AffiliateLimits {
-  /** Nombre de liens actuellement ACTIFS (tous produits). */
+  /** Liens actifs HORS campagne — seuls comparés au plafond. */
   activeCount: number;
+  /** Liens actifs issus de campagnes rejointes : hors plafond. */
+  campaignCount?: number;
   /** Plafond de liens actifs effectif (0 = illimité, cas Super). */
   maxActiveLinks: number;
   /** Plafond de ventes par lien avant saturation. */

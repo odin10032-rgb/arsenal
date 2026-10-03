@@ -44,6 +44,7 @@ const DEFAULT_LIMITS: AffiliateLimits = {
   maxActiveLinks: 3,
   maxSalesPerLink: 20,
   activeCount: 0,
+  campaignCount: 0,
   isSuper: false,
 };
 
@@ -589,7 +590,9 @@ function LimitsPanel({
   products: AffiliateProduct[];
 }) {
   const unlimited = limits.isSuper || limits.maxActiveLinks === 0;
+  // Seuls les liens HORS campagne sont comparés au plafond.
   const linksFull = !unlimited && limits.activeCount >= limits.maxActiveLinks;
+  const campaignCount = limits.campaignCount ?? 0;
 
   // Ventes cumulées sur les liens ACTIFS, rapportées à la capacité des liens
   // actifs (activeCount × plafond par lien). Rien n'est inventé : on n'affiche
@@ -610,6 +613,14 @@ function LimitsPanel({
           unlimited={unlimited}
           danger={linksFull}
         />
+        {campaignCount > 0 && (
+          <LimitGauge
+            label="Liens de campagne (hors plafond)"
+            current={campaignCount}
+            max={0}
+            unlimited
+          />
+        )}
         <LimitGauge
           label="Ventes (liens actifs)"
           current={activeSales}
@@ -620,6 +631,14 @@ function LimitsPanel({
       </div>
 
       <p className="mt-3 text-[0.76rem] leading-relaxed text-[#666]">
+        {campaignCount > 0 && !unlimited && (
+          <>
+            Vos <b className="text-[#a0a0a0]">{fmt(campaignCount)}</b> lien
+            {campaignCount > 1 ? "s" : ""} de campagne ne comptent PAS dans le plafond de{" "}
+            {fmt(limits.maxActiveLinks)} lien{limits.maxActiveLinks > 1 ? "s" : ""} actif
+            {limits.maxActiveLinks > 1 ? "s" : ""} : ils viennent en plus.{" "}
+          </>
+        )}
         {unlimited ? (
           <>Super affilié : pas de plafond de liens actifs.</>
         ) : linksFull ? (

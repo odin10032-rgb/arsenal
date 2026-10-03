@@ -265,6 +265,15 @@ function CampaignForm({
   const eligible = products.filter((p) => p.affiliateEnabled);
   /** Détail du produit choisi (activité des liens + campagne active). */
   const selected = eligibility.find((e) => e.id === productId) ?? null;
+  /**
+   * Produit choisi mais NON ouvert à l'affiliation. On AVERTIT sans bloquer
+   * (décision propriétaire) : l'admin peut vouloir préparer une campagne, mais
+   * il doit savoir qu'aucun affilié ne verra ce produit tant qu'il n'est pas
+   * rendu éligible — c'est exactement ce qui a rendu « Lancement Spark »
+   * sans effet.
+   */
+  const chosenProduct = products.find((p) => p.id === productId) ?? null;
+  const notEligible = Boolean(chosenProduct) && !chosenProduct?.affiliateEnabled;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -326,7 +335,25 @@ function CampaignForm({
                   </option>
                 );
               })}
+              {products
+                .filter((p) => !p.affiliateEnabled)
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.title} — ⚠ non éligible à l&apos;affiliation
+                  </option>
+                ))}
             </select>
+            {/* Avertissement NON bloquant : produit hors affiliation. */}
+            {notEligible && (
+              <div className="mt-2 rounded-[10px] border border-[rgba(244,162,97,0.45)] bg-[rgba(244,162,97,0.08)] px-3.5 py-3 text-[0.75rem] leading-relaxed text-[#f4c886]">
+                <b>Ce produit n&apos;est pas éligible à l&apos;affiliation.</b> Aucun affilié ne le
+                voit dans sa liste, donc personne ne pourra activer de lien dessus : la campagne
+                n&apos;aura aucun effet tant que le produit n&apos;est pas rendu éligible
+                (onglet Produits → « Affiliation »). Vous pouvez tout de même l&apos;activer si
+                vous le souhaitez.
+              </div>
+            )}
+
             {/* « Avant de lancer » : ce que l'on sait du produit choisi. */}
             {selected && (
               <div className="mt-2 flex flex-col gap-1.5 rounded-[10px] border border-[#333] bg-[rgba(255,255,255,0.02)] px-3.5 py-3 text-[0.74rem] leading-relaxed">
