@@ -86,8 +86,22 @@ export function useCatalog() {
       }
     })();
 
+    // 3. Revalidation au retour sur l'onglet : une modification faite depuis
+    // l'admin est reprise sans que le visiteur ait à vider son cache (le cache
+    // reste peint instantanément, mais ne peut plus « coller » indéfiniment).
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      void refresh(true).catch(() => {
+        /* hors ligne : le cache reste affiché */
+      });
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+
     return () => {
       cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
     };
   }, [refresh]);
 

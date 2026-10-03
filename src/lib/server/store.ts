@@ -336,6 +336,19 @@ export async function setSetting(db: D1Database, key: string, value: string): Pr
 /* ------------------------------- Divers ------------------------------- */
 
 export function catalogVersion(products: Product[], tracked: Record<string, number>): string {
-  const view = products.map((p) => [p.id, p.updatedAt, p.clicks + (tracked[p.id] || 0)]);
+  // La version inclut les CHAMPS dont une modification doit invalider le cache
+  // des visiteurs : notamment l'IMAGE et le prix. Sans eux, un produit dont
+  // seule la couverture changeait gardait la même version → les navigateurs
+  // servaient leur cache et l'ancienne image restait affichée (bug constaté le
+  // 03/10 : images changées dans l'admin, invisibles sur les autres appareils).
+  // Le contenu de la chaîne n'a pas d'importance — seul son CHANGEMENT compte.
+  const view = products.map((p) => [
+    p.id,
+    p.updatedAt,
+    p.clicks + (tracked[p.id] || 0),
+    p.imageUrl,
+    p.price,
+    p.actionUrl,
+  ]);
   return Buffer.from(JSON.stringify(view)).toString("base64").slice(0, 22);
 }
