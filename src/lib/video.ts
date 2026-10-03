@@ -3,7 +3,7 @@
  */
 
 export interface ParsedVideo {
-  platform: "tiktok" | "shorts" | "youtube" | "iframe";
+  platform: "tiktok" | "shorts" | "youtube" | "facebook" | "iframe";
   id: string;
   vertical: boolean;
   label: string;
@@ -23,15 +23,18 @@ export function parseVideoUrl(raw: unknown): ParsedVideo | null {
   if (!url) return null;
   if (!/^(https?:\/\/|\/)/i.test(url)) return null;
 
-  // TikTok — vidéo verticale
-  const tiktok = url.match(/tiktok\.com\/(?:@[\w.-]+\/)?video\/(\d{6,})/i);
+  // TikTok — vidéo verticale.
+  // ⚠️ L'ancien endpoint `www.tiktok.com/embed/v2/<id>` ne fonctionne PLUS
+  // (vérifié le 03/10/2026 : réponse 503 Service Unavailable) — les vidéos ne
+  // s'affichaient donc jamais. Le format valide aujourd'hui est `player/v1/<id>`.
+  const tiktok = url.match(/tiktok\.com\/(?:@[\w.-]+\/)?(?:video|photo)\/(\d{6,})/i);
   if (tiktok) {
     return {
       platform: "tiktok",
       id: tiktok[1],
       vertical: true,
       label: "TikTok",
-      embedUrl: `https://www.tiktok.com/embed/v2/${tiktok[1]}`,
+      embedUrl: `https://www.tiktok.com/player/v1/${tiktok[1]}`,
       sourceUrl: url,
     };
   }
@@ -75,6 +78,28 @@ export function parseVideoUrl(raw: unknown): ParsedVideo | null {
       sourceUrl: url,
       thumb: `https://i.ytimg.com/vi/${youtube[1]}/hqdefault.jpg`,
     };
+  }
+
+  // Facebook — vidéos (`/watch/?v=`, `/videos/`, `fb.watch`, reel) et posts.
+  // Facebook n'expose d'iframe QUE via son endpoint officiel `plugins/` : une
+  // URL `facebook.com/.../videos/123` ne s'intègre pas telle quelle.
+  //   • vidéo  -> https://www.facebook.com/plugins/video.php?href=<url encodée>
+  //   • post   -> https://www.facebook.com/plugins/post.php?href=<url encodée>
+  if (/facebook\.com|fb\.watch/i.test(url)) {
+    const isReel = /\/reel\//i.test(url);
+    const isPost = /\/(posts|permalink\.php)\//i.test(url) || /[?&]story_fbid=/i.test(url);
+    const isVideo = !isPost && (/\/videos?\//i.test(url) || /[?&]v=/i.test(url) || /^https?:\/\/fb\.watch\//i.test(url) || isReel);
+    if (isPost || isVideo) {
+      return {
+        platform: "facebook",
+        id: "",
+        // Les vidéos et reels Facebook sont verticaux, les posts sont larges.
+        vertical: isVideo,
+        label: isPost ? "Facebook" : "Facebook",
+        embedUrl: `https://www.facebook.com/plugins/${isPost ? "post" : "video"}.php?href=${encodeURIComponent(url)}&show_text=false&width=560`,
+        sourceUrl: url,
+      };
+    }
   }
 
   // iframe directe (player externe)
