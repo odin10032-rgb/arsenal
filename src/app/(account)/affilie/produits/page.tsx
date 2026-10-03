@@ -16,6 +16,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { AffiliateNav } from "@/components/account/affiliate-nav";
 import { useUser } from "@/hooks/use-user";
 import { ApiError } from "@/lib/api";
 import {
@@ -25,6 +26,7 @@ import {
   deactivateAffiliateLink,
   fetchAffiliateMe,
   fetchAffiliateProducts,
+  shareReward,
   type Affiliate,
   type AffiliateLimits,
   type AffiliateLinkState,
@@ -44,12 +46,6 @@ const DEFAULT_LIMITS: AffiliateLimits = {
   activeCount: 0,
   isSuper: false,
 };
-
-/** « 3/3 liens actifs » ou « illimité » pour un Super. */
-function activeLinksLabel(limits: AffiliateLimits): string {
-  if (limits.maxActiveLinks === 0) return `${fmt(limits.activeCount)} / illimité`;
-  return `${fmt(limits.activeCount)}/${limits.maxActiveLinks}`;
-}
 
 /** « 30 % » ou « 5 000 FCFA » — valeur toujours fournie par l'API */
 function commissionLabel(p: AffiliateProduct): string {
@@ -168,8 +164,39 @@ export default function AffiliateProductsPage() {
     [],
   );
 
+  /**
+   * Copie du lien de suivi + enregistrement du partage (best-effort).
+   *
+   * La copie est TOUJOURS prioritaire : on la déclenche d'abord (retour visuel
+   * immédiat « Copié ! »), puis on notifie le serveur via POST /api/me/share
+   * SANS BLOQUER ni faire échouer la copie si l'appel échoue (réseau, quota
+   * atteint → 429, non-membre → 403). Quand l'API renvoie `remainingToday`, on
+   * affiche le compteur de partages restants du jour.
+   */
   const copyLink = async (p: AffiliateProduct) => {
-    flash(p.id, await copyText(p.link));
+    const ok = await copyText(p.link);
+    flash(p.id, ok);
+    if (!ok) return;
+    // Best-effort : la récompense de partage ne conditionne jamais la copie.
+    try {
+      const res = await shareReward({ productId: p.id, linkId: p.linkId });
+      if (res.rewarded) {
+        flashNotice(
+          res.rewardA > 0
+            ? `Partage enregistré : +${fmt(res.rewardA)} A · ${fmt(res.remainingToday)} partage${res.remainingToday > 1 ? "s" : ""} restant${res.remainingToday > 1 ? "s" : ""} aujourd'hui.`
+            : `Partage enregistré · ${fmt(res.remainingToday)} restant${res.remainingToday > 1 ? "s" : ""} aujourd'hui.`,
+        );
+      } else {
+        flashNotice(
+          `Partage enregistré · ${fmt(res.remainingToday)} restant${res.remainingToday > 1 ? "s" : ""} aujourd'hui.`,
+        );
+      }
+    } catch (err) {
+      // 429 (quota) : on informe sans dramatiser ; toute autre erreur est silencieuse.
+      if (err instanceof ApiError && err.status === 429) {
+        flashNotice("Quota de partages récompensés du jour atteint.");
+      }
+    }
   };
 
   /** Applique un lien (état réel) au produit correspondant dans la liste. */
@@ -278,7 +305,7 @@ export default function AffiliateProductsPage() {
     <div className="container-arsenal py-10 sm:py-14">
       <div className="mx-auto w-full max-w-[720px]">
         <Link
-          href="/affilie"
+          href="/compte"
           className="inline-flex items-center gap-1.5 text-[0.78rem] text-[#666] transition-colors hover:text-[#f0f0f0]"
         >
           <svg
@@ -294,7 +321,7 @@ export default function AffiliateProductsPage() {
           >
             <path d="M19 12H5m7-7-7 7 7 7" />
           </svg>
-          Espace Affilié
+          Mon compte
         </Link>
 
         <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
@@ -316,6 +343,9 @@ export default function AffiliateProductsPage() {
             </button>
           )}
         </div>
+
+        {/* Navigation de l'espace (onglet « Mes liens » actif) */}
+        <AffiliateNav active="links" />
 
         {error && (
           <p
@@ -377,27 +407,10 @@ export default function AffiliateProductsPage() {
           </div>
         ) : (
           <>
-            {/* Plafonds (vague 4) : liens actifs + ventes par lien */}
-            <div className="mt-5 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-md border border-[#333] bg-[#1a1a1a] px-2.5 py-1 font-mono text-[0.74rem] text-[#a0a0a0]">
-                <span className="text-[#666]">Liens actifs</span>
-                <span className="font-semibold tabular-nums text-[#f0f0f0]">
-                  {activeLinksLabel(limits)}
-                </span>
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-md border border-[#333] bg-[#1a1a1a] px-2.5 py-1 font-mono text-[0.74rem] text-[#a0a0a0]">
-                <span className="text-[#666]">Plafond par lien</span>
-                <span className="font-semibold tabular-nums text-[#f0f0f0]">
-                  {limits.maxSalesPerLink > 0 ? fmt(limits.maxSalesPerLink) : "illimité"} ventes
-                </span>
-              </span>
-              {limits.isSuper && (
-                <span className="rounded-md border border-[rgba(42,157,143,0.4)] bg-[rgba(42,157,143,0.08)] px-2.5 py-1 font-mono text-[0.74rem] font-semibold text-[#4fb3a1]">
-                  Super affilié — sans plafond
-                </span>
-              )}
-            </div>
-            <p className="mt-2 font-mono text-[0.74rem] text-[#666]">
+            {/* Plafonds (vague 4) : lisibles d'un coup d'œil (jauges), pas seulement un badge */}
+            <LimitsPanel limits={limits} products={products} />
+
+            <p className="mt-3 font-mono text-[0.74rem] text-[#666]">
               {products.length} produit{products.length > 1 ? "s" : ""} éligible
               {products.length > 1 ? "s" : ""}
             </p>
@@ -407,6 +420,9 @@ export default function AffiliateProductsPage() {
                   key={p.id}
                   product={p}
                   maxSalesPerLink={limits.maxSalesPerLink}
+                  maxActiveLinks={limits.maxActiveLinks}
+                  activeCount={limits.activeCount}
+                  isSuper={limits.isSuper}
                   activating={activatingId === p.id}
                   copied={copied}
                   onCopy={() => void copyLink(p)}
@@ -520,9 +536,122 @@ function AccessCard({
   );
 }
 
+/**
+ * Barre de progression d'un plafond (« 2 / 3 ») : texte mono bien visible +
+ * jauge. `danger` colore la barre quand la limite est atteinte.
+ */
+function LimitGauge({
+  label,
+  current,
+  max,
+  unlimited,
+  danger,
+}: {
+  label: string;
+  current: number;
+  max: number;
+  unlimited?: boolean;
+  danger?: boolean;
+}) {
+  const pct = unlimited || max <= 0 ? 0 : Math.min(100, Math.round((current / max) * 100));
+  return (
+    <div className="rounded-xl border border-[#333] bg-[rgba(255,255,255,0.02)] p-3.5">
+      <p className="text-[0.68rem] uppercase tracking-wider text-[#666]">{label}</p>
+      <p className="mt-1 font-mono text-[1.15rem] font-bold tabular-nums text-[#f0f0f0]">
+        {fmt(current)}
+        <span className="text-[0.85rem] font-normal text-[#666]">
+          {" / "}
+          {unlimited || max <= 0 ? "∞" : fmt(max)}
+        </span>
+      </p>
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#222]">
+        <div
+          className={`h-full rounded-full ${danger ? "bg-[#e63946]" : "bg-[#2a9d8f]"}`}
+          style={{ width: (unlimited || max <= 0 ? (current > 0 ? 100 : 0) : pct) + "%" }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Panneau de plafonds de l'affilié, lisible d'un coup d'œil :
+ *  • « 2 / 3 liens actifs » (jauge, passe en rouge à saturation) ;
+ *  • « ventes cumulées / capacités des liens actifs » (jauge globale) ;
+ *  • rappel de la règle de saturation.
+ * Pour un Super affilié, les plafonds de liens sont illimités (∞).
+ */
+function LimitsPanel({
+  limits,
+  products,
+}: {
+  limits: AffiliateLimits;
+  products: AffiliateProduct[];
+}) {
+  const unlimited = limits.isSuper || limits.maxActiveLinks === 0;
+  const linksFull = !unlimited && limits.activeCount >= limits.maxActiveLinks;
+
+  // Ventes cumulées sur les liens ACTIFS, rapportées à la capacité des liens
+  // actifs (activeCount × plafond par lien). Rien n'est inventé : on n'affiche
+  // la jauge que si un plafond par lien existe.
+  const activeSales = products
+    .filter((p) => p.linkStatus === "active")
+    .reduce((sum, p) => sum + p.salesCount, 0);
+  const capacity =
+    limits.maxSalesPerLink > 0 ? limits.activeCount * limits.maxSalesPerLink : 0;
+
+  return (
+    <div className="mt-5 rounded-2xl border border-[#333] bg-[#141414] p-4 sm:p-5">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <LimitGauge
+          label="Liens actifs"
+          current={limits.activeCount}
+          max={limits.maxActiveLinks}
+          unlimited={unlimited}
+          danger={linksFull}
+        />
+        <LimitGauge
+          label="Ventes (liens actifs)"
+          current={activeSales}
+          max={capacity}
+          unlimited={limits.maxSalesPerLink <= 0}
+          danger={capacity > 0 && activeSales >= capacity}
+        />
+      </div>
+
+      <p className="mt-3 text-[0.76rem] leading-relaxed text-[#666]">
+        {unlimited ? (
+          <>Super affilié : pas de plafond de liens actifs.</>
+        ) : linksFull ? (
+          <>
+            Vous avez atteint votre maximum de {fmt(limits.maxActiveLinks)} liens actifs.{" "}
+            <b className="text-[#a0a0a0]">Désactivez un autre lien pour libérer une place</b> avant
+            d&apos;en activer un nouveau.
+          </>
+        ) : (
+          <>
+            {fmt(limits.maxActiveLinks - limits.activeCount)} emplacement
+            {limits.maxActiveLinks - limits.activeCount > 1 ? "s" : ""} de lien libre
+            {limits.maxActiveLinks - limits.activeCount > 1 ? "s" : ""}.
+          </>
+        )}{" "}
+        {limits.maxSalesPerLink > 0 && (
+          <>
+            Un lien se désactive automatiquement à {fmt(limits.maxSalesPerLink)} ventes et libère sa
+            place.
+          </>
+        )}
+      </p>
+    </div>
+  );
+}
+
 function ProductCard({
   product,
   maxSalesPerLink,
+  maxActiveLinks,
+  activeCount,
+  isSuper,
   activating,
   copied,
   onCopy,
@@ -531,6 +660,9 @@ function ProductCard({
 }: {
   product: AffiliateProduct;
   maxSalesPerLink: number;
+  maxActiveLinks: number;
+  activeCount: number;
+  isSuper: boolean;
   activating: boolean;
   copied: { id: string; ok: boolean } | null;
   onCopy: () => void;
@@ -543,6 +675,14 @@ function ProductCard({
   const isSaturated = status === "saturated";
   const isInactive = status === "inactive";
   const neverActivated = product.linkId === null;
+  // Le plafond de liens est-il déjà atteint ? (utile pour expliquer un blocage)
+  const linksFull = !isSuper && maxActiveLinks > 0 && activeCount >= maxActiveLinks;
+
+  /** Jauge de ventes du lien (si un plafond existe). */
+  const salesPct =
+    maxSalesPerLink > 0
+      ? Math.min(100, Math.round((product.salesCount / maxSalesPerLink) * 100))
+      : 0;
 
   return (
     <article className="flex flex-col overflow-hidden rounded-2xl border border-[#333] bg-[#141414] transition-colors duration-200 hover:border-[#444]">
@@ -609,14 +749,28 @@ function ProductCard({
           ))}
         </dl>
 
-        {/* Plafond de ventes du lien (si un lien existe) */}
+        {/* Plafond de ventes du lien (si un lien existe) — jauge lisible */}
         {product.linkId && maxSalesPerLink > 0 && (
-          <p className="mt-3 font-mono text-[0.72rem] tabular-nums text-[#666]">
-            <span className={isSaturated ? "text-[#fda4af]" : "text-[#a0a0a0]"}>
-              {fmt(product.salesCount)} / {fmt(maxSalesPerLink)}
-            </span>{" "}
-            ventes sur ce lien
-          </p>
+          <div className="mt-3">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="font-mono text-[0.72rem] tabular-nums text-[#666]">
+                Ventes sur ce lien
+              </span>
+              <span
+                className={`font-mono text-[0.78rem] font-semibold tabular-nums ${
+                  isSaturated ? "text-[#fda4af]" : "text-[#f0f0f0]"
+                }`}
+              >
+                {fmt(product.salesCount)} / {fmt(maxSalesPerLink)}
+              </span>
+            </div>
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#222]">
+              <div
+                className={`h-full rounded-full ${isSaturated ? "bg-[#e63946]" : "bg-[#2a9d8f]"}`}
+                style={{ width: salesPct + "%" }}
+              />
+            </div>
+          </div>
         )}
 
         {/* Lien de suivi + actions */}
@@ -660,6 +814,14 @@ function ProductCard({
                     ? "Aucun lien actif pour ce produit. Activez-le pour obtenir votre lien de suivi et commencer à partager."
                     : "Ce lien est désactivé. Réactivez-le pour qu'il attribue de nouveau clics et ventes."}
               </p>
+              {/* Pourquoi l'activation peut être refusée : plafond de liens atteint */}
+              {!neverActivated && linksFull && (
+                <p className="mt-2 rounded-lg border border-[rgba(244,162,97,0.4)] bg-[rgba(244,162,97,0.08)] px-3 py-2 text-[0.76rem] leading-relaxed text-[#f4a261]">
+                  Vos {fmt(maxActiveLinks)} liens actifs sont utilisés. Pour réactiver celui-ci,{" "}
+                  <b>désactivez un autre lien</b> (bouton dans le panneau de choix proposé à
+                  l&apos;activation) afin de libérer une place.
+                </p>
+              )}
               <button
                 type="button"
                 onClick={onActivate}

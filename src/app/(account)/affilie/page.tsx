@@ -19,9 +19,9 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   applyToAffiliate,
-  fetchAffiliateHistory,
   fetchAffiliateMe,
   fetchAffiliateMeData,
+  fetchAffiliateProducts,
   fetchMyCampaigns,
   joinCampaign,
   requestProductAvailability,
@@ -29,6 +29,7 @@ import {
   withdrawFromAffiliate,
   type Affiliate,
   type AffiliateCampaign,
+  type AffiliateLimits,
   type AffiliateStats,
   type SuperProgress,
 } from "@/lib/affiliate";
@@ -37,14 +38,35 @@ import { UnlockAnimation } from "@/components/unlock-animation";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { CoinA } from "@/components/account/coin-a";
 import { UserAvatar } from "@/components/account/user-avatar";
-import {
-  AffiliateStatusHistory,
-  type StatusHistoryEntry,
-} from "@/components/account/affiliate-status-history";
+import { AffiliateNav } from "@/components/account/affiliate-nav";
 import { useUser } from "@/hooks/use-user";
-import { ApiError } from "@/lib/api";
+import { ApiError, apiFetch } from "@/lib/api";
 import { fmt } from "@/lib/format";
 import { logout } from "@/lib/user-auth";
+
+/**
+ * Plafonds par défaut du programme (alignés sur le schéma serveur) : affichés
+ * même si GET …/me/products n'a pas encore répondu. Aucune valeur inventée —
+ * ce sont les défauts documentés (3 liens actifs / 20 ventes par lien / 50 partages).
+ */
+const DEFAULT_LIMITS: AffiliateLimits = {
+  maxActiveLinks: 3,
+  maxSalesPerLink: 20,
+  activeCount: 0,
+  isSuper: false,
+};
+
+/** Partage récompensé : quota journalier par défaut (réglage `share_max_per_day`). */
+const DEFAULT_SHARE_MAX_PER_DAY = 50;
+
+/** Transaction A — forme minimale de GET /api/me/transactions (contrat Phase 1). */
+interface TransactionA {
+  id: string;
+  delta: number;
+  type: string;
+  label: string;
+  createdAt: number;
+}
 
 /** Devise affichée pour les montants de commission (défaut du schéma : FCFA) */
 const CURRENCY = "FCFA";
@@ -70,8 +92,6 @@ export default function AffiliePage() {
   const [unlockStatus, setUnlockStatus] = useState<UnlockStatusValue | null>(null);
   const [superProgress, setSuperProgress] = useState<SuperProgress | null>(null);
   const [campaigns, setCampaigns] = useState<AffiliateCampaign[] | null>(null);
-  /** Historique de statut (`status_history`) — chargé en parallèle de l'état. */
-  const [history, setHistory] = useState<StatusHistoryEntry[]>([]);
 
   // Garde : session absente → porte de connexion (une fois le boot terminé)
   useEffect(() => {
@@ -85,10 +105,6 @@ export default function AffiliePage() {
       setSuperProgress(me?.super ?? null);
       // Phase 3 : animation — on interroge /api/me/unlock si un événement est en attente.
       setUnlockStatus(me?.unlockPending ?? null);
-      // Historique de statut : non bloquant (liste vide si illisible).
-      void fetchAffiliateHistory()
-        .then(setHistory)
-        .catch(() => setHistory([]));
       setError("");
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
@@ -186,6 +202,9 @@ export default function AffiliePage() {
           Vos liens, vos performances et vos commissions.
         </p>
 
+        {/* Navigation de l'espace (onglet « Vue d'ensemble » actif) */}
+        <AffiliateNav active="overview" />
+
         {error && (
           <p
             className="mt-5 rounded-lg border border-[rgba(230,57,70,0.4)] bg-[rgba(230,57,70,0.1)] px-3 py-2 text-[0.8rem] text-[#fda4af]"
@@ -209,7 +228,7 @@ export default function AffiliePage() {
             balanceA={user.balanceA}
             superProgress={superProgress}
             campaigns={campaigns}
-            onCampaignJoined={() => void loadCampaigns()}
+                        onCampaignJoined={() => void loadCampaigns()}
             onWithdrawn={() => void load()}
           />
         ) : affiliate.status === "suspended" ? (
@@ -222,8 +241,6 @@ export default function AffiliePage() {
           <PendingCard affiliate={affiliate} />
         )}
 
-        {/* Historique de statut — visible dès qu'un dossier affilié existe */}
-        {!affLoading && affiliate && <AffiliateStatusHistory entries={history} />}
       </div>
     </div>
   );
@@ -379,7 +396,7 @@ function ActiveView({
 
   return (
     <>
-      {/* Identité */}
+      {/* ── 1. Identité + statut ─────────────────────────────────────────── */}
       <div className="mt-6 rounded-2xl border border-[#333] bg-[#141414] p-6 sm:p-8">
         <div className="flex items-center gap-4">
           <UserAvatar pseudo={pseudo} seed={userId} size={54} />
@@ -405,63 +422,53 @@ function ActiveView({
           </p>
         )}
 
-        {/* Solde A */}
-        <div className="mt-6 border-t border-dashed border-[#333] pt-6">
-          <p className="text-[0.74rem] font-semibold uppercase tracking-wider text-[#666]">Solde</p>
-          <div className="mt-2 flex items-center gap-3">
-            <CoinA size={34} />
-            <p className="whitespace-nowrap font-mono text-[2rem] font-bold leading-none tabular-nums text-[#f0f0f0]">
-              {fmt(balanceA)}
-              <span className="ml-2 text-[1.1rem] text-gold">A</span>
-            </p>
-          </div>
-        </div>
-
         <Link href="/affilie/produits" className="btn-arsenal btn-primary mt-6 w-full">
           Mes produits &amp; mes liens
         </Link>
       </div>
 
-      {/* Performances */}
-      <div className="mt-4 rounded-2xl border border-[#333] bg-[#141414] p-6">
-        <h2 className="font-display text-[1rem] font-bold">Performances</h2>
-        <p className="mt-1 text-[0.78rem] text-[#666]">
-          Chiffres cumulés depuis l&apos;activation de votre compte affilié.
-        </p>
+      {/* ── 2. Chiffres clés ─────────────────────────────────────────────── */}
+      <Section
+        title="Chiffres clés"
+        hint="Chiffres cumulés depuis l'activation de votre compte affilié."
+      >
         <StatsGrid stats={affiliate.stats} />
-      </div>
+      </Section>
 
+      {/* ── 3. Portefeuille A ────────────────────────────────────────────── */}
+      <WalletSection balanceA={balanceA} />
+
+      {/* ── 4. Règles et limites du programme ────────────────────────────── */}
+      <RulesSection isSuper={affiliate.isSuper} />
+
+      {/* ── 6. Campagnes ─────────────────────────────────────────────────── */}
+      <CampaignsSection campaigns={campaigns} onJoined={onCampaignJoined} />
+
+      {/* Super Affiliate : progression (non Super) ou demande de produit (Super) */}
       {!affiliate.isSuper && (
         <SuperAffiliateCard progress={superProgress} pseudo={pseudo} />
       )}
 
+      {/* ── 7. Demande de disponibilité produit (Super) ──────────────────── */}
       {affiliate.isSuper && <ProductAvailabilityRequest />}
 
-      <CampaignsSection campaigns={campaigns} onJoined={onCampaignJoined} />
-
-      <div className="mt-4 flex flex-col gap-3">
-        <Link href="/compte/portefeuille" className="btn-arsenal btn-ghost w-full">
-          Voir le portefeuille A
-        </Link>
-      </div>
-
-      {/* Sortie : retrait volontaire du programme (confirmation obligatoire) */}
-      <div className="mt-4 rounded-2xl border border-[#333] bg-[#141414] p-6">
-        <h2 className="font-display text-[1rem] font-bold">Quitter le programme</h2>
-        <p className="mt-1 text-[0.78rem] leading-relaxed text-[#666]">
-          Le retrait désactive vos liens et vous rend le rôle standard. Vos ventes et commissions
-          déjà acquises sont conservées, ainsi que votre solde A et votre adhésion.
-        </p>
-        {withdrawError && <p className="mt-3 text-[0.8rem] text-[#e63946]">{withdrawError}</p>}
+      {/*
+        Sortie du programme — action RARE : un simple lien texte, pas un bloc qui
+        occupe l'écran. La confirmation (obligatoire) porte le détail des
+        conséquences, donc rien n'est caché à l'affilié qui la déclenche.
+      */}
+      <div className="mt-6 flex justify-center">
         <button
           type="button"
           onClick={() => setConfirmWithdraw(true)}
-          className="btn-arsenal btn-ghost mt-4 w-full"
-          style={{ color: "#fda4af", borderColor: "rgba(230,57,70,0.45)" }}
+          className="text-[0.74rem] text-[#666] underline-offset-2 transition-colors hover:text-[#fda4af] hover:underline"
         >
-          Me retirer du programme
+          Quitter le programme
         </button>
       </div>
+      {withdrawError && (
+        <p className="mt-2 text-center text-[0.78rem] text-[#e63946]">{withdrawError}</p>
+      )}
 
       {confirmWithdraw && (
         <ConfirmDialog
@@ -803,6 +810,214 @@ function StatTile({
       </span>
       {hint && <span className="text-[0.68rem] text-[#666]">{hint}</span>}
     </div>
+  );
+}
+
+/* ---------------- Vue d'ensemble : sections ajoutées (vague 6) ---------------- */
+
+/**
+ * Carte de section titrée — même enveloppe que le reste de l'espace (bordure
+ * #333, fond #141414, coins arrondis). Réutilisée pour homogénéiser la page.
+ */
+function Section({
+  title,
+  hint,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="mt-4 rounded-2xl border border-[#333] bg-[#141414] p-6">
+      <h2 className="font-display text-[1rem] font-bold">{title}</h2>
+      {hint && <p className="mt-1 text-[0.78rem] text-[#666]">{hint}</p>}
+      {children}
+    </section>
+  );
+}
+
+function txTypeLabel(type: string): string {
+  switch (type) {
+    case "reward":
+      return "Récompense";
+    case "spend":
+      return "Dépense";
+    case "adjustment":
+      return "Ajustement";
+    default:
+      return type;
+  }
+}
+
+function txDate(ts: number): string {
+  return new Date(ts).toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+/**
+ * Section « Portefeuille A » : solde, accès au portefeuille complet et résumé
+ * des dernières transactions (GET /api/me/transactions?limit=5).
+ *
+ * ⚠️ DISTINCTION DES MONNAIES : le solde et l'historique affichés ici sont en A,
+ * la monnaie interne. Les commissions d'affiliation (FCFA, bloc « Chiffres clés »)
+ * sont une AUTRE monnaie : elles ne se cumulent jamais et ne se convertissent pas
+ * (décision propriétaire). On n'affiche donc AUCUN total unique qui mélangerait les deux.
+ *
+ * Chargement best-effort non bloquant : en cas d'échec (réseau, non-membre), le
+ * solde reste affiché et la liste retombe sur un message neutre.
+ */
+function WalletSection({ balanceA }: { balanceA: number }) {
+  const [txs, setTxs] = useState<TransactionA[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    void apiFetch<{ ok: boolean; transactions?: TransactionA[] }>(
+      "/api/me/transactions?limit=5&offset=0",
+      { bearer: true, timeoutMs: 4000 },
+    )
+      .then((res) => {
+        if (alive) setTxs(res.transactions || []);
+      })
+      .catch(() => {
+        if (alive) setTxs([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  return (
+    <Section
+      title="Portefeuille A"
+      hint="Votre monnaie interne — indépendante des commissions FCFA ci-dessus."
+    >
+      <div className="mt-3 flex items-center gap-3">
+        <CoinA size={30} />
+        <p className="whitespace-nowrap font-mono text-[1.7rem] font-bold leading-none tabular-nums text-[#f0f0f0]">
+          {fmt(balanceA)}
+          <span className="ml-2 text-[1rem] text-gold">A</span>
+        </p>
+      </div>
+
+      <div className="mt-5 border-t border-dashed border-[#333] pt-4">
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="text-[0.74rem] font-semibold uppercase tracking-wider text-[#666]">
+            Dernières opérations
+          </p>
+          <Link href="/compte/portefeuille" className="text-[0.78rem] text-[#4fb3a1] hover:underline">
+            Tout voir
+          </Link>
+        </div>
+
+        {txs === null ? (
+          <p className="mt-3 font-mono text-[0.78rem] text-[#666]">Chargement…</p>
+        ) : txs.length === 0 ? (
+          <p className="mt-3 text-[0.82rem] text-[#666]">Aucune opération pour le moment.</p>
+        ) : (
+          <ul className="mt-1">
+            {txs.map((t) => (
+              <li
+                key={t.id}
+                className="flex items-center justify-between gap-3 border-b border-[#222] py-2.5 last:border-0"
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-[0.84rem] text-[#f0f0f0]">{t.label}</p>
+                  <p className="mt-0.5 text-[0.7rem] text-[#666]">
+                    {txTypeLabel(t.type)} · {txDate(t.createdAt)}
+                  </p>
+                </div>
+                <span
+                  className={`flex-shrink-0 font-mono text-[0.82rem] font-semibold tabular-nums ${
+                    t.delta >= 0 ? "text-[#2a9d8f]" : "text-[#e63946]"
+                  }`}
+                >
+                  {t.delta > 0 ? "+" : ""}
+                  {fmt(t.delta)} A
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <Link href="/compte/portefeuille" className="btn-arsenal btn-ghost mt-5 w-full">
+        Ouvrir le portefeuille
+      </Link>
+    </Section>
+  );
+}
+
+/**
+ * Section « Règles et limites du programme » — pédagogie : les plafonds RÉELS
+ * sont affichés AVANT que l'affilié ne se les fasse opposer (exigence du cahier
+ * des charges : « éviter que l'utilisateur découvre une restriction uniquement
+ * après avoir tenté une action »).
+ *
+ * Les plafonds proviennent de GET /api/affiliate/me/products (`limits`) ; en cas
+ * d'échec, on retombe sur les défauts documentés du schéma (3 / 20). Le quota de
+ * partage (50/jour) est un réglage serveur sans exposition dédiée dans l'API
+ * affilié : on affiche le défaut documenté.
+ */
+function RulesSection({ isSuper }: { isSuper: boolean }) {
+  const [limits, setLimits] = useState<AffiliateLimits>(DEFAULT_LIMITS);
+
+  useEffect(() => {
+    let alive = true;
+    void fetchAffiliateProducts()
+      .then((data) => {
+        if (alive) setLimits(data.limits);
+      })
+      .catch(() => {
+        /* défauts conservés */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  const maxLinks = limits.maxActiveLinks > 0 ? fmt(limits.maxActiveLinks) : "illimité";
+  const maxSales = limits.maxSalesPerLink > 0 ? fmt(limits.maxSalesPerLink) : "illimité";
+
+  const rows: { label: string; value: string }[] = [
+    {
+      label: "Liens actifs simultanés",
+      value: isSuper ? "illimité (Super affilié)" : `${maxLinks} liens`,
+    },
+    {
+      label: "Ventes par lien",
+      value: `${maxSales} ventes`,
+    },
+    { label: "Saturation automatique", value: `au plafond, le lien se désactive et libère sa place` },
+    { label: "Partages récompensés", value: `${fmt(DEFAULT_SHARE_MAX_PER_DAY)} par jour` },
+    {
+      label: "Statut Super affilié",
+      value: isSuper ? "actif sur votre compte" : "progressif — voir « Super Affiliate » ci-dessous",
+    },
+  ];
+
+  return (
+    <Section
+      title="Règles et limites du programme"
+      hint="Ce que le programme autorise — pour ne jamais découvrir une limite au moment où elle refuse une action."
+    >
+      <dl className="mt-4 flex flex-col gap-2.5 border-t border-dashed border-[#333] pt-4">
+        {rows.map((r) => (
+          <div key={r.label} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+            <dt className="text-[0.82rem] text-[#a0a0a0]">{r.label}</dt>
+            <dd className="font-mono text-[0.8rem] tabular-nums text-[#f0f0f0]">{r.value}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-4 text-[0.74rem] leading-relaxed text-[#666]">
+        Les gains en <span className="text-gold">A</span> et les commissions en{" "}
+        <b className="text-[#a0a0a0]">FCFA</b> sont deux monnaies distinctes : elles ne se
+        cumulent jamais et ne se convertissent pas.
+      </p>
+    </Section>
   );
 }
 
