@@ -170,6 +170,118 @@ export async function recordTransaction(db: D1Database, tx: NewTransaction): Pro
   await aTransactionStatement(db, tx).run();
 }
 
+/* ------------------------------- Transfert de A ------------------------------- */
+
+/**
+ * Clé d'idempotence d'un transfert : `transfer:<id>`. Le débit utilise
+ * `transfer-out:<id>` et le crédit `transfer-in:<id>` — tous deux DÉRIVÉS de
+ * l'id de tentative, jamais du client tel quel.
+ */
+export function transferDebitKey(transferId: string): string {
+  return `transfer-out:${transferId}`;
+}
+export function transferCreditKey(transferId: string): string {
+  return `transfer-in:${transferId}`;
+}
+
+/**
+ * Statements d'un TRANSFERT de A entre deux utilisateurs — à exécuter en UN
+ * SEUL db.batch (atomicité D1 : tout ou rien). Montant ENTIER positif calculé
+ * côté serveur (jamais fourni par le client).
+ *
+ * Anti-rejeu : le débit est conditionné à l'inexistence de SA PROPRE clé ET au
+ * solde (`WHERE NOT EXISTS(transfer-out:<id>) AND SUM(delta) >= montant`). Le
+ * crédit est gardé par l'existence du débit (`transactionExistsSql`) : si le
+ * débit n'a pas été écrit (rejeu, ou solde insuffisant), le crédit n'est PAS
+ * créé. Un même `transferId` ne peut donc produire qu'un seul mouvement.
+ *
+ * Le solde n'est jamais stocké : le débit est gardé DANS le SQL, correct sous
+ * concurrence (D1 sérialise les écritures ; la garde est recalculée à l'écriture).
+ */
+export function transferStatements(
+  db: D1Database,
+  input: {
+    transferId: string;
+    fromUserId: string;
+    toUserId: string;
+    /** Montant ENTIER positif à débiter chez l'expéditeur (crédité au destinataire). */
+    amount: number;
+    /** Libellés explicites (incluent le pseudo de l'autre partie — fournis par l'appelant). */
+    outLabel: string;
+    inLabel: string;
+    refType?: string | null;
+    refId?: string | null;
+    now?: number;
+  }
+): {
+  /** Statement de débit conditionnel (à exécuter EN PREMIER dans le batch). */
+  debitStatement: D1PreparedStatement;
+  /** Statements complets du batch : [débit, crédit]. */
+  statements: D1PreparedStatement[];
+  debitId: string;
+  debitKey: string;
+  creditKey: string;
+  amount: number;
+} {
+  const now = input.now ?? Date.now();
+  const amount = Math.max(0, Math.trunc(Number(input.amount) || 0));
+  const debitId = crypto.randomUUID();
+  const debitKey = transferDebitKey(input.transferId);
+  const creditKey = transferCreditKey(input.transferId);
+
+  // Débit : condition au solde ET anti-rejeu (la clé de débit ne doit pas exister).
+  const debitStatement = db
+    .prepare(
+      `INSERT OR IGNORE INTO a_transactions
+         (id, user_id, delta, type, label, ref_type, ref_id, idempotency_key, created_at)
+       SELECT ?, ?, ?, 'transfer_out', ?, ?, ?, ?, ?
+        WHERE NOT EXISTS (SELECT 1 FROM a_transactions WHERE idempotency_key = ?)
+          AND (SELECT COALESCE(SUM(delta), 0) FROM a_transactions WHERE user_id = ?) >= ?`
+    )
+    .bind(
+      debitId,
+      input.fromUserId,
+      -amount,
+      input.outLabel,
+      input.refType ?? "transfer",
+      input.refId ?? input.transferId,
+      debitKey,
+      now,
+      debitKey,
+      input.fromUserId,
+      amount
+    );
+
+  // Crédit : écrit SEULEMENT si le débit a été écrit (même batch, garde EXISTS).
+  const creditStatement = db
+    .prepare(
+      `INSERT OR IGNORE INTO a_transactions
+         (id, user_id, delta, type, label, ref_type, ref_id, idempotency_key, created_at)
+       SELECT ?, ?, ?, 'transfer_in', ?, ?, ?, ?, ?
+        WHERE ${transactionExistsSql()}`
+    )
+    .bind(
+      crypto.randomUUID(),
+      input.toUserId,
+      amount,
+      input.inLabel,
+      input.refType ?? "transfer",
+      input.refId ?? input.transferId,
+      creditKey,
+      now,
+      debitKey
+    );
+
+  return {
+    debitStatement,
+    statements: [debitStatement, creditStatement],
+    debitId,
+    debitKey,
+    creditKey,
+    amount,
+  };
+}
+
 /** +WELCOME_A « Bienvenue sur Arsenal » — idempotence `welcome:<userId>`. */
 export function welcomeRewardStatement(db: D1Database, userId: string): D1PreparedStatement {
   return aTransactionStatement(db, {

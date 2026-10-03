@@ -93,6 +93,15 @@ export const AFFILIATE_SETTING_DEFAULTS = {
   super_min_clicks: 100,
   default_commission_percent: 30,
   default_reward_a: 50,
+  /**
+   * Vague 2 — récompenses copie/clic et anti-spam du partage (décisions
+   * propriétaire). Ces clés sont ÉCRIVABLES via `POST /api/admin/settings` :
+   * `isAffiliateSettingKey` les reconnaît (dérivé de ces défauts) et
+   * `writeAffiliateSetting` les normalise (entier ≥ 0, sinon défaut).
+   */
+  reward_share_a: 5,
+  reward_click_a: 1,
+  share_max_per_day: 50,
 } as const;
 
 export type AffiliateSettingKey = keyof typeof AFFILIATE_SETTING_DEFAULTS;
@@ -108,6 +117,12 @@ export interface AffiliateSettings {
   superMinClicks: number;
   defaultCommissionPercent: number;
   defaultRewardA: number;
+  /** A crédités par partage enregistré (défaut 5). */
+  rewardShareA: number;
+  /** A crédités par clic compté (défaut 1). */
+  rewardClickA: number;
+  /** Plafond de partages par jour (défaut 50). */
+  shareMaxPerDay: number;
 }
 
 export function isAffiliateSettingKey(key: string): key is AffiliateSettingKey {
@@ -143,6 +158,9 @@ export async function readAffiliateSettings(db: D1Database): Promise<AffiliateSe
     superMinClicks: read("super_min_clicks"),
     defaultCommissionPercent: read("default_commission_percent"),
     defaultRewardA: read("default_reward_a"),
+    rewardShareA: read("reward_share_a"),
+    rewardClickA: read("reward_click_a"),
+    shareMaxPerDay: read("share_max_per_day"),
   };
 }
 
@@ -507,7 +525,7 @@ const RECENT_VISITS_MAX = 500;
  */
 export function clickEventStatements(
   db: D1Database,
-  input: { link: AffiliateLinkRow; visitorHash: string; now?: number }
+  input: { link: AffiliateLinkRow; visitorHash: string; now?: number; clickId?: string }
 ): D1PreparedStatement[] {
   const now = input.now ?? Date.now();
   return [
@@ -517,7 +535,7 @@ export function clickEventStatements(
          VALUES (?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
-        crypto.randomUUID(),
+        input.clickId ?? crypto.randomUUID(),
         input.link.id,
         input.link.affiliate_id,
         input.link.product_id,
@@ -555,10 +573,105 @@ export async function recordAffiliateClick(
   db: D1Database,
   input: { link: AffiliateLinkRow; visitorHash: string; now?: number }
 ): Promise<boolean> {
+  return (await recordAffiliateClickId(db, input)) !== null;
+}
+
+/**
+ * Variante qui retourne l'ID du clic compté (null si dédupliqué) : cet id est
+ * la clé d'idempotence du crédit de récompense de clic (`click:<id>`) — la
+ * récompense est ainsi liée AU CLIC COMPTÉ, jamais à une requête client.
+ * Un clic dédupliqué (même lien + même empreinte sous 24 h) ne crédite RIEN :
+ * c'est la garde anti-abus de la route publique.
+ */
+export async function recordAffiliateClickId(
+  db: D1Database,
+  input: { link: AffiliateLinkRow; visitorHash: string; now?: number }
+): Promise<string | null> {
   const now = input.now ?? Date.now();
-  if (await hasRecentClick(db, input.link.id, input.visitorHash, now)) return false;
-  await db.batch(clickEventStatements(db, { link: input.link, visitorHash: input.visitorHash, now }));
-  return true;
+  if (await hasRecentClick(db, input.link.id, input.visitorHash, now)) return null;
+  const clickId = crypto.randomUUID();
+  await db.batch(
+    clickEventStatements(db, { link: input.link, visitorHash: input.visitorHash, now, clickId })
+  );
+  return clickId;
+}
+
+/* ------------------------------ Partage (vague 2) ------------------------------ */
+/*
+ * Récompense de PARTAGE (copie d'un lien) : un partage n'existe que s'il est
+ * ENREGISTRÉ côté serveur (route `POST /api/me/share`). La limite anti-spam
+ * (50/jour par défaut, réglage `share_max_per_day`) se compte ICI, sur les
+ * `share_events` du jour — avant d'enregistrer, pour refuser sans rien créditer.
+ */
+
+/** Début du jour UTC (minuit) contenant `now` — même découpage que `visitorHashOf`. */
+export function startOfUtcDay(now: number = Date.now()): number {
+  return Date.parse(`${new Date(now).toISOString().slice(0, 10)}T00:00:00.000Z`);
+}
+
+/** Nombre de partages enregistrés par cet utilisateur depuis `since` (inclus). */
+export async function countSharesSince(
+  db: D1Database,
+  userId: string,
+  since: number
+): Promise<number> {
+  const row = await db
+    .prepare("SELECT COUNT(*) AS n FROM share_events WHERE user_id = ? AND created_at >= ?")
+    .bind(userId, Math.trunc(since))
+    .first<{ n: number }>();
+  return Math.trunc(Number(row?.n) || 0);
+}
+
+/** Nombre de partages enregistrés aujourd'hui (jour UTC) par cet utilisateur. */
+export async function countSharesToday(db: D1Database, userId: string, now: number = Date.now()): Promise<number> {
+  return countSharesSince(db, userId, startOfUtcDay(now));
+}
+
+export interface ShareEventInput {
+  affiliateId: string;
+  userId: string;
+  linkId?: string | null;
+  productId?: string | null;
+  now?: number;
+}
+
+/** Ligne `share_events` créée pour un partage enregistré (l'id est la clé d'idempotence du crédit). */
+export interface ShareEvent {
+  id: string;
+  affiliateId: string;
+  userId: string;
+  createdAt: number;
+}
+
+/**
+ * INSERT de `share_events` prêt pour un db.batch. L'`id` retourné sert de clé
+ * d'idempotence au crédit (`share:<id>`) : un même partage ne crédite qu'une fois.
+ */
+export function shareEventStatement(
+  db: D1Database,
+  input: ShareEventInput
+): { event: ShareEvent; statement: D1PreparedStatement } {
+  const now = input.now ?? Date.now();
+  const event: ShareEvent = {
+    id: crypto.randomUUID(),
+    affiliateId: input.affiliateId,
+    userId: input.userId,
+    createdAt: now,
+  };
+  const statement = db
+    .prepare(
+      `INSERT INTO share_events (id, affiliate_id, user_id, link_id, product_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`
+    )
+    .bind(
+      event.id,
+      event.affiliateId,
+      event.userId,
+      input.linkId ?? null,
+      input.productId ?? null,
+      event.createdAt
+    );
+  return { event, statement };
 }
 
 /* -------------------------------- Statistiques -------------------------------- */
