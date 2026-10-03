@@ -315,6 +315,12 @@ export const affiliateRoutes: AuthedApp = new Hono<AuthedEnv>()
         const rule = resolveCommissionRule(product, campaign, settings);
         const stats = performance.get(product.id);
         const link = linksByProduct.get(product.id) ?? null;
+        // « Pourquoi je touche ça » : la règle affichée peut venir du PRODUIT,
+        // d'une CAMPAGNE active, ou du réglage par défaut. Sans l'origine, un
+        // affilié ne peut pas voir l'effet d'une campagne (constat du 03/10).
+        // On expose aussi la règle « sans campagne » pour permettre le comparatif
+        // (« +60 A au lieu de +20 A »).
+        const baseRule = resolveCommissionRule(product, null, settings);
         return {
           id: product.id,
           title: product.title,
@@ -323,6 +329,22 @@ export const affiliateRoutes: AuthedApp = new Hono<AuthedEnv>()
           commissionType: rule.type,
           commissionValue: rule.value,
           rewardA: rule.rewardA,
+          /** Origine de la règle appliquée : produit | campagne | défaut. */
+          commissionSource: rule.source,
+          rewardSource: rule.rewardSource,
+          /** Campagne active responsable (null si la règle vient du produit). */
+          campaign: campaign
+            ? {
+                id: campaign.id,
+                name: campaign.name,
+                endsAt: campaign.ends_at != null ? Number(campaign.ends_at) : null,
+                goalSales: campaign.goal_sales != null ? Math.trunc(Number(campaign.goal_sales)) : null,
+              }
+            : null,
+          /** Ce que le produit donnerait SANS campagne (pour comparer). */
+          baseCommissionType: baseRule.type,
+          baseCommissionValue: baseRule.value,
+          baseRewardA: baseRule.rewardA,
           clicks: stats?.clicks ?? 0,
           sales: stats?.sales ?? 0,
           conversion: stats?.conversion ?? 0,

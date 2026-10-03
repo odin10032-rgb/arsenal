@@ -46,6 +46,94 @@ async function participationCounts(db: D1Database, campaignIds: string[]): Promi
 }
 
 export const adminCampaignRoutes: App = new Hono<{ Bindings: Env }>()
+  /**
+   * GET /api/admin/campaigns/eligibility — « avant de lancer une campagne ».
+   * Pour CHAQUE produit éligible à l'affiliation : sa règle de commission
+   * actuelle, la campagne active éventuelle, et l'activité RÉELLE des liens
+   * (combien d'affiliés en ont un, combien sont actifs, ventes cumulées).
+   * Permet à l'admin de choisir un produit en connaissance de cause au lieu de
+   * découvrir après coup que personne ne le promeut.
+   * Lecture défensive : une table absente/vide ne fait jamais échouer la route.
+   */
+  .get("/api/admin/campaigns/eligibility", async (c) => {
+    if (!(await isAdmin(c.req.raw, c.env))) return unauthorized();
+    const db = c.env.DB;
+
+    // Une seule requête agrégée : liens par produit (total, actifs, ventes).
+    let linkRows: { product_id: string; n: number; actifs: number; ventes: number }[] = [];
+    try {
+      const res = await db
+        .prepare(
+          `SELECT product_id,
+                  COUNT(*) AS n,
+                  SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END) AS actifs,
+                  COALESCE(SUM(sales_count), 0) AS ventes
+             FROM affiliate_links
+            GROUP BY product_id`
+        )
+        .all<any>();
+      linkRows = (res.results || []) as any;
+    } catch {
+      /* table absente (base ancienne) : aucune activité connue */
+    }
+    const byProduct = new Map(linkRows.map((r) => [r.product_id, r]));
+
+    const { results = [] } = await db
+      .prepare(
+        `SELECT id, title, affiliate_enabled, commission_type, commission_value, reward_a
+           FROM products
+          WHERE affiliate_enabled = 1
+          ORDER BY title COLLATE NOCASE`
+      )
+      .all<any>();
+
+    const campaigns = await db
+      .prepare(
+        `SELECT c.*, p.title AS product_title FROM campaigns c
+           LEFT JOIN products p ON p.id = c.product_id
+          WHERE c.status = 'active'`
+      )
+      .all<any>()
+      .then((r) => (r.results || []) as any[])
+      .catch(() => [] as any[]);
+    const activeByProduct = new Map(campaigns.map((c) => [c.product_id, c]));
+
+    const now = Date.now();
+    return c.json({
+      ok: true,
+      products: (results || []).map((p: any) => {
+        const links = byProduct.get(p.id);
+        const campaign = activeByProduct.get(p.id) ?? null;
+        return {
+          id: p.id,
+          title: p.title,
+          // Règle de commission ACTUELLE du produit (peut être nulle → défaut).
+          commissionType: p.commission_type ?? null,
+          commissionValue: p.commission_value != null ? Number(p.commission_value) : null,
+          rewardA: Math.trunc(Number(p.reward_a) || 0),
+          // Campagne déjà active ? (une seule à la fois par produit)
+          activeCampaign: campaign
+            ? {
+                id: campaign.id,
+                name: campaign.name,
+                commissionType: campaign.commission_type ?? null,
+                commissionValue:
+                  campaign.commission_value != null ? Number(campaign.commission_value) : null,
+                rewardA: Math.trunc(Number(campaign.reward_a) || 0),
+                endsAt: campaign.ends_at != null ? Number(campaign.ends_at) : null,
+                expired: campaign.ends_at != null && Number(campaign.ends_at) < now,
+              }
+            : null,
+          // Activité réelle des liens affiliés sur ce produit.
+          links: {
+            total: Math.trunc(Number(links?.n) || 0),
+            active: Math.trunc(Number(links?.actifs) || 0),
+            sales: Math.trunc(Number(links?.ventes) || 0),
+          },
+        };
+      }),
+    });
+  })
   .get("/api/admin/campaigns", async (c) => {
     if (!(await isAdmin(c.req.raw, c.env))) return unauthorized();
     const status = normalizeCampaignStatus(c.req.query("status"));

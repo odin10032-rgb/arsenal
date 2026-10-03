@@ -110,6 +110,24 @@ export interface AffiliateProduct {
   linkStatus: AffiliateLinkStatus | null;
   /** Ventes attribuées à CE lien (plafond maxSalesPerLink). */
   salesCount: number;
+  /**
+   * Origine de la règle appliquée : `product` (réglages du produit),
+   * `campaign` (une campagne active l'emporte) ou `default` (réglage global).
+   * Permet d'afficher POURQUOI l'affilié touche ce montant.
+   */
+  commissionSource: "product" | "campaign" | "default" | "none";
+  rewardSource: "product" | "campaign" | "default" | "none";
+  /** Campagne active responsable (null si la règle ne vient pas d'une campagne). */
+  campaign: {
+    id: string;
+    name: string;
+    endsAt: number | null;
+    goalSales: number | null;
+  } | null;
+  /** Ce que le produit rapporterait SANS campagne (comparatif). */
+  baseCommissionType: CommissionType;
+  baseCommissionValue: number;
+  baseRewardA: number;
 }
 
 /** Lien d'affiliation d'un produit (réponse de POST …/link et …/activate) */
@@ -206,7 +224,31 @@ function normalizeProduct(raw: AffiliateProduct): AffiliateProduct {
     linkId: typeof raw?.linkId === "string" && raw.linkId ? raw.linkId : null,
     linkStatus: normalizeLinkStatus(raw?.linkStatus),
     salesCount: num(raw?.salesCount),
+    commissionSource: normalizeRuleSource(raw?.commissionSource),
+    rewardSource: normalizeRuleSource(raw?.rewardSource),
+    campaign: raw?.campaign
+      ? {
+          id: str((raw.campaign as Record<string, unknown>).id),
+          name: str((raw.campaign as Record<string, unknown>).name),
+          endsAt:
+            typeof (raw.campaign as Record<string, unknown>).endsAt === "number"
+              ? ((raw.campaign as Record<string, unknown>).endsAt as number)
+              : null,
+          goalSales:
+            typeof (raw.campaign as Record<string, unknown>).goalSales === "number"
+              ? Math.trunc((raw.campaign as Record<string, unknown>).goalSales as number)
+              : null,
+        }
+      : null,
+    baseCommissionType: raw?.baseCommissionType === "fixed" ? "fixed" : "percent",
+    baseCommissionValue: num(raw?.baseCommissionValue),
+    baseRewardA: num(raw?.baseRewardA),
   };
+}
+
+/** Origine d'une règle de commission (repli prudent : « none »). */
+function normalizeRuleSource(raw: unknown): "product" | "campaign" | "default" | "none" {
+  return raw === "product" || raw === "campaign" || raw === "default" ? raw : "none";
 }
 
 /** Extrait le code de suivi d'une URL « …/r/<code> » */

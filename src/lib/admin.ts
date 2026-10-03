@@ -709,6 +709,72 @@ export interface AdminCampaign {
   createdAt: number;
 }
 
+/** Ligne de GET /api/admin/campaigns/eligibility — un produit éligible à l'affiliation. */
+export interface CampaignEligibility {
+  id: string;
+  title: string;
+  commissionType: "percent" | "fixed" | null;
+  commissionValue: number | null;
+  rewardA: number;
+  /** Campagne DÉJÀ active sur ce produit (une seule à la fois). */
+  activeCampaign: {
+    id: string;
+    name: string;
+    commissionType: "percent" | "fixed" | null;
+    commissionValue: number | null;
+    rewardA: number;
+    endsAt: number | null;
+    expired: boolean;
+  } | null;
+  /** Activité réelle des liens affiliés : total, actifs, ventes cumulées. */
+  links: { total: number; active: number; sales: number };
+}
+
+/**
+ * GET /api/admin/campaigns/eligibility — « avant de lancer une campagne » :
+ * quels produits sont éligibles, ce qu'ils rapportent déjà, s'ils ont une
+ * campagne active et si des affiliés les promeuvent réellement.
+ * Jamais d'exception : une réponse illisible donne une liste vide.
+ */
+export async function fetchCampaignEligibility(): Promise<CampaignEligibility[]> {
+  const res = await apiFetch<{ ok: boolean; products?: unknown[] }>(
+    "/api/admin/campaigns/eligibility",
+    { auth: true, timeoutMs: 6000 },
+  );
+  const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+  const type = (v: unknown): "percent" | "fixed" | null =>
+    v === "percent" || v === "fixed" ? v : null;
+  return (res.products || []).map((raw) => {
+    const p = (raw || {}) as Record<string, unknown>;
+    const camp = p.activeCampaign as Record<string, unknown> | null | undefined;
+    const links = (p.links || {}) as Record<string, unknown>;
+    return {
+      id: String(p.id ?? ""),
+      title: String(p.title ?? ""),
+      commissionType: type(p.commissionType),
+      commissionValue: typeof p.commissionValue === "number" ? p.commissionValue : null,
+      rewardA: Math.trunc(num(p.rewardA)),
+      activeCampaign: camp
+        ? {
+            id: String(camp.id ?? ""),
+            name: String(camp.name ?? ""),
+            commissionType: type(camp.commissionType),
+            commissionValue:
+              typeof camp.commissionValue === "number" ? camp.commissionValue : null,
+            rewardA: Math.trunc(num(camp.rewardA)),
+            endsAt: typeof camp.endsAt === "number" ? camp.endsAt : null,
+            expired: camp.expired === true,
+          }
+        : null,
+      links: {
+        total: Math.trunc(num(links.total)),
+        active: Math.trunc(num(links.active)),
+        sales: Math.trunc(num(links.sales)),
+      },
+    };
+  });
+}
+
 export async function fetchAdminCampaigns(status?: "draft" | "active" | "ended"): Promise<AdminCampaign[]> {
   const query = status ? `?status=${encodeURIComponent(status)}` : "";
   const res = await apiFetch<{ ok: boolean; campaigns?: unknown[] }>(`/api/admin/campaigns${query}`, {

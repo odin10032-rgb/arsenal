@@ -11,7 +11,9 @@ import {
   createAdminCampaign,
   deleteAdminCampaign,
   fetchAdminCampaigns,
+  fetchCampaignEligibility,
   setCampaignState,
+  type CampaignEligibility,
   type AdminCampaign,
 } from "@/lib/admin";
 import type { Product } from "@/lib/products";
@@ -249,8 +251,20 @@ function CampaignForm({
   const [endsAt, setEndsAt] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  /** Activité réelle par produit (liens, ventes, campagne en cours). */
+  const [eligibility, setEligibility] = useState<CampaignEligibility[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCampaignEligibility()
+      .then((rows) => { if (!cancelled) setEligibility(rows); })
+      .catch(() => { /* l'info est un confort : jamais bloquante */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const eligible = products.filter((p) => p.affiliateEnabled);
+  /** Détail du produit choisi (activité des liens + campagne active). */
+  const selected = eligibility.find((e) => e.id === productId) ?? null;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -303,12 +317,57 @@ function CampaignForm({
               onChange={(e) => setProductId(e.target.value)}
             >
               <option value="">— Choisir —</option>
-              {eligible.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.title}
-                </option>
-              ))}
+              {eligible.map((p) => {
+                const e = eligibility.find((x) => x.id === p.id);
+                return (
+                  <option key={p.id} value={p.id}>
+                    {p.title}
+                    {e && e.links.active > 0 ? ` — ${e.links.active} lien(s) actif(s)` : " — aucun lien actif"}
+                  </option>
+                );
+              })}
             </select>
+            {/* « Avant de lancer » : ce que l'on sait du produit choisi. */}
+            {selected && (
+              <div className="mt-2 flex flex-col gap-1.5 rounded-[10px] border border-[#333] bg-[rgba(255,255,255,0.02)] px-3.5 py-3 text-[0.74rem] leading-relaxed">
+                <p className="text-[#a0a0a0]">
+                  Règle actuelle :{" "}
+                  <b className="text-[#f0f0f0]">
+                    {selected.commissionType === "fixed"
+                      ? `${fmt(selected.commissionValue ?? 0)} FCFA`
+                      : selected.commissionType === "percent"
+                        ? `${fmt(selected.commissionValue ?? 0)} %`
+                        : "aucune (réglage par défaut)"}
+                  </b>
+                  {selected.rewardA > 0 && (
+                    <>
+                      {" · "}
+                      <b className="text-gold">+{fmt(selected.rewardA)} A</b>
+                    </>
+                  )}
+                </p>
+                <p className={selected.links.total > 0 ? "text-[#a0a0a0]" : "text-[#f4a261]"}>
+                  Liens affiliés : <b className="text-[#f0f0f0]">{selected.links.total}</b> créé(s)
+                  {" · "}
+                  <b className="text-[#f0f0f0]">{selected.links.active}</b> actif(s)
+                  {" · "}
+                  <b className="text-[#f0f0f0]">{fmt(selected.links.sales)}</b> vente(s)
+                  {selected.links.active === 0 && (
+                    <span className="mt-0.5 block">
+                      Aucun affilié ne promeut ce produit pour l&apos;instant : la campagne ne
+                      touchera personne tant qu&apos;un lien n&apos;est pas activé.
+                    </span>
+                  )}
+                </p>
+                {selected.activeCampaign && !selected.activeCampaign.expired && (
+                  <p className="text-[#f4a261]">
+                    ⚠ Une campagne est <b>déjà active</b> sur ce produit («{" "}
+                    {selected.activeCampaign.name} »). La nouvelle ne prendra effet qu&apos;après
+                    la fin ou l&apos;arrêt de celle-ci.
+                  </p>
+                )}
+              </div>
+            )}
           </label>
           <label>
             <span className="mb-1.5 block text-[0.78rem] text-[#a0a0a0]">Type de commission</span>

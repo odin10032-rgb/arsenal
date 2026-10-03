@@ -719,17 +719,63 @@ function ProductCard({
           <p className="mt-1.5 font-mono text-[0.82rem] text-[#f0808a]">{product.price}</p>
         )}
 
-        {/* Commission + récompense A */}
+        {/* Commission + récompense A — avec l'ORIGINE de la règle : sans elle,
+            un affilié ne peut pas voir l'effet d'une campagne (constat 03/10). */}
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <span className="rounded-md border border-[rgba(42,157,143,0.4)] bg-[rgba(42,157,143,0.08)] px-2 py-0.5 font-mono text-[0.72rem] font-semibold text-[#4fb3a1]">
             Commission {commissionLabel(product)}
+            {product.commissionSource === "campaign" && (
+              <span className="ml-1 text-[#f4a261]">· campagne</span>
+            )}
           </span>
           {product.rewardA > 0 && (
             <span className="inline-flex items-center gap-1 rounded-md border border-[rgba(212,175,55,0.4)] bg-[rgba(212,175,55,0.08)] px-2 py-0.5 font-mono text-[0.72rem] font-semibold text-gold">
               +{fmt(product.rewardA)} A
+              {product.rewardSource === "campaign" && (
+                <span className="text-[#f4a261]">· campagne</span>
+              )}
             </span>
           )}
         </div>
+
+        {/* Campagne active : bandeau visible + comparatif avec le produit seul. */}
+        {product.campaign && (
+          <div className="mt-3 rounded-[10px] border border-[rgba(244,162,97,0.4)] bg-[rgba(244,162,97,0.07)] px-3.5 py-3">
+            <p className="flex flex-wrap items-baseline gap-x-2 text-[0.78rem] font-semibold text-[#f4c886]">
+              Campagne « {product.campaign.name} »
+              {product.campaign.endsAt != null && (
+                <span className="font-mono text-[0.68rem] font-normal text-[#a0a0a0]">
+                  jusqu&apos;au {new Date(product.campaign.endsAt).toLocaleDateString("fr-FR")}
+                </span>
+              )}
+            </p>
+            <div className="mt-1.5 flex flex-col gap-1 text-[0.74rem] leading-relaxed text-[#a0a0a0]">
+              {/* Comparatif : ce que la campagne apporte CONCRÈTEMENT. */}
+              {product.commissionSource === "campaign" && (
+                <p>
+                  Commission portée à{" "}
+                  <b className="text-[#f0f0f0]">{commissionLabel(product)}</b> (au lieu de{" "}
+                  {product.baseCommissionType === "fixed"
+                    ? `${fmt(product.baseCommissionValue)} ${CURRENCY}`
+                    : `${fmt(product.baseCommissionValue)} %`}
+                  ).
+                </p>
+              )}
+              {product.rewardSource === "campaign" && product.baseRewardA !== product.rewardA && (
+                <p>
+                  Récompense portée à <b className="text-gold">+{fmt(product.rewardA)} A</b> (au
+                  lieu de +{fmt(product.baseRewardA)} A).
+                </p>
+              )}
+              {product.campaign.goalSales != null && (
+                <p>
+                  Objectif de la campagne : <b className="text-[#f0f0f0]">{fmt(product.campaign.goalSales)}</b>{" "}
+                  vente(s).
+                </p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Performance */}
         <dl className="mt-4 grid grid-cols-3 gap-2 border-t border-dashed border-[#333] pt-4">
