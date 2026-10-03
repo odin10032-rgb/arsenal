@@ -112,6 +112,38 @@ export const affiliateRoutes: AuthedApp = new Hono<AuthedEnv>()
       unlockPending: unlockPending ? unlockPending.status : null,
     });
   })
+  /**
+   * Historique de statut de l'affilié (la table `status_history` était écrite
+   * mais jamais lue). Scopé par la session : aucun identifiant d'affilié ne
+   * vient du client. `from_role`/`to_role` portent tantôt des RÔLES, tantôt des
+   * STATUTS (dualité historique du schéma) — le front mappe les deux.
+   */
+  .get("/api/affiliate/me/history", requireAuth, async (c) => {
+    const { user } = c.get("authUser");
+    if (!(await getAffiliateByUserId(c.env.DB, user.id))) {
+      return c.json({ ok: true, history: [] });
+    }
+    const { results = [] } = await c.env.DB
+      .prepare(
+        `SELECT id, from_role, to_role, reason, created_at
+           FROM status_history
+          WHERE user_id = ?
+          ORDER BY created_at DESC, id DESC
+          LIMIT 100`
+      )
+      .bind(user.id)
+      .all<{ id: string; from_role: string | null; to_role: string; reason: string | null; created_at: number }>();
+    return c.json({
+      ok: true,
+      history: (results || []).map((row) => ({
+        id: row.id,
+        fromRole: row.from_role ?? null,
+        toRole: row.to_role,
+        reason: row.reason ?? null,
+        createdAt: Number(row.created_at),
+      })),
+    });
+  })
   /** Phase 3 — candidature Super Affiliate (validation ADMIN ultérieure, §19). */
   .post("/api/affiliate/me/upgrade", requireAuth, async (c) => {
     const { user } = c.get("authUser");

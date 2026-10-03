@@ -29,9 +29,13 @@ import { getUnlock, markUnlockSeen, type UnlockStatus as UnlockStatusValue } fro
 import { UnlockAnimation } from "@/components/unlock-animation";
 import { CoinA } from "@/components/account/coin-a";
 import { UserAvatar } from "@/components/account/user-avatar";
+import {
+  AffiliateStatusHistory,
+  type StatusHistoryEntry,
+} from "@/components/account/affiliate-status-history";
 import { useUser } from "@/hooks/use-user";
 import { ApiError } from "@/lib/api";
-import { applyToAffiliate, fetchAffiliateMe, type Affiliate, type AffiliateStats } from "@/lib/affiliate";
+import { applyToAffiliate, fetchAffiliateHistory, fetchAffiliateMe, type Affiliate, type AffiliateStats } from "@/lib/affiliate";
 import { fmt } from "@/lib/format";
 import { logout } from "@/lib/user-auth";
 
@@ -59,6 +63,8 @@ export default function AffiliePage() {
   const [unlockStatus, setUnlockStatus] = useState<UnlockStatusValue | null>(null);
   const [superProgress, setSuperProgress] = useState<SuperProgress | null>(null);
   const [campaigns, setCampaigns] = useState<AffiliateCampaign[] | null>(null);
+  /** Historique de statut (`status_history`) — chargé en parallèle de l'état. */
+  const [history, setHistory] = useState<StatusHistoryEntry[]>([]);
 
   // Garde : session absente → porte de connexion (une fois le boot terminé)
   useEffect(() => {
@@ -72,6 +78,10 @@ export default function AffiliePage() {
       setSuperProgress(me?.super ?? null);
       // Phase 3 : animation — on interroge /api/me/unlock si un événement est en attente.
       setUnlockStatus(me?.unlockPending ?? null);
+      // Historique de statut : non bloquant (liste vide si illisible).
+      void fetchAffiliateHistory()
+        .then(setHistory)
+        .catch(() => setHistory([]));
       setError("");
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
@@ -199,6 +209,9 @@ export default function AffiliePage() {
         ) : (
           <PendingCard affiliate={affiliate} />
         )}
+
+        {/* Historique de statut — visible dès qu'un dossier affilié existe */}
+        {!affLoading && affiliate && <AffiliateStatusHistory entries={history} />}
       </div>
     </div>
   );
@@ -270,6 +283,12 @@ function ApplicationCard({
         </button>
         <p className="mt-3 text-[0.74rem] leading-relaxed text-[#666]">
           Votre candidature est examinée par l&apos;équipe. Vos liens sont activés dès sa validation.
+          Le programme encadre un compte standard à <b className="text-[#a0a0a0]">3 liens actifs</b> et{" "}
+          <b className="text-[#a0a0a0]">20 ventes par lien</b> (un lien saturé est désactivé
+          automatiquement et libère sa place).{" "}
+          <Link href="/affiliation" className="text-[#4fb3a1] hover:underline">
+            En savoir plus
+          </Link>
         </p>
       </div>
     </form>

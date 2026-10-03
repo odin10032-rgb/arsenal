@@ -6,6 +6,7 @@
  * grille · compteur · état vide · skeletons · stale-while-revalidate
  */
 
+import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ProductCard } from "@/components/product-card";
 import { useCatalog } from "@/hooks/use-catalog";
@@ -325,6 +326,28 @@ export default function CatalogPage() {
             ))}
           </div>
         )}
+      </section>
+
+      {/* ---------- Bloc de découverte : programme d'affiliation ---------- */}
+      {/* Ajout isolé en fin de JSX (vague 3 « panier » modifie aussi ce fichier). */}
+      <section className="container-arsenal pb-14">
+        <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-[#333] bg-[#141414] p-6 sm:flex-row sm:items-center sm:p-7">
+          <div className="min-w-0">
+            <h2 className="font-display text-[1.05rem] font-bold">
+              Gagnez des A en partageant les produits Arsenal
+            </h2>
+            <p className="mt-1.5 max-w-[60ch] text-[0.86rem] leading-relaxed text-[#a0a0a0]">
+              Rejoignez le programme d&apos;affiliation : partagez un lien de suivi et touchez une
+              récompense en A plus une commission à chaque vente.
+            </p>
+          </div>
+          <Link
+            href="/affiliation"
+            className="btn-arsenal btn-ghost flex-shrink-0 whitespace-nowrap"
+          >
+            Découvrir le programme
+          </Link>
+        </div>
       </section>
     </>
   );

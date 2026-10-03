@@ -201,6 +201,30 @@ export async function fetchAffiliateMe(): Promise<Affiliate | null> {
 }
 
 /**
+ * GET /api/affiliate/me/history — historique de statut (`status_history`, écrit
+ * depuis la Phase 2 mais jusqu'ici jamais lu). Liste chronologique inverse,
+ * plafonnée à 100 entrées côté serveur. Jamais d'erreur bloquante : un historique
+ * illisible renvoie une liste vide (l'affichage du reste n'en dépend pas).
+ */
+export async function fetchAffiliateHistory(): Promise<StatusHistoryEntry[]> {
+  const res = await apiFetch<{ ok: boolean; history?: StatusHistoryEntry[] }>(
+    "/api/affiliate/me/history",
+    { bearer: true, timeoutMs: 4000 },
+  );
+  return res.history || [];
+}
+
+/** Entrée d'historique de statut (forme renvoyée par GET /api/affiliate/me/history). */
+export interface StatusHistoryEntry {
+  id: string;
+  /** Rôle ou statut précédent — le schéma historique porte les deux sémantiques. */
+  fromRole: string | null;
+  toRole: string;
+  reason: string | null;
+  createdAt: number;
+}
+
+/**
  * GET /api/affiliate/me/products — produits éligibles + performance.
  * Un affilié `suspended` reçoit une liste vide (contrat).
  */
@@ -242,6 +266,109 @@ export async function trackAffiliateClick(code: string): Promise<string> {
     timeoutMs: 1500, // POST → garde-fou de 6 s maximum dans apiFetch
   });
   return str(res.url);
+}
+
+/* ---------------- Vague 2 — transferts de A et partage récompensé ---------------- */
+
+/** Destinataire d'un transfert — réponse MINIMALE (pseudo seul, jamais d'id/email/solde). */
+export interface TransferRecipient {
+  pseudo: string;
+}
+
+/**
+ * GET /api/me/transfer/lookup?q=<pseudo> — résolution EXACTE.
+ * `recipient` vaut null si aucun utilisateur ne porte ce pseudo.
+ */
+export async function lookupTransferRecipient(
+  pseudo: string,
+): Promise<TransferRecipient | null> {
+  const q = (pseudo || "").trim();
+  if (!q) return null;
+  const res = await apiFetch<{ ok: boolean; recipient?: { pseudo?: unknown } | null }>(
+    `/api/me/transfer/lookup?q=${encodeURIComponent(q)}`,
+    { bearer: true, timeoutMs: 4000 },
+  );
+  const p = res.recipient?.pseudo;
+  return typeof p === "string" && p ? { pseudo: p } : null;
+}
+
+/** Résultat d'un transfert exécuté (POST /api/me/transfer). */
+export interface TransferResult {
+  transferId: string;
+  amount: number;
+  recipient: TransferRecipient;
+  /** Solde A de l'expéditeur après transfert (recalculé serveur). */
+  balanceA: number;
+}
+
+/**
+ * POST /api/me/transfer {recipientPseudo, amount, idempotencyKey} — transfert A.
+ * `idempotencyKey` (UUID généré UNE fois par tentative côté appelant) empêche un
+ * double clic de créer deux transferts : réutiliser la même clé pour un nouvel
+ * essai ne double jamais l'opération.
+ */
+export async function transferA(input: {
+  recipientPseudo: string;
+  amount: number;
+  idempotencyKey: string;
+}): Promise<TransferResult> {
+  const res = await apiFetch<{
+    ok: boolean;
+    transferId?: unknown;
+    amount?: unknown;
+    recipient?: { pseudo?: unknown };
+    balanceA?: unknown;
+  }>("/api/me/transfer", {
+    method: "POST",
+    body: {
+      recipientPseudo: input.recipientPseudo.trim(),
+      amount: input.amount,
+      idempotencyKey: input.idempotencyKey,
+    },
+    bearer: true,
+    timeoutMs: 8000,
+  });
+  return {
+    transferId: str(res.transferId),
+    amount: num(res.amount),
+    recipient: { pseudo: str(res.recipient?.pseudo) },
+    balanceA: num(res.balanceA),
+  };
+}
+
+/** Résultat d'un partage récompensé (POST /api/me/share). */
+export interface ShareRewardResult {
+  /** true si la récompense a été créditée (réglage > 0 et quota disponible). */
+  rewarded: boolean;
+  /** A crédités par ce partage (0 si non récompensé). */
+  rewardA: number;
+  /** Partages restants aujourd'hui après celui-ci (jamais négatif). */
+  remainingToday: number;
+}
+
+/**
+ * POST /api/me/share {productId, linkId?} — enregistre un partage et crédite la
+ * récompense. 429 « Limite de N partages par jour atteinte » au-delà du quota
+ * (aucune récompense) — l'erreur est propagée telle quelle par `apiFetch`.
+ */
+export async function shareReward(input: {
+  productId: string;
+  linkId?: string | null;
+}): Promise<ShareRewardResult> {
+  const res = await apiFetch<{ ok: boolean; rewarded?: unknown; rewardA?: unknown; remainingToday?: unknown }>(
+    "/api/me/share",
+    {
+      method: "POST",
+      body: { productId: input.productId, linkId: input.linkId ?? null },
+      bearer: true,
+      timeoutMs: 8000,
+    },
+  );
+  return {
+    rewarded: res.rewarded === true,
+    rewardA: num(res.rewardA),
+    remainingToday: num(res.remainingToday),
+  };
 }
 
 /* ---------------- Phase 3 — Super Affiliate + campagnes ---------------- */
