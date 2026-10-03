@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Shell du dashboard admin — header compact + 9 onglets + déconnexion
+ * Shell du dashboard admin — header compact + 10 onglets + déconnexion
  */
 
 import Link from "next/link";
@@ -12,6 +12,7 @@ import { CampaignsTab } from "./campaigns-tab";
 import { ChariowTab } from "./chariow-tab";
 import { MediaTab } from "./media-tab";
 import { ProductsTab } from "./products-tab";
+import { ProgramTab } from "./program-tab";
 import { PurchasesTab } from "./purchases-tab";
 import { SettingsTab } from "./settings-tab";
 import { UsersTab } from "./users-tab";
@@ -20,7 +21,7 @@ import { clearAdminToken } from "@/lib/products";
 import { Product } from "@/lib/products";
 import { ToastHost } from "@/lib/toast";
 
-type Tab = "products" | "media" | "analytics" | "affiliates" | "users" | "purchases" | "campaigns" | "chariow" | "settings";
+type Tab = "products" | "media" | "analytics" | "affiliates" | "users" | "program" | "purchases" | "campaigns" | "chariow" | "settings";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   {
@@ -73,6 +74,16 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
         <path d="M2 21v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2" />
         <circle cx="17.5" cy="14.5" r="4.5" />
         <path d="M17.5 12.5v2l1.5 1.5" />
+      </svg>
+    ),
+  },
+  {
+    id: "program",
+    label: "Programme",
+    icon: (
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 7.5v9M9.3 10.2a2.6 2.6 0 0 1 2.7-1.6c1.5 0 2.6.9 2.6 2.1s-1 1.8-2.6 2.1c-1.7.3-2.7.9-2.7 2.1s1.1 2.1 2.7 2.1a2.6 2.6 0 0 0 2.7-1.6" />
       </svg>
     ),
   },
@@ -244,6 +255,7 @@ export function AdminDashboard({
           {pane("analytics", <AnalyticsTab apiAvailable={apiAvailable} />)}
           {pane("affiliates", <AffiliatesTab apiAvailable={apiAvailable} products={products} />)}
           {pane("users", <UsersTab apiAvailable={apiAvailable} />)}
+          {pane("program", <ProgramTab apiAvailable={apiAvailable} />)}
           {pane("campaigns", <CampaignsTab apiAvailable={apiAvailable} products={products} />)}
           {pane("purchases", <PurchasesTab apiAvailable={apiAvailable} />)}
           {pane("chariow", <ChariowTab apiAvailable={apiAvailable} products={products} />)}

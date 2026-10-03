@@ -27,6 +27,7 @@ import { siteConfigRoutes } from "./routes/site-config";
 import { meTransferRoutes } from "./routes/me-transfers";
 import { cartRoutes } from "./routes/cart";
 import { adminProductRequestRoutes } from "./routes/admin-product-requests";
+import { adminProgramRoutes } from "./routes/admin-program";
 import { PURCHASE_MAX_PER_MIN_DEFAULT, readPurchaseMaxPerMin } from "../src/lib/server/purchases";
 import { rateLimit } from "./middleware/rate-limit";
 
@@ -146,6 +147,8 @@ app.route("/", meTransferRoutes);
 app.route("/", cartRoutes);
 /** Vague 4 — demandes de disponibilité produit (Super) : décision admin. */
 app.route("/", adminProductRequestRoutes);
+/** Vague 5 — administration du programme (réglages, transferts, abandons, ajustement A). */
+app.route("/", adminProgramRoutes);
 
 app.notFound((c) => c.json({ ok: false, error: "Route introuvable." }, 404));
 

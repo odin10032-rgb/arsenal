@@ -232,16 +232,24 @@ function normalizePurchaseFields(
  * DEUX clés à retirer par champ : `getProducts()` étale la ligne SQL brute puis
  * ajoute les alias camelCase, donc la valeur existe aussi en `chariow_product_id`
  * / `chariow_discount_code` (fuite constatée en test).
+ *
+ * `priceA` est retiré pour la même raison de fond : la monnaie A est réservée
+ * aux MEMBRES (décision du 03/10/2026). L'interface ne l'affichait pas, mais la
+ * VALEUR restait lisible dans la réponse JSON publique (constat de l'audit de la
+ * vague 5) — un prix réservé ne doit pas circuler dans le catalogue public.
+ * L'admin reçoit toujours la valeur complète (requête authentifiée).
  */
-function withoutIntegrationFields(
-  product: Product
-): Omit<Product, "chariowProductId" | "chariowDiscountCode"> {
+type PublicProduct = Omit<Product, "chariowProductId" | "chariowDiscountCode" | "priceA">;
+
+function withoutIntegrationFields(product: Product): PublicProduct {
   const copy: Record<string, unknown> = { ...product };
   delete copy.chariowProductId;
   delete copy.chariow_product_id;
   delete copy.chariowDiscountCode;
   delete copy.chariow_discount_code;
-  return copy as Omit<Product, "chariowProductId" | "chariowDiscountCode">;
+  delete copy.priceA;
+  delete copy.price_a;
+  return copy as PublicProduct;
 }
 
 export const productRoutes: App = new Hono<{ Bindings: Env }>()
