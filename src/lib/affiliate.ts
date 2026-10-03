@@ -481,16 +481,23 @@ export async function withdrawFromAffiliate(): Promise<{ status: AffiliateAccoun
 
 /**
  * POST /api/track/affiliate-click — route PUBLIQUE (aucun Bearer).
- * Renvoie l'URL de destination du produit (`action_url`).
+ * Renvoie l'URL de destination du produit (`action_url`, jeton de tracking déjà
+ * posé en `ars=`) ET le jeton de tracking opaque (vague 1, `ars` — vide si le
+ * serveur n'a pas pu en délivrer).
  * Timeout court : la page /r ne doit jamais faire patienter le visiteur.
  */
-export async function trackAffiliateClick(code: string): Promise<string> {
-  const res = await apiFetch<{ ok: boolean; url?: string }>("/api/track/affiliate-click", {
-    method: "POST",
-    body: { code: code.trim() },
-    timeoutMs: 1500, // POST → garde-fou de 6 s maximum dans apiFetch
-  });
-  return str(res.url);
+export async function trackAffiliateClick(
+  code: string,
+): Promise<{ url: string; trackingToken: string }> {
+  const res = await apiFetch<{ ok: boolean; url?: string; trackingToken?: unknown }>(
+    "/api/track/affiliate-click",
+    {
+      method: "POST",
+      body: { code: code.trim() },
+      timeoutMs: 1500, // POST → garde-fou de 6 s maximum dans apiFetch
+    },
+  );
+  return { url: str(res.url), trackingToken: str(res.trackingToken) };
 }
 
 /* ---------------- Vague 2 — transferts de A et partage récompensé ---------------- */

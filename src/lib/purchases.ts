@@ -421,8 +421,26 @@ export async function fetchMyLicenses(): Promise<UserLicense[]> {
 export const AFFILIATE_REF_KEY = "arsenal_affiliate_ref";
 export const AFFILIATE_REF_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 
+/**
+ * Clé localStorage du JETON DE TRACKING (vague 1, pont `/r/<code>`).
+ * Même fenêtre que le code (30 j). Le jeton est OPAQUE : aucune donnée
+ * personnelle, aucune IP — il identifie seulement le parcours du visiteur.
+ */
+export const TRACKING_TOKEN_KEY = "arsenal_tracking_token";
+/** Fenêtre du jeton de tracking — alignée sur celle du code de repli (30 j). */
+export const TRACKING_TOKEN_WINDOW_MS = AFFILIATE_REF_WINDOW_MS;
+/** Alignement de nom : l'agent écrivain du pont parle de `arsenal_tracking_token`. */
+export const TRACKING_TOKEN_STORAGE_KEY = TRACKING_TOKEN_KEY;
+export const TRACKING_TOKEN_REF_WINDOW_MS = TRACKING_TOKEN_WINDOW_MS;
+
 interface AffiliateRef {
   code: string;
+  at: number;
+}
+
+/** Entrée du jeton de tracking : jeton opaque + instant de pose (fenêtre 30 j). */
+interface TrackingTokenRef {
+  token: string;
   at: number;
 }
 
@@ -458,5 +476,48 @@ export function storeAffiliateRef(code: string): void {
     );
   } catch {
     /* storage indisponible : on ignore (le clic reste décompté côté serveur) */
+  }
+}
+
+/* ---------- Jeton de tracking (localStorage, fenêtre 30 jours, vague 1) ---------- */
+/* Le jeton est posé par /r/<code> À CÔTÉ du code. Le code reste le REPLI : si le
+ * jeton est absent/expiré, l'attribution actuelle (par code) s'applique. */
+
+/**
+ * Mémorise le jeton de tracking d'un lien (appelé par /r avant la redirection).
+ * Un jeton vide est ignoré (jamais d'écrasement d'un jeton valide par du vide).
+ */
+export function storeTrackingToken(token: string): void {
+  const clean = (token || "").trim();
+  if (!clean) return;
+  try {
+    localStorage.setItem(
+      TRACKING_TOKEN_KEY,
+      JSON.stringify({ token: clean, at: Date.now() } satisfies TrackingTokenRef),
+    );
+  } catch {
+    /* storage indisponible : on ignore (le jeton reste côté serveur) */
+  }
+}
+
+/**
+ * Jeton de tracking mémorisé — renvoyé uniquement s'il est dans la fenêtre de
+ * 30 jours (l'entrée expirée est purgée ; le serveur revérifie de toute façon).
+ * Chaîne vide si absent/expiré/illisible → le REPLI par code s'applique.
+ */
+export function readTrackingToken(): string {
+  try {
+    const raw = localStorage.getItem(TRACKING_TOKEN_KEY);
+    if (!raw) return "";
+    const parsed = JSON.parse(raw) as TrackingTokenRef;
+    const token = typeof parsed?.token === "string" ? parsed.token.trim() : "";
+    const at = typeof parsed?.at === "number" ? parsed.at : 0;
+    if (!token || Date.now() - at > TRACKING_TOKEN_WINDOW_MS) {
+      localStorage.removeItem(TRACKING_TOKEN_KEY);
+      return "";
+    }
+    return token;
+  } catch {
+    return "";
   }
 }

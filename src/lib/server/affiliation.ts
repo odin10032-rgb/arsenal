@@ -808,6 +808,24 @@ export const CLICK_DEDUP_WINDOW_MS = 24 * 60 * 60 * 1000;
  * Empreinte visiteur : `sha256(ip + user-agent + jour)`.
  * L'IP brute et le user-agent ne sont JAMAIS stockés.
  */
+/**
+ * Empreinte de suivi DURABLE (PONT DE TRACKING, vague 2) — volontairement
+ * SANS le jour, contrairement à `visitorHashOf` :
+ *
+ *  • `visitorHashOf` (sha256(ip+ua+JOUR)) sert à DÉDUPLIQUER les clics : il DOIT
+ *    changer chaque jour, sinon un même visiteur ne compterait qu'un clic à vie.
+ *  • Le suivi d'un parcours, lui, doit reconnaître le MÊME visiteur plusieurs
+ *    jours de suite (fenêtre 30 j) — sinon « dernier toucher » ne relie pas
+ *    deux visites à J et J+1 (défaut constaté le 03/10/2026).
+ *
+ * Même nature et mêmes garanties que l'autre : l'IP BRUTE n'est jamais stockée,
+ * seules l'IP et l'empreinte du navigateur entrent dans le calcul, salées par un
+ * préfixe distinct pour qu'on ne puisse pas corréler les deux usages.
+ */
+export function trackingVisitorHash(ip: string | undefined | null, userAgent: string | undefined | null): string {
+  return sha256hex(`track|${ip || "unknown"}|${userAgent || "unknown"}`);
+}
+
 export function visitorHashOf(
   ip: string | undefined | null,
   userAgent: string | undefined | null,

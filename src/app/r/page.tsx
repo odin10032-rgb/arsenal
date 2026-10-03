@@ -18,7 +18,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { trackAffiliateClick } from "@/lib/affiliate";
-import { storeAffiliateRef } from "@/lib/purchases";
+import { storeAffiliateRef, storeTrackingToken } from "@/lib/purchases";
 
 const FALLBACK_MESSAGE = "Ce lien d'affiliation est introuvable ou n'est plus actif.";
 
@@ -92,10 +92,14 @@ function RedirectBody() {
     let cancelled = false;
     void (async () => {
       try {
-        const url = await trackAffiliateClick(code);
+        const { url, trackingToken } = await trackAffiliateClick(code);
         if (cancelled) return;
+        // Jeton de tracking serveur (vague 1) : mémorisé 30 j AVANT la redirection
+        // (il identifie tout le parcours du visiteur — règle « dernier toucher »).
+        if (trackingToken) storeTrackingToken(trackingToken);
         // Code validé par le serveur : mémorisé 30 j côté client pour les achats en A
-        // (contrat Paiement en A — le serveur revérifie à l'achat).
+        // (contrat Paiement en A — le serveur revérifie à l'achat). REPLI si le
+        // jeton est absent/expiré : le mécanisme actuel continue de fonctionner.
         storeAffiliateRef(code);
         if (!isHttpUrl(url)) {
           setMessage(FALLBACK_MESSAGE);

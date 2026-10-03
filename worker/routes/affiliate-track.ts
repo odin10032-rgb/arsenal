@@ -4,15 +4,22 @@ import {
   recordAffiliateClickId,
   resolveLinkTarget,
   visitorHashOf,
+  trackingVisitorHash,
 } from "../../src/lib/server/affiliation";
 import { aTransactionStatement } from "../../src/lib/server/ledger";
+import {
+  createTrackingSession,
+  latestTrackingTouch,
+  recordTrackingLinkHistory,
+  refreshTrackingTouch,
+} from "../../src/lib/server/tracking";
 import { isMember } from "../../src/lib/server/user-auth";
 import type { UserRow } from "../../src/lib/server/user-auth";
 import type { App, Env } from "../env";
 
 /**
  * Phase 2 — tracking public d'un clic affilié (page `/r/` de l'export statique) :
- * POST /api/track/affiliate-click {code} → 200 {ok, url}
+ * POST /api/track/affiliate-click {code} → 200 {ok, url, trackingToken}
  *
  * - dédup : au plus 1 clic compté par (lien, empreinte visiteur) sur 24 h ;
  * - `visitor_hash = sha256(ip + user-agent + jour)` — l'IP BRUTE n'est jamais stockée ;
@@ -25,6 +32,13 @@ import type { App, Env } from "../env";
  *   utilisateur MEMBRE (monnaie A réservée aux membres) ;
  * - produit sans URL (100 % A) : le clic est compté et le visiteur atterrit sur la page
  *   produit du site (`/produit?id=…`, première origine valide de FRONT_ORIGINS) ;
+ * - PONT DE TRACKING (vague 1) : un jeton OPAQUE et ANONYME est délivré au passage
+ *   (jamais dérivé de l'IP ; `visitor_hash` = `sha256(ip+ua+jour)` reste la seule
+ *   empreinte). Le jeton est ajouté à l'URL de destination en paramètre `ars` et
+ *   renvoyé dans `trackingToken`. Règle d'attribution = DERNIER TOUCHER : si une
+ *   session existe déjà pour la MÊME empreinte visiteur, on réécrit son affilié /
+ *   lien / produit (rafraîchie à 30 j) et l'entrée précédente reste TRACÉE dans
+ *   `tracking_links_history` ; sinon une nouvelle session est créée ;
  * - 404 `{ok:false,error:"Lien inconnu."}` si le code est inconnu,
  *   409 si l'affilié est suspendu, le produit non éligible, ou le produit sans URL
  *   alors qu'aucune origine front valide n'est configurée.
@@ -37,6 +51,24 @@ function firstValidFrontOrigin(frontOrigins: string | undefined): string | null 
     if (/^https?:\/\//i.test(origin)) return origin;
   }
   return null;
+}
+
+/**
+ * Ajoute le jeton de tracking (`ars=<token>`) à une URL de destination, en
+ * respectant la query EXISTANTE (`?` ou `&` selon l'URL) — la destination
+ * d'origine n'est jamais cassée. Le hash `#…` éventuel est préservé (le
+ * paramètre est posé sur la query, avant le fragment) ; un fragment déjà
+ * porteur de `ars=` est laissé tel quel (idempotence). Le jeton est encodé.
+ */
+function withTrackingParam(url: string, token: string): string {
+  const trimmed = (url ?? "").trim();
+  if (!trimmed || !token) return trimmed;
+  const hashIndex = trimmed.indexOf("#");
+  const base = hashIndex === -1 ? trimmed : trimmed.slice(0, hashIndex);
+  const hash = hashIndex === -1 ? "" : trimmed.slice(hashIndex);
+  if (/([?&])ars=/.test(base) || /(^|[&?])ars=/.test(hash.slice(1))) return trimmed;
+  const sep = base.includes("?") ? "&" : "?";
+  return `${base}${sep}ars=${encodeURIComponent(token)}${hash}`;
 }
 
 export const affiliateTrackRoutes: App = new Hono<{ Bindings: Env }>().post(
@@ -80,6 +112,7 @@ export const affiliateTrackRoutes: App = new Hono<{ Bindings: Env }>().post(
       return c.json({ ok: false, error: "Produit sans URL de destination." }, 409);
     }
 
+    // Empreinte JOURNALIÈRE : dédup des clics (un même visiteur = 1 clic/jour).
     const visitorHash = visitorHashOf(
       c.req.header("cf-connecting-ip"),
       c.req.header("user-agent")
@@ -120,6 +153,54 @@ export const affiliateTrackRoutes: App = new Hono<{ Bindings: Env }>().post(
       }
     }
 
-    return c.json({ ok: true, url: destination });
+    // PONT DE TRACKING (vague 1) — BEST-EFFORT : jamais bloquant. Le jeton est
+    // OPAQUE (UUID serveur), ANONYME (aucune IP ; `visitor_hash` seul, comme
+    // partout). Règle DERNIER TOUCHER : la session récente de la MÊME empreinte
+    // est réécrite (affilié/lien/produit), l'entrée précédente restant TRACÉE
+    // dans `tracking_links_history` ; sinon une nouvelle session est créée.
+    let trackingToken: string | null = null;
+    try {
+      // ⚠️ Empreinte DURABLE (sans le jour) : le suivi doit reconnaître le même
+      // visiteur d'un jour à l'autre sur 30 j — l'empreinte journalière ci-dessus
+      // ne sert qu'à la dédup des clics.
+      const trackHash = trackingVisitorHash(
+        c.req.header("cf-connecting-ip"),
+        c.req.header("user-agent")
+      );
+      const previous = await latestTrackingTouch(c.env.DB, trackHash);
+      if (previous) {
+        await recordTrackingLinkHistory(c.env.DB, {
+          token: previous.token,
+          affiliateId: previous.affiliate_id,
+          linkId: previous.link_id,
+          productId: previous.product_id,
+        });
+        await refreshTrackingTouch(c.env.DB, previous.token, {
+          visitorHash,
+          affiliateId: target.affiliate.id,
+          linkId: target.link.id,
+          productId: target.product.id,
+          campaignId: target.link.campaign_id,
+        });
+        trackingToken = previous.token;
+      } else {
+        trackingToken = await createTrackingSession(c.env.DB, {
+          visitorHash: trackHash,
+          affiliateId: target.affiliate.id,
+          linkId: target.link.id,
+          productId: target.product.id,
+          campaignId: target.link.campaign_id,
+        });
+      }
+    } catch (err) {
+      console.error("tracking:", err);
+      trackingToken = null; // la redirection reste prioritaire, sans jeton
+    }
+
+    const finalUrl = trackingToken
+      ? withTrackingParam(destination, trackingToken)
+      : destination;
+
+    return c.json({ ok: true, url: finalUrl, trackingToken });
   }
 );
