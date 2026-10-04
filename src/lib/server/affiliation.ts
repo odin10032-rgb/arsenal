@@ -439,7 +439,17 @@ export async function findProductByExternalRef(
 export const AFFILIATE_LINK_BASE = "https://arsenal-tools.pages.dev/r";
 
 export function linkUrl(code: string): string {
-  return `${AFFILIATE_LINK_BASE}/${code}`;
+  // ⚠️ FORMAT QUERY, PAS DE CHEMIN (corrigé le 04/10/2026).
+  //
+  // Le site est exporté avec `trailingSlash: true` : Cloudflare Pages renvoie un
+  // **308 vers la version avec slash** (`/r/CODE` → `/r/`), et ce 308 **PERD le
+  // segment de chemin** — le code disparaissait avant même d'atteindre la page
+  // (« Aucun code affilié dans cette adresse » sur TOUS les liens partagés).
+  // La query, elle, est CONSERVÉE par le 308 (`/r/CODE?x` → `/r/?x`) : c'est
+  // donc le seul format fiable, et il ne dépend d'AUCUN rewrite.
+  // La page /r lit déjà `?code=` en priorité (puis hash, puis chemin) — les
+  // anciens liens `/r/CODE` restent donc gérés côté page.
+  return `${AFFILIATE_LINK_BASE}/?code=${encodeURIComponent(code)}`;
 }
 
 /** Suffixe lisible du code de lien, dérivé du titre (repli : début de l'id produit). */

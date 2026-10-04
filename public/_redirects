@@ -1,17 +1,7 @@
-# URLs propres pour les pages produits (export statique Next.js)
-# /produit/<id> sert la page produit ; l'id est lu depuis le hash (#<id>)
-# par la page elle-même (les rewrites Pages ne transmettent pas les query).
-/produit/* /produit/index.html 200
-/produit/:id /produit/index.html 200
-
-# Liens affiliés (contrat Phase 2) : /r/<linkCode> → page de redirection.
-#
-# ⚠️ CAUSE DU BUG « ERR_TOO_MANY_REDIRECTS » (corrigé le 03/10/2026) :
-# la cible portait une QUERY (`/r/index.html?code=:splat`). Cloudflare Pages
-# normalise alors `/r/index.html` → `/r/` (308), ce qui RE-DÉCLENCHE la règle
-# `/r/*` → boucle infinie : AUCUN lien affilié ne s'ouvrait.
-# Correction : cible SANS query (comme `/produit/*`, qui fonctionnait).
-# Le code n'est donc plus transmis en query : la page /r le lit depuis le
-# CHEMIN (`/r/<code>`), ce qu'elle sait déjà faire.
-/r/* /r/index.html 200
-/r/:code /r/index.html 200
+# URLs propres pour les pages produits (export statique Next.js).
+# ⚠️ NE PAS ajouter de rewrite /produit/* ni /r/* (retirés le 04/10/2026) :
+# le site est exporté avec `trailingSlash: true`, donc Cloudflare Pages renvoie
+# un 308 vers la version avec slash AVANT d'évaluer ce fichier — un rewrite
+# /r/* était donc DEAD CODE, et le 308 perdait le segment de chemin.
+# Les pages /produit/ et /r/ lisent leur paramètre dans la QUERY (conservée par
+# le 308) : /produit/?id=<id> et /r/?code=<code>.
