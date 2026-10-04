@@ -15,13 +15,14 @@ import { ProductsTab } from "./products-tab";
 import { ProgramTab } from "./program-tab";
 import { PurchasesTab } from "./purchases-tab";
 import { SettingsTab } from "./settings-tab";
+import { TrackingTab } from "./tracking-tab";
 import { UsersTab } from "./users-tab";
 import { BrandLogo } from "@/components/brand-logo";
 import { clearAdminToken } from "@/lib/products";
 import { Product } from "@/lib/products";
 import { ToastHost } from "@/lib/toast";
 
-type Tab = "products" | "media" | "analytics" | "affiliates" | "users" | "program" | "purchases" | "campaigns" | "chariow" | "settings";
+type Tab = "products" | "media" | "analytics" | "affiliates" | "users" | "program" | "purchases" | "tracking" | "campaigns" | "chariow" | "settings";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   {
@@ -105,6 +106,15 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
         <path d="M4 4h2l2.4 10.5a2 2 0 0 0 2 1.5h7.4a2 2 0 0 0 2-1.6L21 8H6" />
         <circle cx="10" cy="20" r="1.3" />
         <circle cx="17.5" cy="20" r="1.3" />
+      </svg>
+    ),
+  },
+  {
+    id: "tracking",
+    label: "Suivi",
+    icon: (
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 12h4l3-7 4 14 3-7h4" />
       </svg>
     ),
   },
@@ -258,6 +268,7 @@ export function AdminDashboard({
           {pane("program", <ProgramTab apiAvailable={apiAvailable} />)}
           {pane("campaigns", <CampaignsTab apiAvailable={apiAvailable} products={products} />)}
           {pane("purchases", <PurchasesTab apiAvailable={apiAvailable} />)}
+          {pane("tracking", <TrackingTab apiAvailable={apiAvailable} />)}
           {pane("chariow", <ChariowTab apiAvailable={apiAvailable} products={products} />)}
           {pane("settings", <SettingsTab apiAvailable={apiAvailable} onLogout={logout} />)}
         </div>

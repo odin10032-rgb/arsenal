@@ -16,6 +16,7 @@ import { BuyWithA } from "@/components/product/buy-with-a";
 import { useCatalog } from "@/hooks/use-catalog";
 import { fmt, timeAgo } from "@/lib/format";
 import { CATEGORIES, PRODUCT_LANGUAGES } from "@/lib/products";
+import { trackStep } from "@/lib/purchases";
 import { trackClick } from "@/lib/track";
 import { parseVideoUrl } from "@/lib/video";
 
@@ -47,7 +48,11 @@ function ProductBody() {
   const video = parseVideoUrl(product?.videoUrl);
 
   useEffect(() => {
-    if (product) trackClick(product.id, "open");
+    if (product) {
+      trackClick(product.id, "open");
+      // Étape du parcours (vague 4) — best-effort, jamais bloquant.
+      void trackStep("product_view");
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product?.id]);
 

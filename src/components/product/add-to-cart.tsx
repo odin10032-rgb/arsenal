@@ -20,6 +20,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { addToCart } from "@/lib/cart";
+import { trackStep } from "@/lib/purchases";
 
 type Status = "idle" | "busy" | "added" | "error";
 
@@ -42,6 +43,8 @@ export function AddToCart({ productId }: { productId: string }) {
     try {
       await addToCart(productId, 1);
       setStatus("added");
+      // Étape du parcours (vague 4) — best-effort, jamais bloquant.
+      void trackStep("add_to_cart");
       if (timerRef.current !== null) window.clearTimeout(timerRef.current);
       timerRef.current = window.setTimeout(() => setStatus("idle"), 2200);
     } catch (err) {

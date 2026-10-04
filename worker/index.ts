@@ -28,6 +28,8 @@ import { meTransferRoutes } from "./routes/me-transfers";
 import { cartRoutes } from "./routes/cart";
 import { adminProductRequestRoutes } from "./routes/admin-product-requests";
 import { adminProgramRoutes } from "./routes/admin-program";
+import { trackingRoutes } from "./routes/tracking";
+import { adminTrackingRoutes } from "./routes/admin-tracking";
 import { PURCHASE_MAX_PER_MIN_DEFAULT, readPurchaseMaxPerMin } from "../src/lib/server/purchases";
 import { rateLimit } from "./middleware/rate-limit";
 
@@ -149,6 +151,10 @@ app.route("/", cartRoutes);
 app.route("/", adminProductRequestRoutes);
 /** Vague 5 — administration du programme (réglages, transferts, abandons, ajustement A). */
 app.route("/", adminProgramRoutes);
+/** PONT DE TRACKING — collecte des étapes de parcours (public, anonyme). */
+app.route("/", trackingRoutes);
+/** PONT DE TRACKING — écrans admin (parcours, conflits multi-liens, recrutements). */
+app.route("/", adminTrackingRoutes);
 
 app.notFound((c) => c.json({ ok: false, error: "Route introuvable." }, 404));
 

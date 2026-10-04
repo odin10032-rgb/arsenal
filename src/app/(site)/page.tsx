@@ -42,6 +42,7 @@ export default function CatalogPage() {
     trackVisit();
   }, []);
 
+  // Pont de tracking : capte `?ars=<token>` à l'arrivée, le mémorise et nettoie l'URL.
   useEffect(() => {
     let cancelled = false;
     apiFetch<{ showHomeStats?: boolean }>("/api/site-config", { timeoutMs: 4000 })

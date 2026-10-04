@@ -527,3 +527,60 @@ export function readTrackingToken(): string {
     return "";
   }
 }
+
+/* ---------- Collecte des étapes du parcours (vague 4) ---------- */
+
+/**
+ * Étapes collectables depuis le FRONT — miroir de `TRACKING_STEPS` serveur, mais
+ * SANS `checkout_start` ni `purchase` (voir plus bas). Ces deux étapes sont
+ * déclarées côté serveur (achat A) et n'ont pas à être appelées par le client :
+ *   • `purchase`   → posée par le flux d'achat (serveur, source de vérité) ;
+ *   • `checkout_start` → INUTILISÉE tant qu'il n'existe AUCUN tunnel de paiement
+ *     interne (le canal Chariow est externe : le visiteur quitte le site). Elle
+ *     n'est donc volontairement jamais branchée.
+ */
+export type TrackingStepClient = "product_view" | "add_to_cart";
+
+/** Le paramètre d'URL qui porte le jeton (`?ars=<token>`, posé par `/r/<code>`). */
+const TRACKING_URL_PARAM = "ars";
+
+/**
+ * Lit `?ars=<token>` dans l'URL, le mémorise (30 j) et NETTOIE l'URL
+ * (`history.replaceState`, on retire SEULEMENT `ars`) pour ne pas laisser le
+ * jeton traîner dans la barre d'adresse. Idempotent : rappelable sans risque,
+ * et sans effet si le paramètre est absent (rien n'est réécrit).
+ */
+export function captureTrackingTokenFromUrl(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const url = new URL(window.location.href);
+    const token = (url.searchParams.get(TRACKING_URL_PARAM) || "").trim();
+    if (!token) return;
+    storeTrackingToken(token);
+    // Nettoyage : on ne touche QU'À `ars` — les autres paramètres (ex. `?id=`)
+    // restent intacts, le hash et le chemin aussi.
+    url.searchParams.delete(TRACKING_URL_PARAM);
+    const clean = `${url.pathname}${url.search}${url.hash}`;
+    window.history.replaceState(window.history.state, "", clean);
+  } catch {
+    /* URL illisible / history indisponible : on ignore (aucun impact visiteur) */
+  }
+}
+
+/**
+ * Déclare une étape du parcours au serveur (`POST /api/track/step`).
+ * BEST-EFFORT : ne lève JAMAIS, n'attend pas de retour exploitable ; si aucun
+ * jeton n'est mémorisé, on n'envoie rien (aucune requête inutile). Le jeton est
+ * celui de `readTrackingToken()` (localStorage, fenêtre 30 j).
+ */
+export function trackStep(step: TrackingStepClient): void {
+  const token = readTrackingToken();
+  if (!token) return;
+  void apiFetch("/api/track/step", {
+    method: "POST",
+    body: { token, step },
+    timeoutMs: 2000,
+  }).catch(() => {
+    /* best-effort : un compteur d'étapes ne doit jamais gêner le visiteur */
+  });
+}

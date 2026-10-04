@@ -17,6 +17,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { CoinA } from "@/components/account/coin-a";
+import { SignupInvite } from "@/components/account/signup-invite";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { AddToCart } from "@/components/product/add-to-cart";
 import { useUser } from "@/hooks/use-user";
@@ -343,6 +344,9 @@ export function BuyWithA({ product }: { product: Product }) {
           </p>
           {/* Le panier reste ouvert à tous, même sans compte */}
           <AddToCart productId={product.id} />
+          {/* Visiteur venu d'un lien affilié : invitation contextuelle à créer un
+              compte (encart discret, jamais répétitif — voir SignupInvite). */}
+          <SignupInvite />
         </div>
       )}
 
