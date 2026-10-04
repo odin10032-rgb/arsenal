@@ -15,6 +15,8 @@
 /** Réglage : montant de la récompense de recrutement (A). 0 = désactivé. */
 export const RECRUITMENT_REWARD_KEY = "reward_recruitment_a";
 
+import { getAffiliateById } from "./affiliation";
+
 /** Clé d'idempotence du crédit — un seul versement par filleul. */
 function recruitmentKey(userId: string): string {
   return `recruitment:${userId}`;
@@ -112,6 +114,14 @@ export async function recruitmentRewardStatements(
   const referral = await getReferralForUser(db, input.userId);
   if (!referral || referral.rewarded_at != null) return [];
 
+  // ⚠️ Le ledger A est indexé par `user_id` (un COMPTE), alors que
+  // `user_referrals.affiliate_id` porte l'id de la ligne `affiliates`. Créditer
+  // ce dernier créerait un solde sur un identifiant qui n'est pas un compte
+  // (bug constaté le 03/10/2026 : +50 A versés dans le vide). On résout donc le
+  // COMPTE de l'affilié — sans résolution valide, on ne crédite RIEN.
+  const affiliate = await getAffiliateById(db, referral.affiliate_id);
+  if (!affiliate || !affiliate.user_id) return [];
+
   const now = input.now ?? Date.now();
   const { aTransactionStatement } = await import("./ledger");
 
@@ -119,7 +129,7 @@ export async function recruitmentRewardStatements(
     // 1. Crédit idempotent : la clé `recruitment:<userId>` empêche tout doublon,
     //    même en cas de double exécution du batch.
     aTransactionStatement(db, {
-      userId: referral.affiliate_id,
+      userId: affiliate.user_id,
       delta: amount,
       type: "reward",
       label: "Récompense de recrutement",
@@ -128,11 +138,14 @@ export async function recruitmentRewardStatements(
       idempotencyKey: recruitmentKey(input.userId),
     }),
     // 2. Marquage : la garde `rewarded_at IS NULL` rend le crédit définitif.
+    //    ⚠️ Conditionné à l'EXISTENCE du crédit ci-dessus : si la clé existait
+    //    déjà (rejeu), le marquage ne s'applique pas deux fois.
     db
       .prepare(
         `UPDATE user_referrals SET rewarded_at = ?, rewarded_purchase_id = ?
-          WHERE user_id = ? AND rewarded_at IS NULL`
+          WHERE user_id = ? AND rewarded_at IS NULL
+            AND EXISTS (SELECT 1 FROM a_transactions WHERE idempotency_key = ?)`
       )
-      .bind(now, input.purchaseId, input.userId),
+      .bind(now, input.purchaseId, input.userId, recruitmentKey(input.userId)),
   ];
 }
