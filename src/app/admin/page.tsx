@@ -11,6 +11,7 @@ import { AdminLogin } from "@/components/admin/admin-login";
 import { AdminDashboard } from "@/components/admin/admin-dashboard";
 import { useCatalog } from "@/hooks/use-catalog";
 import { readAdminToken } from "@/lib/products";
+import { useTheme } from "@/lib/theme";
 
 export default function AdminPage() {
   const [token, setToken] = useState<string | null>(null);
@@ -23,18 +24,15 @@ export default function AdminPage() {
   }, []);
 
   // L'admin est un TABLEAU DE BORD : toujours sombre, quel que soit le thème
-  // choisi pour le site public (spec refonte : le mode clair ne concerne que
-  // le site). On force data-theme="dark" pendant la visite, puis on restitue
-  // la préférence à la sortie.
+  // choisi pour le site public (le mode clair ne concerne que le site). Le
+  // forçage passe par le ThemeProvider — un data-theme posé directement ici
+  // serait écrasé par l'effet du provider (les effets parents s'exécutent
+  // après ceux des enfants).
+  const { setForcedDark } = useTheme();
   useEffect(() => {
-    const root = document.documentElement;
-    const previous = root.getAttribute("data-theme");
-    root.setAttribute("data-theme", "dark");
-    return () => {
-      if (previous) root.setAttribute("data-theme", previous);
-      else root.removeAttribute("data-theme");
-    };
-  }, []);
+    setForcedDark(true);
+    return () => setForcedDark(false);
+  }, [setForcedDark]);
 
   if (!booted) {
     return (

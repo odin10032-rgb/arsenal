@@ -63,6 +63,12 @@ interface ThemeContextValue {
   resolved: ResolvedTheme;
   /** Change la préférence (persistée) et applique immédiatement. */
   setPref: (p: ThemePref) => void;
+  /**
+   * Force le thème sombre tant que le drapeau est actif (dashboard admin).
+   * L'effet du provider s'exécute APRÈS ceux des pages enfants : une page qui
+   * poserait data-theme à la main serait écrasée — d'où ce mécanisme.
+   */
+  setForcedDark: (forced: boolean) => void;
 }
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -71,19 +77,25 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // Rendu initial : valeurs neutres — le script inline du layout a déjà posé
   // data-theme ; la préférence réelle est lue après montage (anti-hydratation).
   const [pref, setPrefState] = useState<ThemePref>("system");
+  const [forced, setForced] = useState(false);
   const [resolved, setResolved] = useState<ResolvedTheme>("dark");
 
+  // Détection initiale de la préférence (une seule fois, après montage).
   useEffect(() => {
-    const initial = detectPref();
-    setPrefState(initial);
-    const first = initial === "system" ? systemTheme() : initial;
-    setResolved(first);
-    applyTheme(first);
+    setPrefState(detectPref());
   }, []);
 
-  // « système » : suivre les changements d'OS en direct.
+  // Application du thème — source unique : préférence (ou système) SAUF si le
+  // sombre est forcé (admin). Se réexécute quand l'un ou l'autre change.
   useEffect(() => {
-    if (pref !== "system") return;
+    const next: ResolvedTheme = forced ? "dark" : pref === "system" ? systemTheme() : pref;
+    setResolved(next);
+    applyTheme(next);
+  }, [pref, forced]);
+
+  // « système » : suivre les changements d'OS en direct (hors admin forcé).
+  useEffect(() => {
+    if (pref !== "system" || forced) return;
     let mq: MediaQueryList;
     try {
       mq = window.matchMedia("(prefers-color-scheme: dark)");
@@ -97,7 +109,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     };
     mq.addEventListener?.("change", onChange);
     return () => mq.removeEventListener?.("change", onChange);
-  }, [pref]);
+  }, [pref, forced]);
 
   const setPref = useCallback((p: ThemePref) => {
     setPrefState(p);
@@ -107,12 +119,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     } catch {
       /* stockage indisponible : le thème reste appliqué pour la session */
     }
-    const next = p === "system" ? systemTheme() : p;
-    setResolved(next);
-    applyTheme(next);
   }, []);
 
-  const value = useMemo(() => ({ pref, resolved, setPref }), [pref, resolved, setPref]);
+  const setForcedDark = useCallback((f: boolean) => {
+    setForced(f);
+  }, []);
+
+  const value = useMemo(
+    () => ({ pref, resolved, setPref, setForcedDark }),
+    [pref, resolved, setPref, setForcedDark]
+  );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

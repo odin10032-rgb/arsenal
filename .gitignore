@@ -76,3 +76,6 @@ TESTING_GUIDE.md
 .wrangler-out/
 .prod-backup/
 .chariow-stores.local.json
+
+# Fichiers QA temporaires (jamais committés — leçon du 05/10 : un git add -A a exposé un token)
+.qa_*
