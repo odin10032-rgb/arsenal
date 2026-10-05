@@ -18,7 +18,6 @@
 
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
-import { ArticleCard } from "@/components/article-card";
 import { useCatalog } from "@/hooks/use-catalog";
 import { ProductCard } from "@/components/product-card";
 import { MediaEmbed } from "@/components/media-embed";
@@ -60,6 +59,12 @@ function FeedBody() {
 
 /* ------------------------------- Liste ------------------------------- */
 
+/**
+ * Le Feed est un FLUX de publications (spec « refonte rendu Feed ») :
+ *   Titre → Date → début du VRAI contenu (« … Lire plus » discret) → Image.
+ * Pas de badge, pas de grille de cartes, pas de sous-titre d'introduction :
+ * on arrive, on lit, on déplie en place, on descend à la publication suivante.
+ */
 function FeedList({ t }: { t: (key: string) => string }) {
   const [articles, setArticles] = useState<FeedArticleListItem[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -81,84 +86,157 @@ function FeedList({ t }: { t: (key: string) => string }) {
     };
   }, []);
 
-  const [featured, ...rest] = articles;
-
   return (
     <>
-      <section className="py-6 md:py-9">
+      <section className="py-6 md:py-8">
         <div className="container-arsenal">
-          <h1 className="font-display text-[clamp(1.6rem,3.6vw,2.4rem)] font-bold leading-tight tracking-tight">
+          <h1 className="font-display text-[clamp(1.6rem,3.6vw,2.2rem)] font-bold leading-tight tracking-tight">
             {t("feed_title")}
           </h1>
-          <p className="mt-2 max-w-[56ch] leading-relaxed text-tx2">{t("feed_sub")}</p>
         </div>
       </section>
 
-      <section className="container-arsenal pb-14">
-        {!loaded ? (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3" aria-hidden="true">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="overflow-hidden rounded-2xl border border-line bg-s1">
-                <div className="aspect-[16/9] bg-s2" />
-                <div className="p-4">
-                  <div className="mb-2 h-3 w-2/5 rounded bg-s2" />
-                  <div className="mb-2 h-3 w-4/5 rounded bg-s2" />
-                  <div className="h-3 w-3/5 rounded bg-s2" />
+      {/* Largeur de LECTURE confortable, centrée — un vrai flux éditorial,
+          pas une grille de fiches (spec §7). */}
+      <section className="container-arsenal pb-16">
+        <div className="mx-auto w-full max-w-[680px]">
+          {!loaded ? (
+            <div className="flex flex-col gap-10" aria-hidden="true">
+              {[0, 1].map((i) => (
+                <div key={i} className="flex flex-col gap-2.5">
+                  <div className="h-5 w-3/5 rounded bg-s2" />
+                  <div className="h-3 w-1/4 rounded bg-s2" />
+                  <div className="mt-1 h-3 w-full rounded bg-s2" />
+                  <div className="h-3 w-11/12 rounded bg-s2" />
+                  <div className="h-3 w-2/3 rounded bg-s2" />
+                  <div className="mt-3 aspect-[16/9] w-full rounded-xl border border-line bg-s2" />
                 </div>
-              </div>
-            ))}
-          </div>
-        ) : articles.length === 0 ? (
-          <p className="py-14 text-center font-mono text-[0.85rem] text-tx3">{t("feed_empty")}</p>
-        ) : (
-          <>
-            {/* Article principal — premier de la liste */}
-            <Link
-              href={`/feed/?a=${encodeURIComponent(featured.slug)}`}
-              className="group mb-4 grid overflow-hidden rounded-2xl border border-line bg-s1 transition-colors hover:border-line2 hover:bg-s2 sm:grid-cols-[1.2fr_1fr]"
-            >
-              {featured.coverUrl ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={featured.coverUrl}
-                  alt=""
-                  className="aspect-[16/9] h-full w-full border-b border-line object-cover sm:border-b-0 sm:border-r"
-                />
-              ) : (
-                <div className="flex aspect-[16/9] w-full items-center justify-center border-b border-line bg-s2 font-display text-[2rem] font-bold text-tx3 sm:border-b-0 sm:border-r">
-                  A
-                </div>
-              )}
-              <div className="flex flex-col justify-center p-5 sm:p-6">
-                <p className="flex items-center gap-2 font-mono text-[0.64rem] uppercase tracking-[0.12em] text-tx3">
-                  <span className="rounded border border-[rgba(230,57,70,0.45)] bg-[rgba(230,57,70,0.08)] px-1.5 py-0.5 text-brand">
-                    {t("feed_title")}
-                  </span>
-                  {featured.category && <span className="text-teal">{featured.category}</span>}
-                  {featured.publishedAt && <span>{formatArticleDate(featured.publishedAt)}</span>}
-                </p>
-                <h2 className="mt-2 font-display text-[clamp(1.2rem,2.6vw,1.6rem)] font-bold leading-snug text-tx1 group-hover:underline group-hover:decoration-[#e63946] group-hover:decoration-2 group-hover:underline-offset-4">
-                  {featured.title}
-                </h2>
-                {featured.excerpt && (
-                  <p className="mt-2 line-clamp-3 text-[0.88rem] leading-relaxed text-tx2">
-                    {featured.excerpt}
-                  </p>
-                )}
-              </div>
-            </Link>
-
-            {rest.length > 0 && (
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {rest.map((a) => (
-                  <ArticleCard key={a.slug} article={a} />
-                ))}
-              </div>
-            )}
-          </>
-        )}
+              ))}
+            </div>
+          ) : articles.length === 0 ? (
+            <p className="py-14 text-center font-mono text-[0.85rem] text-tx3">{t("feed_empty")}</p>
+          ) : (
+            <div className="flex flex-col">
+              {articles.map((a) => (
+                <FeedPost key={a.slug} article={a} t={t} />
+              ))}
+            </div>
+          )}
+        </div>
       </section>
     </>
+  );
+}
+
+/** Une publication du flux — lecture directe, dépliage en place. */
+function FeedPost({
+  article,
+  t,
+}: {
+  article: FeedArticleListItem;
+  t: (key: string) => string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [full, setFull] = useState<FeedArticle | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const toggle = async () => {
+    if (busy) return;
+    if (expanded) {
+      setExpanded(false); // « Réduire » — discret, instantané
+      return;
+    }
+    if (full) {
+      setExpanded(true);
+      return;
+    }
+    // Premier dépliage : le contenu complet vient de l'API (une fois par post).
+    setBusy(true);
+    try {
+      const fetched = await fetchFeedArticle(article.slug);
+      if (fetched) {
+        setFull(fetched);
+        setExpanded(true);
+      }
+    } catch {
+      /* API injoignable : le preview reste, rien ne casse */
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const paragraphs = full
+    ? full.content
+        .split(/\n{2,}/)
+        .map((b) => b.trim())
+        .filter(Boolean)
+    : [];
+
+  return (
+    <article className="border-b border-line py-7 first:pt-1 last:border-b-0">
+      {/* Titre cliquable → page complète de l'article (URL propre conservée) */}
+      <h2 className="font-display text-[1.25rem] font-bold leading-snug tracking-tight md:text-[1.4rem]">
+        <Link
+          href={`/feed/?a=${encodeURIComponent(article.slug)}`}
+          className="text-tx1 underline-offset-4 hover:underline hover:decoration-[#e63946] hover:decoration-2"
+        >
+          {article.title}
+        </Link>
+      </h2>
+
+      {/* Date seule — pas de badge « FEED », pas de catégorie artificielle */}
+      {article.publishedAt && (
+        <p className="mt-1.5 font-mono text-[0.7rem] uppercase tracking-[0.1em] text-tx3">
+          {formatArticleDate(article.publishedAt)}
+        </p>
+      )}
+
+      {/* Texte : aperçu du contenu réel, puis dépliage en place */}
+      <div className="mt-3.5 text-[0.95rem] leading-[1.8] text-tx2">
+        {expanded ? (
+          <div className="feed-reveal flex flex-col gap-4">
+            {paragraphs.map((block, i) => (
+              <p key={i} className="whitespace-pre-line">
+                {block}
+              </p>
+            ))}
+            <p className="text-[0.82rem]">
+              <button
+                type="button"
+                onClick={() => void toggle()}
+                className="text-tx3 underline decoration-line underline-offset-4 transition-colors hover:text-tx1"
+              >
+                {t("feed_collapse")}
+              </button>
+            </p>
+          </div>
+        ) : (
+          <p className="whitespace-pre-line">
+            {article.preview || article.excerpt}
+            {article.hasMore && (
+              <button
+                type="button"
+                onClick={() => void toggle()}
+                className="whitespace-nowrap text-[0.85rem] text-tx3 underline decoration-line underline-offset-4 transition-colors hover:text-tx1"
+              >
+                {busy ? "…" : `… ${t("feed_read_more")}`}
+              </button>
+            )}
+          </p>
+        )}
+      </div>
+
+      {/* Image APRÈS le texte et le lien (ordre imposé par la spec §5) */}
+      {article.coverUrl && (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={article.coverUrl}
+          alt=""
+          loading="lazy"
+          className="mt-5 w-full rounded-xl border border-line object-cover"
+        />
+      )}
+    </article>
   );
 }
 

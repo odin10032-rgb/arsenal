@@ -227,8 +227,29 @@ export async function setArticleStatus(
     .run();
 }
 
+/** Longueur visée de l'aperçu du Feed (le vrai début du texte, pas un résumé). */
+const PREVIEW_MAX = 260;
+
+/**
+ * Aperçu du CONTENU RÉEL pour le flux : premières lignes, coupées proprement à
+ * la fin d'un mot (jamais un faux extrait marketing). `hasMore` indique qu'il
+ * reste du texte à déplier.
+ */
+export function contentPreview(
+  content: string,
+  max = PREVIEW_MAX
+): { preview: string; hasMore: boolean } {
+  const text = (content || "").replace(/\s+/g, " ").trim();
+  if (text.length <= max) return { preview: text, hasMore: false };
+  let cut = text.slice(0, max);
+  const lastSpace = cut.lastIndexOf(" ");
+  if (lastSpace > max * 0.6) cut = cut.slice(0, lastSpace);
+  return { preview: cut.replace(/[.,;:!?…]+$/, ""), hasMore: true };
+}
+
 /** Forme publique d'un article (jamais la ligne brute). */
 export function articleToJson(row: FeedArticleRow, full = false) {
+  const { preview, hasMore } = contentPreview(row.content || "");
   return {
     slug: row.slug,
     title: row.title,
@@ -237,6 +258,9 @@ export function articleToJson(row: FeedArticleRow, full = false) {
     category: row.category,
     publishedAt: row.published_at != null ? Number(row.published_at) : null,
     productId: row.product_id,
+    // Aperçu du vrai contenu (flux éditorial) — toujours présent, léger.
+    preview,
+    hasMore,
     ...(full ? { content: row.content, videoUrl: row.video_url } : {}),
   };
 }

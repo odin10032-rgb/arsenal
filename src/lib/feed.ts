@@ -13,6 +13,10 @@ export interface FeedArticleListItem {
   slug: string;
   title: string;
   excerpt: string;
+  /** Début du CONTENU RÉEL (flux éditorial) — jamais un résumé inventé. */
+  preview: string;
+  /** true = il reste du texte à déplier (« Lire plus »). */
+  hasMore: boolean;
   coverUrl: string | null;
   category: string | null;
   publishedAt: number | null;
@@ -33,6 +37,8 @@ function toListItem(raw: unknown): FeedArticleListItem {
     slug: typeof a.slug === "string" ? a.slug : "",
     title: typeof a.title === "string" ? a.title : "",
     excerpt: typeof a.excerpt === "string" ? a.excerpt : "",
+    preview: typeof a.preview === "string" ? a.preview : "",
+    hasMore: a.hasMore === true,
     coverUrl: typeof a.coverUrl === "string" && a.coverUrl ? a.coverUrl : null,
     category: typeof a.category === "string" && a.category ? a.category : null,
     publishedAt: typeof a.publishedAt === "number" ? a.publishedAt : null,

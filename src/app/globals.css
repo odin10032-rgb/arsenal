@@ -342,7 +342,17 @@ body {
 .unlock-delay-2 { animation-delay: 0.75s; }
 .unlock-delay-3 { animation-delay: 0.95s; }
 
+/* Feed éditorial : apparition douce du contenu déplié (« Lire plus ») */
+.feed-reveal {
+  animation: feed-reveal-up 0.28s ease both;
+}
+@keyframes feed-reveal-up {
+  0% { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .unlock-coin { animation: none; }
   .unlock-reveal { animation-duration: 0.01s; }
+  .feed-reveal { animation: none; }
 }
