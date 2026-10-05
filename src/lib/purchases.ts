@@ -539,7 +539,7 @@ export function readTrackingToken(): string {
  *     interne (le canal Chariow est externe : le visiteur quitte le site). Elle
  *     n'est donc volontairement jamais branchée.
  */
-export type TrackingStepClient = "product_view" | "add_to_cart";
+export type TrackingStepClient = "product_view" | "add_to_cart" | "feed_view";
 
 /** Le paramètre d'URL qui porte le jeton (`?ars=<token>`, posé par `/r/<code>`). */
 const TRACKING_URL_PARAM = "ars";

@@ -7,7 +7,7 @@ export function BrandLogo({ size = 34 }: { size?: number }) {
   return (
     <span
       aria-hidden="true"
-      className="inline-grid flex-shrink-0 place-items-center rounded-[9px] border border-[#333] bg-[#141414]"
+      className="inline-grid flex-shrink-0 place-items-center rounded-[9px] border border-line bg-s1"
       style={{ width: size, height: size }}
     >
       <svg

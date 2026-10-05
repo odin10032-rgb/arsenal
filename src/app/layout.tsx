@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, JetBrains_Mono, Space_Grotesk } from "next/font/google";
 import { BRAND_FAVICON } from "@/components/brand-logo";
 import { LanguageProvider } from "@/lib/i18n";
+import { ThemeProvider, THEME_INIT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 const inter = Inter({
@@ -42,10 +43,20 @@ export default function RootLayout({
     <html
       lang="fr"
       className={`${inter.variable} ${jetbrains.variable} ${spaceGrotesk.variable}`}
+      // Le script inline ci-dessous pose data-theme AVANT la peinture ; la
+      // valeur ici n'est qu'un repli si le JS est désactivé (sombre = référence).
+      data-theme="dark"
+      suppressHydrationWarning
     >
+      <head>
+        {/* Anti-flash : applique le thème mémorisé (ou le système) avant le premier rendu. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="font-sans antialiased">
-        {/* Provider i18n côté client : le rendu initial reste FR (anti-hydratation) */}
-        <LanguageProvider>{children}</LanguageProvider>
+        {/* Providers côté client : rendu initial neutre (anti-hydratation) */}
+        <ThemeProvider>
+          <LanguageProvider>{children}</LanguageProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

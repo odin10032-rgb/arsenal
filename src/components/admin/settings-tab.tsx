@@ -36,6 +36,7 @@ export function SettingsTab({
       <GithubCard />
       <ChariowCard apiAvailable={apiAvailable} />
       <AppearanceCard apiAvailable={apiAvailable} />
+      <CommunityCard apiAvailable={apiAvailable} />
       <LegalCard apiAvailable={apiAvailable} />
       <SecurityCard apiAvailable={apiAvailable} onLogout={onLogout} />
       <DataCard />
@@ -119,6 +120,92 @@ function AppearanceCard({ apiAvailable }: { apiAvailable: boolean }) {
           className="h-5 w-5 flex-shrink-0 accent-[#e63946]"
           aria-label="Afficher les statistiques sur la page d'accueil"
         />
+      </label>
+    </SettingsCard>
+  );
+}
+
+/* ---------------- Communauté ---------------- */
+
+/**
+ * Lien du canal Telegram de la communauté — affiché dans le menu ☰ du site
+ * (section Communauté). Vide = section masquée côté public. Réglage public
+ * `community_telegram_url`, lu par GET /api/site-config.
+ */
+function CommunityCard({ apiAvailable }: { apiAvailable: boolean }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!apiAvailable) return;
+    let cancelled = false;
+    fetchAdminSettings()
+      .then((settings) => {
+        if (!cancelled) setUrl(settings.community_telegram_url ?? "");
+      })
+      .catch(() => {
+        if (!cancelled) setUrl(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiAvailable]);
+
+  const save = async () => {
+    if (busy || url === null) return;
+    if (!apiAvailable) {
+      return toast("Enregistrement possible uniquement avec le backend connecté.", "error");
+    }
+    const value = url.trim();
+    if (value && !/^https?:\/\//i.test(value)) {
+      return toast("Lien invalide : une URL http(s) est attendue.", "error");
+    }
+    setBusy(true);
+    try {
+      await saveAdminSetting("community_telegram_url", value);
+      toast(value ? "Lien Telegram enregistré." : "Lien Telegram retiré (section masquée).", "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Enregistrement impossible.", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <SettingsCard
+      icon={
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="m21.9 4.6-2.9 14.7c-.2 1-.8 1.2-1.6.8l-4.4-3.2-2.1 2c-.2.2-.4.4-.9.4l.3-4.5 8.2-7.4c.4-.3-.1-.5-.6-.2L7.8 12.8l-4.3-1.4c-.9-.3-.9-.9.2-1.3L20.5 3.3c.8-.3 1.5.2 1.4 1.3z" />
+        </svg>
+      }
+      title="Communauté"
+      subtitle="Le canal Telegram apparaît dans le menu ☰ du site public (section Communauté)."
+    >
+      <label className="flex flex-col gap-1.5">
+        <span className="text-[0.84rem] font-semibold">Lien du canal Telegram</span>
+        <div className="flex gap-2">
+          <input
+            type="url"
+            className="input-arsenal flex-1 font-mono text-[0.8rem]"
+            placeholder="https://t.me/votre_canal"
+            value={url ?? ""}
+            disabled={url === null || !apiAvailable}
+            onChange={(e) => setUrl(e.target.value)}
+          />
+          <button
+            type="button"
+            onClick={() => void save()}
+            disabled={busy || url === null || !apiAvailable}
+            className="btn-arsenal btn-primary btn-sm"
+          >
+            {busy && <span className="spin" />}
+            Enregistrer
+          </button>
+        </div>
+        <span className="text-[0.74rem] leading-relaxed text-[#666]">
+          Laissez vide puis enregistrez pour retirer le lien — la section Communauté disparaît du
+          menu public.
+        </span>
       </label>
     </SettingsCard>
   );

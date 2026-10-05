@@ -106,7 +106,7 @@ export default function PortefeuillePage() {
   if (loading) {
     return (
       <div className="flex justify-center p-10">
-        <p className="font-mono text-[0.85rem] text-[#666]">Chargement du portefeuille…</p>
+        <p className="font-mono text-[0.85rem] text-tx3">Chargement du portefeuille…</p>
       </div>
     );
   }
@@ -120,7 +120,7 @@ export default function PortefeuillePage() {
       <div className="mx-auto w-full max-w-[560px]">
         <Link
           href="/compte"
-          className="inline-flex items-center gap-1.5 text-[0.78rem] text-[#666] transition-colors hover:text-[#f0f0f0]"
+          className="inline-flex items-center gap-1.5 text-[0.78rem] text-tx3 transition-colors hover:text-tx1"
         >
           <svg
             viewBox="0 0 24 24"
@@ -138,18 +138,18 @@ export default function PortefeuillePage() {
           Mon compte
         </Link>
         <h1 className="mt-3 font-display text-[1.35rem] font-bold">Portefeuille A</h1>
-        <p className="mt-1 text-[0.84rem] text-[#a0a0a0]">
+        <p className="mt-1 text-[0.84rem] text-tx2">
           Votre monnaie interne et son historique.
         </p>
 
         {/* Solde */}
-        <div className="mt-6 rounded-2xl border border-[#333] bg-[#141414] p-6">
-          <p className="text-[0.74rem] font-semibold uppercase tracking-wider text-[#666]">
+        <div className="mt-6 rounded-2xl border border-line bg-s1 p-6">
+          <p className="text-[0.74rem] font-semibold uppercase tracking-wider text-tx3">
             Solde
           </p>
           <div className="mt-2 flex items-center gap-3">
             <CoinA size={34} />
-            <p className="whitespace-nowrap font-mono text-[2rem] font-bold leading-none tabular-nums text-[#f0f0f0]">
+            <p className="whitespace-nowrap font-mono text-[2rem] font-bold leading-none tabular-nums text-tx1">
               {fmt(user.balanceA)}
               <span className="ml-2 text-[1.1rem] text-gold">A</span>
             </p>
@@ -157,11 +157,11 @@ export default function PortefeuillePage() {
         </div>
 
         {/* Historique */}
-        <div className="mt-4 rounded-2xl border border-[#333] bg-[#141414] p-6">
+        <div className="mt-4 rounded-2xl border border-line bg-s1 p-6">
           <div className="flex items-baseline justify-between gap-3">
             <h2 className="font-display text-[1rem] font-bold">Historique</h2>
             {total !== null && (
-              <p className="text-[0.74rem] text-[#666]">
+              <p className="text-[0.74rem] text-tx3">
                 {fmt(total)} transaction{total > 1 ? "s" : ""}
               </p>
             )}
@@ -169,7 +169,7 @@ export default function PortefeuillePage() {
 
           {error && (
             <p
-              className="mt-4 rounded-lg border border-[rgba(230,57,70,0.4)] bg-[rgba(230,57,70,0.1)] px-3 py-2 text-[0.8rem] text-[#fda4af]"
+              className="mt-4 rounded-lg border border-[rgba(230,57,70,0.4)] bg-[rgba(230,57,70,0.1)] px-3 py-2 text-[0.8rem] text-dangertx"
               role="alert"
             >
               {error}
@@ -177,11 +177,11 @@ export default function PortefeuillePage() {
           )}
 
           {txLoading ? (
-            <p className="mt-6 font-mono text-[0.8rem] text-[#666]">
+            <p className="mt-6 font-mono text-[0.8rem] text-tx3">
               Chargement de l'historique…
             </p>
           ) : txs.length === 0 ? (
-            <p className="mt-6 text-[0.84rem] text-[#666]">
+            <p className="mt-6 text-[0.84rem] text-tx3">
               Aucune transaction pour le moment.
             </p>
           ) : (
@@ -189,17 +189,17 @@ export default function PortefeuillePage() {
               {txs.map((t) => (
                 <li
                   key={t.id}
-                  className="flex items-center justify-between gap-3 border-b border-[#222] py-3 last:border-0"
+                  className="flex items-center justify-between gap-3 border-b border-line py-3 last:border-0"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-[0.88rem] text-[#f0f0f0]">{t.label}</p>
-                    <p className="mt-0.5 text-[0.72rem] text-[#666]">
+                    <p className="truncate text-[0.88rem] text-tx1">{t.label}</p>
+                    <p className="mt-0.5 text-[0.72rem] text-tx3">
                       {TYPE_LABELS[t.type] ?? t.type} · {formatDate(t.createdAt)}
                     </p>
                   </div>
                   <span
                     className={`flex-shrink-0 font-mono text-[0.85rem] font-semibold tabular-nums ${
-                      t.delta >= 0 ? "text-[#2a9d8f]" : "text-[#e63946]"
+                      t.delta >= 0 ? "text-ok" : "text-brand"
                     }`}
                   >
                     {t.delta > 0 ? "+" : ""}

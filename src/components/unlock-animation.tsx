@@ -57,16 +57,16 @@ export function UnlockAnimation({
         <CoinA size={120} />
       </div>
 
-      <p className="unlock-reveal mt-8 font-mono text-[0.72rem] uppercase tracking-[0.35em] text-[#a0a0a0]">
+      <p className="unlock-reveal mt-8 font-mono text-[0.72rem] uppercase tracking-[0.35em] text-tx2">
         Statut débloqué
       </p>
       <h1 className="unlock-reveal unlock-delay-1 mt-3 font-display text-[2rem] font-bold tracking-wide text-gold sm:text-[2.6rem]">
         {label.title}
       </h1>
-      <p className="unlock-reveal unlock-delay-2 mt-2 text-[0.9rem] text-[#f0f0f0]">
+      <p className="unlock-reveal unlock-delay-2 mt-2 text-[0.9rem] text-tx1">
         {pseudo}
       </p>
-      <p className="unlock-reveal unlock-delay-2 mt-1 text-[0.82rem] text-[#a0a0a0]">
+      <p className="unlock-reveal unlock-delay-2 mt-1 text-[0.82rem] text-tx2">
         {label.sub}
       </p>
 

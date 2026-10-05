@@ -45,18 +45,18 @@ import { logout } from "@/lib/user-auth";
 
 /** Libellés + teintes de statut (statuts du schéma serveur, aucune valeur inventée) */
 const STATUS_STYLE: Record<PurchaseStatus, { label: string; color: string; border: string; bg: string }> = {
-  pending: { label: "En attente", color: "#f4a261", border: "rgba(244,162,97,0.4)", bg: "rgba(244,162,97,0.08)" },
-  paid: { label: "Payé", color: "#f4a261", border: "rgba(244,162,97,0.4)", bg: "rgba(244,162,97,0.08)" },
+  pending: { label: "En attente", color: "var(--warn-text)", border: "rgba(244,162,97,0.4)", bg: "rgba(244,162,97,0.08)" },
+  paid: { label: "Payé", color: "var(--warn-text)", border: "rgba(244,162,97,0.4)", bg: "rgba(244,162,97,0.08)" },
   fulfillment_pending: {
     label: "Livraison en cours",
     color: "#f4a261",
     border: "rgba(244,162,97,0.4)",
     bg: "rgba(244,162,97,0.08)",
   },
-  fulfilled: { label: "Obtenu", color: "#56b8a8", border: "rgba(42,157,143,0.4)", bg: "rgba(42,157,143,0.08)" },
-  failed: { label: "Livraison en échec", color: "#fda4af", border: "rgba(230,57,70,0.45)", bg: "rgba(230,57,70,0.1)" },
-  cancelled: { label: "Annulé", color: "#a0a0a0", border: "#333", bg: "#1a1a1a" },
-  refunded: { label: "Remboursé", color: "#a0a0a0", border: "#333", bg: "#1a1a1a" },
+  fulfilled: { label: "Obtenu", color: "var(--teal-text)", border: "rgba(42,157,143,0.4)", bg: "rgba(42,157,143,0.08)" },
+  failed: { label: "Livraison en échec", color: "var(--danger-text)", border: "rgba(230,57,70,0.45)", bg: "rgba(230,57,70,0.1)" },
+  cancelled: { label: "Annulé", color: "var(--text-secondary)", border: "var(--border-base)", bg: "var(--bg-surface-2)" },
+  refunded: { label: "Remboursé", color: "var(--text-secondary)", border: "var(--border-base)", bg: "var(--bg-surface-2)" },
 };
 
 function formatDate(ts: number | null): string {
@@ -214,7 +214,7 @@ export default function MyProductsPage() {
   if (loading) {
     return (
       <div className="flex justify-center p-10">
-        <p className="font-mono text-[0.85rem] text-[#666]">Chargement de vos produits…</p>
+        <p className="font-mono text-[0.85rem] text-tx3">Chargement de vos produits…</p>
       </div>
     );
   }
@@ -226,7 +226,7 @@ export default function MyProductsPage() {
       <div className="mx-auto w-full max-w-[560px]">
         <Link
           href="/compte"
-          className="inline-flex items-center gap-1.5 text-[0.78rem] text-[#666] transition-colors hover:text-[#f0f0f0]"
+          className="inline-flex items-center gap-1.5 text-[0.78rem] text-tx3 transition-colors hover:text-tx1"
         >
           <svg
             viewBox="0 0 24 24"
@@ -245,13 +245,13 @@ export default function MyProductsPage() {
         </Link>
 
         <h1 className="mt-3 font-display text-[1.35rem] font-bold">Mes produits</h1>
-        <p className="mt-1 text-[0.84rem] text-[#a0a0a0]">
+        <p className="mt-1 text-[0.84rem] text-tx2">
           Les produits obtenus avec vos A et leurs accès.
         </p>
 
         {error && (
           <p
-            className="mt-5 rounded-lg border border-[rgba(230,57,70,0.4)] bg-[rgba(230,57,70,0.1)] px-3.5 py-2.5 text-[0.82rem] text-[#fda4af]"
+            className="mt-5 rounded-lg border border-[rgba(230,57,70,0.4)] bg-[rgba(230,57,70,0.1)] px-3.5 py-2.5 text-[0.82rem] text-dangertx"
             role="alert"
           >
             {error}
@@ -259,7 +259,7 @@ export default function MyProductsPage() {
         )}
         {notice && (
           <p
-            className="mt-5 rounded-lg border border-[rgba(42,157,143,0.4)] bg-[rgba(42,157,143,0.08)] px-3.5 py-2.5 text-[0.82rem] text-[#56b8a8]"
+            className="mt-5 rounded-lg border border-[rgba(42,157,143,0.4)] bg-[rgba(42,157,143,0.08)] px-3.5 py-2.5 text-[0.82rem] text-teal"
             role="status"
           >
             {notice}
@@ -267,15 +267,15 @@ export default function MyProductsPage() {
         )}
 
         {pageLoading ? (
-          <p className="mt-8 font-mono text-[0.82rem] text-[#666]">Chargement…</p>
+          <p className="mt-8 font-mono text-[0.82rem] text-tx3">Chargement…</p>
         ) : purchases.length === 0 ? (
           /* État vide soigné */
-          <div className="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-dashed border-[#333] bg-[#141414] px-6 py-10 text-center">
+          <div className="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-dashed border-line bg-s1 px-6 py-10 text-center">
             <CoinA size={40} />
             <p className="font-display text-[1.05rem] font-semibold">
               Aucun produit pour le moment
             </p>
-            <p className="max-w-[42ch] text-[0.84rem] leading-relaxed text-[#a0a0a0]">
+            <p className="max-w-[42ch] text-[0.84rem] leading-relaxed text-tx2">
               Les produits que vous obtenez avec vos A apparaissent ici, avec leur accès. Votre
               solde se recharge via les récompenses d&apos;affiliation et les ajustements de
               l&apos;équipe.
@@ -308,10 +308,10 @@ export default function MyProductsPage() {
                 p.status !== "cancelled";
 
               return (
-                <li key={p.id} className="rounded-2xl border border-[#333] bg-[#141414] p-4 sm:p-5">
+                <li key={p.id} className="rounded-2xl border border-line bg-s1 p-4 sm:p-5">
                   <div className="flex gap-4">
                     {/* Image */}
-                    <div className="h-[64px] w-[96px] flex-shrink-0 overflow-hidden rounded-lg border border-[#333] bg-[#1a1a1a]">
+                    <div className="h-[64px] w-[96px] flex-shrink-0 overflow-hidden rounded-lg border border-line bg-s2">
                       {p.product.imageUrl ? (
                         /* eslint-disable-next-line @next/next/no-img-element */
                         <img
@@ -330,7 +330,7 @@ export default function MyProductsPage() {
                       <p className="truncate font-display text-[1rem] font-semibold leading-snug">
                         {p.product.title || "Produit"}
                       </p>
-                      <p className="mt-0.5 text-[0.72rem] text-[#666]">
+                      <p className="mt-0.5 text-[0.72rem] text-tx3">
                         {p.status === "fulfilled"
                           ? `Obtenu le ${formatDate(p.fulfilledAt || p.createdAt)}`
                           : `Commandé le ${formatDate(p.createdAt)}`}
@@ -352,10 +352,10 @@ export default function MyProductsPage() {
                   {/* Livraison en cours */}
                   {pending && (
                     <div className="mt-4 rounded-[10px] border border-[rgba(244,162,97,0.4)] bg-[rgba(244,162,97,0.07)] px-3.5 py-3">
-                      <p className="text-[0.84rem] font-semibold text-[#f4c886]">
+                      <p className="text-[0.84rem] font-semibold text-goldtx">
                         Livraison en cours
                       </p>
-                      <p className="mt-1 text-[0.78rem] leading-relaxed text-[#a0a0a0]">
+                      <p className="mt-1 text-[0.78rem] leading-relaxed text-tx2">
                         Votre commande est enregistrée et vos A ont été débités une seule fois.
                         L&apos;accès s&apos;active dès que la livraison aboutit.
                       </p>
@@ -365,15 +365,15 @@ export default function MyProductsPage() {
                   {/* Livraison en échec */}
                   {!pending && failed && (
                     <div className="mt-4 rounded-[10px] border border-[rgba(230,57,70,0.4)] bg-[rgba(230,57,70,0.1)] px-3.5 py-3">
-                      <p className="text-[0.84rem] font-semibold text-[#fda4af]">
+                      <p className="text-[0.84rem] font-semibold text-dangertx">
                         Livraison en échec
                       </p>
-                      <p className="mt-1 text-[0.78rem] leading-relaxed text-[#a0a0a0]">
+                      <p className="mt-1 text-[0.78rem] leading-relaxed text-tx2">
                         Vos A ne sont pas perdus : relancez la livraison, ou contactez l&apos;équipe
                         Arsenal qui peut rembourser la commande en A.
                       </p>
                       {p.fulfillment?.lastError && (
-                        <p className="mt-1.5 break-words font-mono text-[0.68rem] text-[#666]">
+                        <p className="mt-1.5 break-words font-mono text-[0.68rem] text-tx3">
                           {p.fulfillment.lastError}
                         </p>
                       )}
@@ -384,14 +384,14 @@ export default function MyProductsPage() {
                       déjà l'accès juste en dessous (le panneau « manuel » n'aurait
                       aucun sens pour un téléchargement ou une licence). */}
                   {p.status === "fulfilled" && !showDelivery && (
-                    <div className="mt-4 border-t border-dashed border-[#333] pt-4">
+                    <div className="mt-4 border-t border-dashed border-line pt-4">
                       <PurchaseAccessPanel purchase={p} sessionEmail={user.email} />
                     </div>
                   )}
 
                   {/* Fichier téléchargeable (deliveryKind = 'file') */}
                   {showDelivery && deliveryKind === "file" && (
-                    <div className="mt-4 border-t border-dashed border-[#333] pt-4">
+                    <div className="mt-4 border-t border-dashed border-line pt-4">
                       <button
                         type="button"
                         onClick={() => void download(p)}
@@ -417,7 +417,7 @@ export default function MyProductsPage() {
                         )}
                         Télécharger le fichier
                       </button>
-                      <p className="mt-1.5 text-[0.72rem] leading-relaxed text-[#666]">
+                      <p className="mt-1.5 text-[0.72rem] leading-relaxed text-tx3">
                         {delivered
                           ? "Lien personnel lié à votre compte — ne le partagez pas."
                           : failed
@@ -429,13 +429,13 @@ export default function MyProductsPage() {
 
                   {/* Clé de licence (deliveryKind = 'license') */}
                   {showDelivery && deliveryKind === "license" && (
-                    <div className="mt-4 border-t border-dashed border-[#333] pt-4">
+                    <div className="mt-4 border-t border-dashed border-line pt-4">
                       {!delivered ? (
                         <>
                           <button type="button" disabled className="btn-arsenal btn-ghost w-full">
                             Clé de licence
                           </button>
-                          <p className="mt-1.5 text-[0.72rem] leading-relaxed text-[#666]">
+                          <p className="mt-1.5 text-[0.72rem] leading-relaxed text-tx3">
                             {failed
                               ? "Désactivée : la livraison a échoué — relancez-la ci-dessous."
                               : "Votre clé s'affichera ici dès que la livraison de cette commande sera confirmée."}
@@ -447,13 +447,13 @@ export default function MyProductsPage() {
                           style={
                             isLicenseRevoked(license)
                               ? { borderColor: "rgba(230,57,70,0.45)", background: "rgba(230,57,70,0.1)" }
-                              : { borderColor: "#333", background: "rgba(255,255,255,0.02)" }
+                              : { borderColor: "var(--border-base)", background: "var(--panel)" }
                           }
                         >
-                          <p className="font-mono text-[0.64rem] uppercase tracking-[0.12em] text-[#666]">
+                          <p className="font-mono text-[0.64rem] uppercase tracking-[0.12em] text-tx3">
                             Clé de licence
                           </p>
-                          <p className="mt-1 break-all font-mono text-[0.86rem] text-[#f0f0f0]">
+                          <p className="mt-1 break-all font-mono text-[0.86rem] text-tx1">
                             {license.licenseKey}
                           </p>
                           <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
@@ -464,32 +464,32 @@ export default function MyProductsPage() {
                             >
                               Copier
                             </button>
-                            <span className="font-mono text-[0.72rem] text-[#a0a0a0]">
+                            <span className="font-mono text-[0.72rem] text-tx2">
                               {license.maxActivations > 0
                                 ? `${fmt(license.activationsCount)} / ${fmt(license.maxActivations)} appareils`
                                 : `${fmt(license.activationsCount)} appareil${license.activationsCount > 1 ? "s" : ""} activé${license.activationsCount > 1 ? "s" : ""}`}
                             </span>
                           </div>
                           {isLicenseRevoked(license) && (
-                            <p className="mt-2 text-[0.76rem] leading-relaxed text-[#fda4af]">
+                            <p className="mt-2 text-[0.76rem] leading-relaxed text-dangertx">
                               Cette clé a été révoquée
                               {license.revokedAt ? ` le ${formatDate(license.revokedAt)}` : ""} : elle
                               n&apos;active plus aucun nouvel appareil. Contactez l&apos;équipe Arsenal
                               si vous pensez qu&apos;il s&apos;agit d&apos;une erreur.
                             </p>
                           )}
-                          <p className="mt-1.5 text-[0.72rem] leading-relaxed text-[#666]">
+                          <p className="mt-1.5 text-[0.72rem] leading-relaxed text-tx3">
                             À saisir dans l&apos;application du produit — chaque appareil activé
                             consomme une activation.
                           </p>
                         </div>
                       ) : licensesError ? (
-                        <p className="rounded-[10px] border border-[rgba(244,162,97,0.4)] bg-[rgba(244,162,97,0.07)] px-3.5 py-3 text-[0.78rem] leading-relaxed text-[#f4a261]">
+                        <p className="rounded-[10px] border border-[rgba(244,162,97,0.4)] bg-[rgba(244,162,97,0.07)] px-3.5 py-3 text-[0.78rem] leading-relaxed text-warn">
                           Clés de licence momentanément indisponibles — rechargez la page ou
                           réessayez plus tard.
                         </p>
                       ) : (
-                        <p className="font-mono text-[0.78rem] text-[#666]">
+                        <p className="font-mono text-[0.78rem] text-tx3">
                           Chargement de votre clé de licence…
                         </p>
                       )}
@@ -498,7 +498,7 @@ export default function MyProductsPage() {
 
                   {/* Remboursé / annulé : solde recrédité par le serveur */}
                   {(p.status === "refunded" || p.status === "cancelled") && (
-                    <p className="mt-4 border-t border-dashed border-[#333] pt-4 text-[0.78rem] leading-relaxed text-[#a0a0a0]">
+                    <p className="mt-4 border-t border-dashed border-line pt-4 text-[0.78rem] leading-relaxed text-tx2">
                       {p.status === "refunded"
                         ? `Commande remboursée${p.refundedAt ? ` le ${formatDate(p.refundedAt)}` : ""} — les A correspondants ont été recrédités sur votre solde.`
                         : "Commande annulée — aucun accès associé."}
@@ -523,7 +523,7 @@ export default function MyProductsPage() {
           </ul>
         )}
 
-        <p className="mt-6 text-center font-mono text-[0.7rem] leading-relaxed text-[#666]">
+        <p className="mt-6 text-center font-mono text-[0.7rem] leading-relaxed text-tx3">
           Un accès manquant, une question ? Contactez l&apos;équipe Arsenal depuis la page
           d&apos;accueil du site.
         </p>

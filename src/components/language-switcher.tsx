@@ -30,8 +30,8 @@ export function LanguageSwitcher() {
             title={label}
             className={`cursor-pointer font-mono text-[0.72rem] leading-none transition-colors ${
               active
-                ? "text-[#f0f0f0] underline decoration-[#e63946] decoration-[1.5px] underline-offset-[3px]"
-                : "text-[#666] hover:text-[#f0f0f0]"
+                ? "text-tx1 underline decoration-[#e63946] decoration-[1.5px] underline-offset-[3px]"
+                : "text-tx3 hover:text-tx1"
             }`}
           >
             {code.toUpperCase()}

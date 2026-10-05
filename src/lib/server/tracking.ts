@@ -59,7 +59,7 @@ export const TRACKING_TTL_MS = 30 * 24 * 60 * 60 * 1000;
  * incrémentées — toute autre étape est ignorée silencieusement). Les vagues
  * suivantes brancheront la collecte sur ces points du parcours.
  */
-export const TRACKING_STEPS = ["product_view", "add_to_cart", "checkout_start", "purchase"] as const;
+export const TRACKING_STEPS = ["product_view", "add_to_cart", "feed_view", "checkout_start", "purchase"] as const;
 export type TrackingStep = (typeof TRACKING_STEPS)[number];
 
 /** true si `step` appartient à la liste FERMÉE des étapes connues. */

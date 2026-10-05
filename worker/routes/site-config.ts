@@ -15,6 +15,9 @@ import type { App, Env } from "../env";
 
 export const SITE_SETTING_KEYS = {
   homeShowStats: "home_show_stats",
+  /** Lien du canal Telegram de la communauté (menu ☰ → Communauté).
+   *  Vide = section masquée (jamais de lien inventé). */
+  communityTelegramUrl: "community_telegram_url",
 } as const;
 
 export type SiteSettingKey = (typeof SITE_SETTING_KEYS)[keyof typeof SITE_SETTING_KEYS];
@@ -29,10 +32,27 @@ export function isSiteSettingKey(key: string): key is SiteSettingKey {
  * acceptés — toute autre valeur est refusée (null), jamais stockée telle quelle.
  */
 export function normalizeSiteSetting(key: SiteSettingKey, raw: unknown): string | null {
-  if (key !== SITE_SETTING_KEYS.homeShowStats) return null;
-  if (raw === true || raw === 1 || raw === "1" || raw === "true") return "1";
-  if (raw === false || raw === 0 || raw === "0" || raw === "false") return "0";
+  if (key === SITE_SETTING_KEYS.homeShowStats) {
+    if (raw === true || raw === 1 || raw === "1" || raw === "true") return "1";
+    if (raw === false || raw === 0 || raw === "0" || raw === "false") return "0";
+    return null;
+  }
+  if (key === SITE_SETTING_KEYS.communityTelegramUrl) {
+    if (typeof raw !== "string") return null;
+    const value = raw.trim();
+    // Vide = effacer le lien (section Communauté masquée côté public).
+    if (!value) return "";
+    // Seuls http(s) sont acceptés — jamais de javascript:, data:, etc.
+    if (!/^https?:\/\//i.test(value) || value.length > 300) return null;
+    return value;
+  }
   return null;
+}
+
+/** Lien Telegram public ("" si non configuré). */
+export async function readCommunityTelegramUrl(db: D1Database): Promise<string> {
+  const value = (await getSetting(db, SITE_SETTING_KEYS.communityTelegramUrl)) ?? "";
+  return /^https?:\/\//i.test(value) ? value : "";
 }
 
 /** Défaut : statistiques AFFICHÉES (comportement historique du site). */
@@ -43,5 +63,10 @@ export async function readHomeShowStats(db: D1Database): Promise<boolean> {
 /** GET /api/site-config — drapeaux d'affichage publics (aucune authentification). */
 export const siteConfigRoutes: App = new Hono<{ Bindings: Env }>().get(
   "/api/site-config",
-  async (c) => c.json({ ok: true, showHomeStats: await readHomeShowStats(c.env.DB) })
+  async (c) =>
+    c.json({
+      ok: true,
+      showHomeStats: await readHomeShowStats(c.env.DB),
+      telegramUrl: await readCommunityTelegramUrl(c.env.DB),
+    })
 );

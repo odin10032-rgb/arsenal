@@ -40,7 +40,7 @@ function Shell({ children }: { children: React.ReactNode }) {
   return (
     <main className="flex min-h-dvh items-center justify-center px-5 py-10">
       <div className="w-full max-w-[360px] text-center">
-        <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-[#666]">
+        <p className="text-[0.72rem] font-semibold uppercase tracking-[0.22em] text-tx3">
           Arsenal Tools
         </p>
         {children}
@@ -55,7 +55,7 @@ function LoadingView() {
       <div className="mt-6 flex justify-center">
         <span className="spin" />
       </div>
-      <p className="mt-4 font-mono text-[0.8rem] text-[#666]" role="status">
+      <p className="mt-4 font-mono text-[0.8rem] text-tx3" role="status">
         Redirection en cours…
       </p>
     </>
@@ -120,7 +120,7 @@ function RedirectBody() {
     return (
       <Shell>
         <h1 className="mt-4 font-display text-[1.15rem] font-bold">Lien indisponible</h1>
-        <p className="mt-2 text-[0.85rem] leading-relaxed text-[#a0a0a0]">{message}</p>
+        <p className="mt-2 text-[0.85rem] leading-relaxed text-tx2">{message}</p>
         <Link href="/" className="btn-arsenal btn-ghost mt-6 w-full">
           Aller au catalogue
         </Link>

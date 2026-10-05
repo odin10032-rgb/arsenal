@@ -219,6 +219,7 @@ async function settingsJson(db: D1Database) {
       getSetting(db, LEGAL_SETTING_KEYS.notice),
       getSetting(db, SITE_SETTING_KEYS.homeShowStats),
     ]);
+  const telegramUrl = (await getSetting(db, SITE_SETTING_KEYS.communityTelegramUrl)) ?? "";
   return {
     ...settings,
     chariow_webhook_secret: "",
@@ -233,6 +234,8 @@ async function settingsJson(db: D1Database) {
     legal_notice: legalNotice ?? "",
     // Affichage public : « 1 » (défaut) = statistiques visibles sur l'accueil.
     home_show_stats: homeShowStats ?? "1",
+    // Communauté : lien Telegram ("" = non configuré → section masquée).
+    community_telegram_url: telegramUrl,
   };
 }
 
@@ -844,7 +847,7 @@ export const adminAffiliationRoutes: App = new Hono<{ Bindings: Env }>()
         // Affichage public : « 1 »/« 0 » uniquement (booléens tolérés côté client).
         const normalized = normalizeSiteSetting(key, value);
         if (normalized === null) {
-          return badRequest(`Valeur invalide pour « ${key} » (attendu : 1 ou 0).`);
+          return badRequest(`Valeur invalide pour « ${key} ».`);
         }
         await setSetting(c.env.DB, key, normalized);
       } else if (isAffiliateSettingKey(key)) {

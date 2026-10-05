@@ -30,6 +30,22 @@
   --badge-beta: #f4a261;
   --badge-nouveau: #00b4d8;
 
+  /* ---- Jetons sémantiques supplémentaires (mode clair/sombre, 05/10) ----
+     Le mode SOMBRE ci-dessus reste la référence visuelle ; le mode clair
+     redéfinit ces mêmes jetons dans [data-theme="light"]. Les composants
+     publics ne codent JAMAIS une couleur en dur : ils consomment ces jetons
+     (classes Tailwind tx1/tx2/tx3, s1/s2/s3, line/line2, panel…). */
+  --panel: rgba(255, 255, 255, 0.035);
+  --panel-strong: rgba(255, 255, 255, 0.06);
+  --header-bg: rgba(10, 10, 10, 0.92);
+  --teal-text: #4fb3a1;
+  --teal-strong: #7fd4cb;
+  --warn-text: #f4a261;
+  --danger-text: #fda4af;
+  --gold-text: #f4c886;
+  --price-text: #f0808a;
+  --overlay: rgba(5, 5, 5, 0.8);
+
   /* Tokens shadcn/ui (mappés sur la palette) */
   --background: #0a0a0a;
   --foreground: #f0f0f0;
@@ -51,6 +67,64 @@
   --input: #333333;
   --ring: #e63946;
   --radius: 10px;
+}
+
+/* ---------- MODE CLAIR ----------
+   Mêmes jetons sémantiques, valeurs claires. Activé par ThemeProvider
+   (data-theme="light" sur <html>) ; « système » suit prefers-color-scheme. */
+html[data-theme="light"] {
+  --bg: #f5f5f4;
+  --bg-surface: #ffffff;
+  --bg-surface-2: #f0f0ee;
+  --bg-surface-3: #e6e6e3;
+  --border-base: #e3e3e0;
+  --border-hover: #c9c9c5;
+
+  --text-primary: #16161a;
+  --text-secondary: #55555a;
+  --text-tertiary: #85858a;
+
+  --accent-red: #d62839;
+  --accent-red-hover: #b8202f;
+  --accent-green: #17796d;
+  --accent-orange: #b45c1f;
+  --accent-gold: #96790f;
+
+  --badge-premium: #7c3aed;
+  --badge-beta: #b45c1f;
+  --badge-nouveau: #0284b6;
+
+  --panel: rgba(16, 16, 20, 0.03);
+  --panel-strong: rgba(16, 16, 20, 0.055);
+  --header-bg: rgba(255, 255, 255, 0.9);
+  --teal-text: #17796d;
+  --teal-strong: #0f5d54;
+  --warn-text: #a8541b;
+  --danger-text: #b3261e;
+  --gold-text: #8a6d0b;
+  --price-text: #c0253a;
+  --overlay: rgba(20, 20, 22, 0.45);
+
+  /* Tokens shadcn/ui */
+  --background: #f5f5f4;
+  --foreground: #16161a;
+  --card: #ffffff;
+  --card-foreground: #16161a;
+  --popover: #ffffff;
+  --popover-foreground: #16161a;
+  --primary: #d62839;
+  --primary-foreground: #ffffff;
+  --secondary: #f0f0ee;
+  --secondary-foreground: #16161a;
+  --muted: #f0f0ee;
+  --muted-foreground: #55555a;
+  --accent: #f0f0ee;
+  --accent-foreground: #16161a;
+  --destructive: #d62839;
+  --destructive-foreground: #ffffff;
+  --border: #e3e3e0;
+  --input: #e3e3e0;
+  --ring: #d62839;
 }
 
 /* Mapping Tailwind v4 → classes utilitaires (bg-background, text-muted-foreground…) */
@@ -79,6 +153,30 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-gold: var(--accent-gold);
+
+  /* Jetons sémantiques publics (mode clair/sombre) */
+  --color-bg: var(--bg);
+  --color-s1: var(--bg-surface);
+  --color-s2: var(--bg-surface-2);
+  --color-s3: var(--bg-surface-3);
+  --color-line: var(--border-base);
+  --color-line2: var(--border-hover);
+  --color-tx1: var(--text-primary);
+  --color-tx2: var(--text-secondary);
+  --color-tx3: var(--text-tertiary);
+  --color-panel: var(--panel);
+  --color-panel2: var(--panel-strong);
+  --color-teal: var(--teal-text);
+  --color-teal2: var(--teal-strong);
+  --color-warn: var(--warn-text);
+  --color-dangertx: var(--danger-text);
+  --color-goldtx: var(--gold-text);
+  --color-pricetx: var(--price-text);
+  --color-brand: var(--accent-red);
+  --color-ok: var(--accent-green);
+  --color-bpremium: var(--badge-premium);
+  --color-bbeta: var(--badge-beta);
+  --color-bnew: var(--badge-nouveau);
 
   --radius-sm: 6px;
   --radius-md: 10px;
@@ -193,8 +291,8 @@ body {
   width: 15px;
   height: 15px;
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff;
+  border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
   animation: spin 0.7s linear infinite;
 }
 @keyframes spin {
@@ -209,7 +307,7 @@ body {
   padding: 0.62rem 0.85rem;
   border-radius: 10px;
   border: 1px solid var(--border-base);
-  background: rgba(20, 20, 20, 0.85);
+  background: var(--bg-surface);
   color: var(--text-primary);
   font-size: 0.9rem;
   transition: border-color 0.2s;

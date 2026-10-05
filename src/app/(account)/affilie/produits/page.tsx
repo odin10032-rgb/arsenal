@@ -295,7 +295,7 @@ export default function AffiliateProductsPage() {
   if (loading) {
     return (
       <div className="flex justify-center p-10">
-        <p className="font-mono text-[0.85rem] text-[#666]">Chargement de votre espace…</p>
+        <p className="font-mono text-[0.85rem] text-tx3">Chargement de votre espace…</p>
       </div>
     );
   }
@@ -307,7 +307,7 @@ export default function AffiliateProductsPage() {
       <div className="mx-auto w-full max-w-[720px]">
         <Link
           href="/compte"
-          className="inline-flex items-center gap-1.5 text-[0.78rem] text-[#666] transition-colors hover:text-[#f0f0f0]"
+          className="inline-flex items-center gap-1.5 text-[0.78rem] text-tx3 transition-colors hover:text-tx1"
         >
           <svg
             viewBox="0 0 24 24"
@@ -328,7 +328,7 @@ export default function AffiliateProductsPage() {
         <div className="mt-3 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="font-display text-[1.35rem] font-bold">Mes produits</h1>
-            <p className="mt-1 text-[0.84rem] text-[#a0a0a0]">
+            <p className="mt-1 text-[0.84rem] text-tx2">
               Copiez un lien, partagez-le : chaque clic et chaque vente sont comptés ici.
             </p>
           </div>
@@ -350,7 +350,7 @@ export default function AffiliateProductsPage() {
 
         {error && (
           <p
-            className="mt-5 rounded-lg border border-[rgba(230,57,70,0.4)] bg-[rgba(230,57,70,0.1)] px-3 py-2 text-[0.8rem] text-[#fda4af]"
+            className="mt-5 rounded-lg border border-[rgba(230,57,70,0.4)] bg-[rgba(230,57,70,0.1)] px-3 py-2 text-[0.8rem] text-dangertx"
             role="alert"
           >
             {error}
@@ -359,7 +359,7 @@ export default function AffiliateProductsPage() {
 
         {notice && (
           <p
-            className="mt-5 rounded-lg border border-[rgba(42,157,143,0.4)] bg-[rgba(42,157,143,0.1)] px-3 py-2 text-[0.8rem] text-[#7fd4cb]"
+            className="mt-5 rounded-lg border border-[rgba(42,157,143,0.4)] bg-[rgba(42,157,143,0.1)] px-3 py-2 text-[0.8rem] text-teal2"
             role="status"
           >
             {notice}
@@ -367,7 +367,7 @@ export default function AffiliateProductsPage() {
         )}
 
         {pageLoading ? (
-          <p className="mt-8 font-mono text-[0.8rem] text-[#666]">Chargement de vos produits…</p>
+          <p className="mt-8 font-mono text-[0.8rem] text-tx3">Chargement de vos produits…</p>
         ) : !affiliate ? (
           <AccessCard
             title="Espace réservé aux affiliés"
@@ -399,9 +399,9 @@ export default function AffiliateProductsPage() {
             ctaHref="/affilie"
           />
         ) : products.length === 0 ? (
-          <div className="mt-6 rounded-2xl border border-[#333] bg-[#141414] p-6 text-center sm:p-8">
+          <div className="mt-6 rounded-2xl border border-line bg-s1 p-6 text-center sm:p-8">
             <p className="font-display text-[1rem] font-bold">Aucun produit éligible</p>
-            <p className="mx-auto mt-2 max-w-[42ch] text-[0.84rem] leading-relaxed text-[#a0a0a0]">
+            <p className="mx-auto mt-2 max-w-[42ch] text-[0.84rem] leading-relaxed text-tx2">
               Aucun produit n&apos;est ouvert à l&apos;affiliation pour le moment. Revenez bientôt :
               les nouveautés apparaissent ici automatiquement.
             </p>
@@ -411,7 +411,7 @@ export default function AffiliateProductsPage() {
             {/* Plafonds (vague 4) : lisibles d'un coup d'œil (jauges), pas seulement un badge */}
             <LimitsPanel limits={limits} products={products} />
 
-            <p className="mt-3 font-mono text-[0.74rem] text-[#666]">
+            <p className="mt-3 font-mono text-[0.74rem] text-tx3">
               {products.length} produit{products.length > 1 ? "s" : ""} éligible
               {products.length > 1 ? "s" : ""}
             </p>
@@ -450,9 +450,9 @@ export default function AffiliateProductsPage() {
       {/* Panneau de CHOIX en cas de plafond atteint : désactiver un lien, ou abandonner */}
       {conflict && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-[480px] rounded-2xl border border-[#333] bg-[#141414] p-6">
+          <div className="w-full max-w-[480px] rounded-2xl border border-line bg-s1 p-6">
             <h2 className="font-display text-[1.05rem] font-bold">Plafond de liens atteint</h2>
-            <p className="mt-2 text-[0.84rem] leading-relaxed text-[#a0a0a0]">
+            <p className="mt-2 text-[0.84rem] leading-relaxed text-tx2">
               Vous avez déjà {fmt(conflict.info.limits.activeCount)} lien
               {conflict.info.limits.activeCount > 1 ? "s" : ""} actif
               {conflict.info.limits.activeCount > 1 ? "s" : ""} sur un maximum de{" "}
@@ -464,20 +464,20 @@ export default function AffiliateProductsPage() {
             </p>
             <ul className="mt-4 flex flex-col gap-2">
               {conflict.info.activeLinks.length === 0 ? (
-                <li className="text-[0.82rem] text-[#f4a261]">
+                <li className="text-[0.82rem] text-warn">
                   Aucun lien actif renvoyé par le serveur — actualisez la page.
                 </li>
               ) : (
                 conflict.info.activeLinks.map((l) => (
                   <li
                     key={l.id}
-                    className="flex items-center justify-between gap-3 rounded-xl border border-[#333] bg-[rgba(255,255,255,0.02)] px-3 py-2"
+                    className="flex items-center justify-between gap-3 rounded-xl border border-line bg-panel px-3 py-2"
                   >
                     <span className="min-w-0">
-                      <span className="block truncate font-mono text-[0.76rem] text-[#a0a0a0]">
+                      <span className="block truncate font-mono text-[0.76rem] text-tx2">
                         {l.linkCode}
                       </span>
-                      <span className="block font-mono text-[0.68rem] tabular-nums text-[#666]">
+                      <span className="block font-mono text-[0.68rem] tabular-nums text-tx3">
                         {fmt(l.salesCount)} /{" "}
                         {conflict.info.limits.maxSalesPerLink > 0
                           ? fmt(conflict.info.limits.maxSalesPerLink)
@@ -527,9 +527,9 @@ function AccessCard({
   ctaHref: string;
 }) {
   return (
-    <div className="mt-6 rounded-2xl border border-[#333] bg-[#141414] p-6 sm:p-8">
+    <div className="mt-6 rounded-2xl border border-line bg-s1 p-6 sm:p-8">
       <h2 className="font-display text-[1.05rem] font-bold">{title}</h2>
-      <p className="mt-2 text-[0.86rem] leading-relaxed text-[#a0a0a0]">{message}</p>
+      <p className="mt-2 text-[0.86rem] leading-relaxed text-tx2">{message}</p>
       <Link href={ctaHref} className="btn-arsenal btn-ghost mt-6 w-full">
         {ctaLabel}
       </Link>
@@ -556,18 +556,18 @@ function LimitGauge({
 }) {
   const pct = unlimited || max <= 0 ? 0 : Math.min(100, Math.round((current / max) * 100));
   return (
-    <div className="rounded-xl border border-[#333] bg-[rgba(255,255,255,0.02)] p-3.5">
-      <p className="text-[0.68rem] uppercase tracking-wider text-[#666]">{label}</p>
-      <p className="mt-1 font-mono text-[1.15rem] font-bold tabular-nums text-[#f0f0f0]">
+    <div className="rounded-xl border border-line bg-panel p-3.5">
+      <p className="text-[0.68rem] uppercase tracking-wider text-tx3">{label}</p>
+      <p className="mt-1 font-mono text-[1.15rem] font-bold tabular-nums text-tx1">
         {fmt(current)}
-        <span className="text-[0.85rem] font-normal text-[#666]">
+        <span className="text-[0.85rem] font-normal text-tx3">
           {" / "}
           {unlimited || max <= 0 ? "∞" : fmt(max)}
         </span>
       </p>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#222]">
+      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-s3">
         <div
-          className={`h-full rounded-full ${danger ? "bg-[#e63946]" : "bg-[#2a9d8f]"}`}
+          className={`h-full rounded-full ${danger ? "bg-brand" : "bg-ok"}`}
           style={{ width: (unlimited || max <= 0 ? (current > 0 ? 100 : 0) : pct) + "%" }}
         />
       </div>
@@ -604,7 +604,7 @@ function LimitsPanel({
     limits.maxSalesPerLink > 0 ? limits.activeCount * limits.maxSalesPerLink : 0;
 
   return (
-    <div className="mt-5 rounded-2xl border border-[#333] bg-[#141414] p-4 sm:p-5">
+    <div className="mt-5 rounded-2xl border border-line bg-s1 p-4 sm:p-5">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <LimitGauge
           label="Liens actifs"
@@ -630,10 +630,10 @@ function LimitsPanel({
         />
       </div>
 
-      <p className="mt-3 text-[0.76rem] leading-relaxed text-[#666]">
+      <p className="mt-3 text-[0.76rem] leading-relaxed text-tx3">
         {campaignCount > 0 && !unlimited && (
           <>
-            Vos <b className="text-[#a0a0a0]">{fmt(campaignCount)}</b> lien
+            Vos <b className="text-tx2">{fmt(campaignCount)}</b> lien
             {campaignCount > 1 ? "s" : ""} de campagne ne comptent PAS dans le plafond de{" "}
             {fmt(limits.maxActiveLinks)} lien{limits.maxActiveLinks > 1 ? "s" : ""} actif
             {limits.maxActiveLinks > 1 ? "s" : ""} : ils viennent en plus.{" "}
@@ -644,7 +644,7 @@ function LimitsPanel({
         ) : linksFull ? (
           <>
             Vous avez atteint votre maximum de {fmt(limits.maxActiveLinks)} liens actifs.{" "}
-            <b className="text-[#a0a0a0]">Désactivez un autre lien pour libérer une place</b> avant
+            <b className="text-tx2">Désactivez un autre lien pour libérer une place</b> avant
             d&apos;en activer un nouveau.
           </>
         ) : (
@@ -704,8 +704,8 @@ function ProductCard({
       : 0;
 
   return (
-    <article className="flex flex-col overflow-hidden rounded-2xl border border-[#333] bg-[#141414] transition-colors duration-200 hover:border-[#444]">
-      <div className="aspect-[16/9] w-full overflow-hidden border-b border-[#333] bg-[#1a1a1a]">
+    <article className="flex flex-col overflow-hidden rounded-2xl border border-line bg-s1 transition-colors duration-200 hover:border-line2">
+      <div className="aspect-[16/9] w-full overflow-hidden border-b border-line bg-s2">
         {product.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -721,37 +721,37 @@ function ProductCard({
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-display text-[1rem] font-bold leading-snug">{product.title}</h3>
           {isSaturated ? (
-            <span className="flex-shrink-0 rounded-md border border-[rgba(230,57,70,0.45)] bg-[rgba(230,57,70,0.1)] px-2 py-0.5 font-mono text-[0.66rem] font-semibold uppercase text-[#fda4af]">
+            <span className="flex-shrink-0 rounded-md border border-[rgba(230,57,70,0.45)] bg-[rgba(230,57,70,0.1)] px-2 py-0.5 font-mono text-[0.66rem] font-semibold uppercase text-dangertx">
               Saturé
             </span>
           ) : isActive ? (
-            <span className="flex-shrink-0 rounded-md border border-[rgba(42,157,143,0.45)] bg-[rgba(42,157,143,0.1)] px-2 py-0.5 font-mono text-[0.66rem] font-semibold uppercase text-[#7fd4cb]">
+            <span className="flex-shrink-0 rounded-md border border-[rgba(42,157,143,0.45)] bg-[rgba(42,157,143,0.1)] px-2 py-0.5 font-mono text-[0.66rem] font-semibold uppercase text-teal2">
               Actif
             </span>
           ) : isInactive ? (
-            <span className="flex-shrink-0 rounded-md border border-[#333] bg-[#1a1a1a] px-2 py-0.5 font-mono text-[0.66rem] font-semibold uppercase text-[#a0a0a0]">
+            <span className="flex-shrink-0 rounded-md border border-line bg-s2 px-2 py-0.5 font-mono text-[0.66rem] font-semibold uppercase text-tx2">
               Inactif
             </span>
           ) : null}
         </div>
         {product.price && (
-          <p className="mt-1.5 font-mono text-[0.82rem] text-[#f0808a]">{product.price}</p>
+          <p className="mt-1.5 font-mono text-[0.82rem] text-pricetx">{product.price}</p>
         )}
 
         {/* Commission + récompense A — avec l'ORIGINE de la règle : sans elle,
             un affilié ne peut pas voir l'effet d'une campagne (constat 03/10). */}
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="rounded-md border border-[rgba(42,157,143,0.4)] bg-[rgba(42,157,143,0.08)] px-2 py-0.5 font-mono text-[0.72rem] font-semibold text-[#4fb3a1]">
+          <span className="rounded-md border border-[rgba(42,157,143,0.4)] bg-[rgba(42,157,143,0.08)] px-2 py-0.5 font-mono text-[0.72rem] font-semibold text-teal">
             Commission {commissionLabel(product)}
             {product.commissionSource === "campaign" && (
-              <span className="ml-1 text-[#f4a261]">· campagne</span>
+              <span className="ml-1 text-warn">· campagne</span>
             )}
           </span>
           {product.rewardA > 0 && (
             <span className="inline-flex items-center gap-1 rounded-md border border-[rgba(212,175,55,0.4)] bg-[rgba(212,175,55,0.08)] px-2 py-0.5 font-mono text-[0.72rem] font-semibold text-gold">
               +{fmt(product.rewardA)} A
               {product.rewardSource === "campaign" && (
-                <span className="text-[#f4a261]">· campagne</span>
+                <span className="text-warn">· campagne</span>
               )}
             </span>
           )}
@@ -760,20 +760,20 @@ function ProductCard({
         {/* Campagne active : bandeau visible + comparatif avec le produit seul. */}
         {product.campaign && (
           <div className="mt-3 rounded-[10px] border border-[rgba(244,162,97,0.4)] bg-[rgba(244,162,97,0.07)] px-3.5 py-3">
-            <p className="flex flex-wrap items-baseline gap-x-2 text-[0.78rem] font-semibold text-[#f4c886]">
+            <p className="flex flex-wrap items-baseline gap-x-2 text-[0.78rem] font-semibold text-goldtx">
               Campagne « {product.campaign.name} »
               {product.campaign.endsAt != null && (
-                <span className="font-mono text-[0.68rem] font-normal text-[#a0a0a0]">
+                <span className="font-mono text-[0.68rem] font-normal text-tx2">
                   jusqu&apos;au {new Date(product.campaign.endsAt).toLocaleDateString("fr-FR")}
                 </span>
               )}
             </p>
-            <div className="mt-1.5 flex flex-col gap-1 text-[0.74rem] leading-relaxed text-[#a0a0a0]">
+            <div className="mt-1.5 flex flex-col gap-1 text-[0.74rem] leading-relaxed text-tx2">
               {/* Comparatif : ce que la campagne apporte CONCRÈTEMENT. */}
               {product.commissionSource === "campaign" && (
                 <p>
                   Commission portée à{" "}
-                  <b className="text-[#f0f0f0]">{commissionLabel(product)}</b> (au lieu de{" "}
+                  <b className="text-tx1">{commissionLabel(product)}</b> (au lieu de{" "}
                   {product.baseCommissionType === "fixed"
                     ? `${fmt(product.baseCommissionValue)} ${CURRENCY}`
                     : `${fmt(product.baseCommissionValue)} %`}
@@ -788,7 +788,7 @@ function ProductCard({
               )}
               {product.campaign.goalSales != null && (
                 <p>
-                  Objectif de la campagne : <b className="text-[#f0f0f0]">{fmt(product.campaign.goalSales)}</b>{" "}
+                  Objectif de la campagne : <b className="text-tx1">{fmt(product.campaign.goalSales)}</b>{" "}
                   vente(s).
                 </p>
               )}
@@ -797,17 +797,17 @@ function ProductCard({
         )}
 
         {/* Performance */}
-        <dl className="mt-4 grid grid-cols-3 gap-2 border-t border-dashed border-[#333] pt-4">
+        <dl className="mt-4 grid grid-cols-3 gap-2 border-t border-dashed border-line pt-4">
           {[
             { label: "Clics", value: fmt(product.clicks) },
             { label: "Ventes", value: fmt(product.sales) },
             { label: "Conversion", value: `${fmt(product.conversion)} %` },
           ].map((s) => (
             <div key={s.label}>
-              <dt className="font-mono text-[0.6rem] uppercase tracking-[0.1em] text-[#666]">
+              <dt className="font-mono text-[0.6rem] uppercase tracking-[0.1em] text-tx3">
                 {s.label}
               </dt>
-              <dd className="mt-0.5 font-mono text-[0.9rem] font-semibold tabular-nums text-[#f0f0f0]">
+              <dd className="mt-0.5 font-mono text-[0.9rem] font-semibold tabular-nums text-tx1">
                 {s.value}
               </dd>
             </div>
@@ -818,20 +818,20 @@ function ProductCard({
         {product.linkId && maxSalesPerLink > 0 && (
           <div className="mt-3">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="font-mono text-[0.72rem] tabular-nums text-[#666]">
+              <span className="font-mono text-[0.72rem] tabular-nums text-tx3">
                 Ventes sur ce lien
               </span>
               <span
                 className={`font-mono text-[0.78rem] font-semibold tabular-nums ${
-                  isSaturated ? "text-[#fda4af]" : "text-[#f0f0f0]"
+                  isSaturated ? "text-dangertx" : "text-tx1"
                 }`}
               >
                 {fmt(product.salesCount)} / {fmt(maxSalesPerLink)}
               </span>
             </div>
-            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#222]">
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-s3">
               <div
-                className={`h-full rounded-full ${isSaturated ? "bg-[#e63946]" : "bg-[#2a9d8f]"}`}
+                className={`h-full rounded-full ${isSaturated ? "bg-brand" : "bg-ok"}`}
                 style={{ width: salesPct + "%" }}
               />
             </div>
@@ -842,10 +842,10 @@ function ProductCard({
         <div className="mt-auto pt-4">
           {isActive ? (
             <>
-              <p className="font-mono text-[0.6rem] uppercase tracking-[0.1em] text-[#666]">
+              <p className="font-mono text-[0.6rem] uppercase tracking-[0.1em] text-tx3">
                 Lien de suivi
               </p>
-              <p className="mt-1.5 break-all rounded-lg border border-[#333] bg-[#111] px-3 py-2 font-mono text-[0.74rem] text-[#a0a0a0]">
+              <p className="mt-1.5 break-all rounded-lg border border-line bg-s2 px-3 py-2 font-mono text-[0.74rem] text-tx2">
                 {product.link}
               </p>
               <div className="mt-2 flex flex-col gap-2 sm:flex-row">
@@ -869,10 +869,10 @@ function ProductCard({
             </>
           ) : (
             <>
-              <p className="font-mono text-[0.6rem] uppercase tracking-[0.1em] text-[#666]">
+              <p className="font-mono text-[0.6rem] uppercase tracking-[0.1em] text-tx3">
                 Lien de suivi
               </p>
-              <p className="mt-1.5 text-[0.78rem] leading-relaxed text-[#a0a0a0]">
+              <p className="mt-1.5 text-[0.78rem] leading-relaxed text-tx2">
                 {isSaturated
                   ? "Ce lien a atteint son plafond de ventes et a été désactivé automatiquement. Vos ventes acquises sont conservées : activez-le pour repartir, ou choisissez un autre produit."
                   : neverActivated
@@ -881,7 +881,7 @@ function ProductCard({
               </p>
               {/* Pourquoi l'activation peut être refusée : plafond de liens atteint */}
               {!neverActivated && linksFull && (
-                <p className="mt-2 rounded-lg border border-[rgba(244,162,97,0.4)] bg-[rgba(244,162,97,0.08)] px-3 py-2 text-[0.76rem] leading-relaxed text-[#f4a261]">
+                <p className="mt-2 rounded-lg border border-[rgba(244,162,97,0.4)] bg-[rgba(244,162,97,0.08)] px-3 py-2 text-[0.76rem] leading-relaxed text-warn">
                   Vos {fmt(maxActiveLinks)} liens actifs sont utilisés. Pour réactiver celui-ci,{" "}
                   <b>désactivez un autre lien</b> (bouton dans le panneau de choix proposé à
                   l&apos;activation) afin de libérer une place.

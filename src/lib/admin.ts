@@ -500,6 +500,11 @@ export interface AdminSettings {
    * (outils, gratuits, clics) visible ; « 0 » = masquée.
    */
   home_show_stats?: string;
+  /**
+   * Communauté : lien du canal Telegram affiché dans le menu ☰ du site public.
+   * `""` = non configuré (section masquée).
+   */
+  community_telegram_url?: string;
 }
 
 export async function fetchAdminSettings(): Promise<AdminSettings> {
@@ -523,6 +528,7 @@ export async function fetchAdminSettings(): Promise<AdminSettings> {
     legal_terms: legalText(settings.legal_terms),
     legal_notice: legalText(settings.legal_notice),
     home_show_stats: legalText(settings.home_show_stats),
+    community_telegram_url: legalText(settings.community_telegram_url),
   };
 }
 

@@ -73,9 +73,9 @@ export function PurchaseAccessPanel({
             />
           </svg>
         </a>
-        <p className="text-[0.76rem] leading-relaxed text-[#a0a0a0]">
+        <p className="text-[0.76rem] leading-relaxed text-tx2">
           Votre accès est associé à l&apos;adresse{" "}
-          <b className="break-all font-mono text-[0.74rem] text-[#f0f0f0]">
+          <b className="break-all font-mono text-[0.74rem] text-tx1">
             {access.email || sessionEmail || "de votre compte"}
           </b>
           . Ouvrez le portail d&apos;accès et identifiez-vous avec cet email.
@@ -88,11 +88,11 @@ export function PurchaseAccessPanel({
     return (
       <div className="flex flex-col gap-2">
         {access.instructions ? (
-          <p className="whitespace-pre-line rounded-[10px] border border-[#333] bg-[rgba(255,255,255,0.02)] p-3 text-[0.82rem] leading-relaxed text-[#f0f0f0]">
+          <p className="whitespace-pre-line rounded-[10px] border border-line bg-panel p-3 text-[0.82rem] leading-relaxed text-tx1">
             {access.instructions}
           </p>
         ) : (
-          <p className="text-[0.82rem] leading-relaxed text-[#a0a0a0]">
+          <p className="text-[0.82rem] leading-relaxed text-tx2">
             Votre accès vous est transmis par l&apos;équipe Arsenal (livraison manuelle de cette
             commande).
           </p>
@@ -102,7 +102,7 @@ export function PurchaseAccessPanel({
   }
 
   return (
-    <p className="text-[0.8rem] leading-relaxed text-[#a0a0a0]">
+    <p className="text-[0.8rem] leading-relaxed text-tx2">
       Les instructions d&apos;accès de cette commande apparaîtront ici.
     </p>
   );
@@ -212,11 +212,11 @@ export function BuyWithA({ product }: { product: Product }) {
    */
   if (user && !isMember(user)) {
     return (
-      <div className="rounded-[10px] border border-[#333] bg-[#141414] p-4 sm:p-5">
+      <div className="rounded-[10px] border border-line bg-s1 p-4 sm:p-5">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
           <CoinA size={30} />
           <div className="min-w-0">
-            <p className="font-mono text-[0.66rem] uppercase tracking-[0.12em] text-[#666]">
+            <p className="font-mono text-[0.66rem] uppercase tracking-[0.12em] text-tx3">
               Paiement en A
             </p>
             <p className="font-display text-[1.05rem] font-bold leading-tight">
@@ -224,8 +224,8 @@ export function BuyWithA({ product }: { product: Product }) {
             </p>
           </div>
         </div>
-        <div className="mt-4 flex flex-col gap-2.5 border-t border-dashed border-[#333] pt-4">
-          <p className="text-[0.84rem] leading-relaxed text-[#a0a0a0]">
+        <div className="mt-4 flex flex-col gap-2.5 border-t border-dashed border-line pt-4">
+          <p className="text-[0.84rem] leading-relaxed text-tx2">
             L&apos;achat en A est réservé aux membres. Découvrez le programme pour gagner des A.
           </p>
           <Link href="/affiliation" className="btn-arsenal btn-ghost w-full">
@@ -239,12 +239,12 @@ export function BuyWithA({ product }: { product: Product }) {
   }
 
   return (
-    <div className="rounded-[10px] border border-[#333] bg-[#141414] p-4 sm:p-5">
+    <div className="rounded-[10px] border border-line bg-s1 p-4 sm:p-5">
       {/* En-tête : prix en A */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <CoinA size={30} />
         <div className="min-w-0">
-          <p className="font-mono text-[0.66rem] uppercase tracking-[0.12em] text-[#666]">
+          <p className="font-mono text-[0.66rem] uppercase tracking-[0.12em] text-tx3">
             Paiement en A
           </p>
           <p className="font-display text-[1.05rem] font-bold leading-tight">
@@ -254,7 +254,7 @@ export function BuyWithA({ product }: { product: Product }) {
           </p>
         </div>
         {user && (
-          <p className="ml-auto whitespace-nowrap font-mono text-[0.72rem] text-[#a0a0a0]">
+          <p className="ml-auto whitespace-nowrap font-mono text-[0.72rem] text-tx2">
             Solde : <span className="tabular-nums">{fmt(user.balanceA)}</span>
             <span className="text-gold"> A</span>
           </p>
@@ -263,8 +263,8 @@ export function BuyWithA({ product }: { product: Product }) {
 
       {/* Accès obtenu (succès) */}
       {result && (
-        <div className="mt-4 flex flex-col gap-3 border-t border-dashed border-[#333] pt-4">
-          <p className="flex items-center gap-2 text-[0.9rem] font-semibold text-[#56b8a8]">
+        <div className="mt-4 flex flex-col gap-3 border-t border-dashed border-line pt-4">
+          <p className="flex items-center gap-2 text-[0.9rem] font-semibold text-teal">
             <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
               <path
                 d="m5 13 4 4L19 7"
@@ -280,7 +280,7 @@ export function BuyWithA({ product }: { product: Product }) {
 
           {isDeliveryPending(result) ? (
             <>
-              <p className="text-[0.82rem] leading-relaxed text-[#a0a0a0]">
+              <p className="text-[0.82rem] leading-relaxed text-tx2">
                 Livraison en cours : votre accès s&apos;activera dès que la commande sera livrée.
                 Vos A sont débités une seule fois et rien n&apos;est perdu en cas d&apos;échec.
               </p>
@@ -307,7 +307,7 @@ export function BuyWithA({ product }: { product: Product }) {
         >
           <p
             className="text-[0.84rem] leading-relaxed"
-            style={{ color: feedback.kind === "balance" ? "#f4a261" : "#fda4af" }}
+            style={{ color: feedback.kind === "balance" ? "var(--warn-text)" : "var(--danger-text)" }}
           >
             {feedback.kind === "balance" && feedback.missingA !== null
               ? `Il vous manque ${fmt(feedback.missingA)} A pour obtenir ce produit.`
@@ -335,11 +335,11 @@ export function BuyWithA({ product }: { product: Product }) {
 
       {/* État du bloc selon la session */}
       {!result && !loading && !user && (
-        <div className="mt-4 flex flex-col gap-2.5 border-t border-dashed border-[#333] pt-4">
+        <div className="mt-4 flex flex-col gap-2.5 border-t border-dashed border-line pt-4">
           <Link href="/connexion" className="btn-arsenal btn-primary w-full">
             Se connecter pour acheter
           </Link>
-          <p className="text-[0.76rem] leading-relaxed text-[#666]">
+          <p className="text-[0.76rem] leading-relaxed text-tx3">
             L&apos;achat se règle avec votre solde A, sans carte bancaire.
           </p>
           {/* Le panier reste ouvert à tous, même sans compte */}
@@ -351,7 +351,7 @@ export function BuyWithA({ product }: { product: Product }) {
       )}
 
       {!result && user && owned !== true && (
-        <div className="mt-4 flex flex-col gap-2.5 border-t border-dashed border-[#333] pt-4">
+        <div className="mt-4 flex flex-col gap-2.5 border-t border-dashed border-line pt-4">
           <button
             type="button"
             onClick={() => setConfirmOpen(true)}
@@ -361,7 +361,7 @@ export function BuyWithA({ product }: { product: Product }) {
             <CoinA size={17} />
             Obtenir pour {fmt(priceA)} A
           </button>
-          <p className="text-[0.76rem] leading-relaxed text-[#666]">
+          <p className="text-[0.76rem] leading-relaxed text-tx3">
             Débit immédiat de votre solde A. L&apos;accès est ouvert dès que la livraison est
             confirmée par le serveur.
           </p>
@@ -370,8 +370,8 @@ export function BuyWithA({ product }: { product: Product }) {
       )}
 
       {!result && user && owned === true && (
-        <div className="mt-4 flex flex-col gap-2.5 border-t border-dashed border-[#333] pt-4">
-          <p className="text-[0.86rem] text-[#a0a0a0]">Vous possédez déjà ce produit.</p>
+        <div className="mt-4 flex flex-col gap-2.5 border-t border-dashed border-line pt-4">
+          <p className="text-[0.86rem] text-tx2">Vous possédez déjà ce produit.</p>
           <Link href="/compte/produits" className="btn-arsenal btn-ghost w-full">
             Voir Mes produits
           </Link>

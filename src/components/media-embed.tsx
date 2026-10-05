@@ -10,7 +10,7 @@ export function MediaEmbed({ video }: { video: ParsedVideo }) {
   return (
     <div>
       {video.vertical ? (
-        <div className="flex justify-center rounded-[10px] border border-[#333] bg-[#0a0a0a] py-3">
+        <div className="flex justify-center rounded-[10px] border border-line bg-bg py-3">
           <div className="relative h-[min(66dvh,560px)] max-w-full overflow-hidden rounded-xl shadow-[0_24px_48px_rgba(0,0,0,0.55)]" style={{ aspectRatio: "9/16" }}>
             <iframe
               src={video.embedUrl}
@@ -24,7 +24,7 @@ export function MediaEmbed({ video }: { video: ParsedVideo }) {
           </div>
         </div>
       ) : (
-        <div className="relative overflow-hidden rounded-[10px] border border-[#444] bg-[#0a0a0a] shadow-[0_18px_44px_rgba(0,0,0,0.45)]" style={{ aspectRatio: "16/9" }}>
+        <div className="relative overflow-hidden rounded-[10px] border border-line2 bg-bg shadow-[0_18px_44px_rgba(0,0,0,0.45)]" style={{ aspectRatio: "16/9" }}>
           <iframe
             src={video.embedUrl}
             title="Démonstration vidéo"
@@ -36,8 +36,8 @@ export function MediaEmbed({ video }: { video: ParsedVideo }) {
           />
         </div>
       )}
-      <p className="mt-2 inline-flex items-center gap-1.5 font-mono text-[0.62rem] uppercase tracking-[0.08em] text-[#666]">
-        Format détecté : <b className="font-semibold text-[#4fb3a1]">{video.label}</b> — intégration{" "}
+      <p className="mt-2 inline-flex items-center gap-1.5 font-mono text-[0.62rem] uppercase tracking-[0.08em] text-tx3">
+        Format détecté : <b className="font-semibold text-teal">{video.label}</b> — intégration{" "}
         {video.vertical ? "verticale 9:16" : "horizontale 16:9"}
       </p>
     </div>

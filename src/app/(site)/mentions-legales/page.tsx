@@ -47,16 +47,16 @@ export default function MentionsLegalesPage() {
 
       <div className="mt-6 max-w-[72ch]">
         {state === "loading" ? (
-          <p className="font-mono text-[0.85rem] text-[#666]">Chargement…</p>
+          <p className="font-mono text-[0.85rem] text-tx3">Chargement…</p>
         ) : state === "error" ? (
-          <p className="text-[0.92rem] leading-relaxed text-[#a0a0a0]">
+          <p className="text-[0.92rem] leading-relaxed text-tx2">
             Le contenu de cette page est momentanément indisponible.
           </p>
         ) : text.trim() ? (
-          <p className="whitespace-pre-line text-[0.95rem] leading-[1.75] text-[#a0a0a0]">{text}</p>
+          <p className="whitespace-pre-line text-[0.95rem] leading-[1.75] text-tx2">{text}</p>
         ) : (
-          <div className="rounded-2xl border border-[#333] bg-[#141414] p-5">
-            <p className="text-[0.92rem] leading-relaxed text-[#a0a0a0]">
+          <div className="rounded-2xl border border-line bg-s1 p-5">
+            <p className="text-[0.92rem] leading-relaxed text-tx2">
               Cette page n&rsquo;est pas encore renseignée.
             </p>
           </div>

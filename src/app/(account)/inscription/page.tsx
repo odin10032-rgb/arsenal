@@ -70,7 +70,7 @@ export default function InscriptionPage() {
     <button
       type="button"
       onClick={() => setShow((s) => !s)}
-      className="absolute right-3 top-1/2 -translate-y-1/2 text-[#666] transition-colors hover:text-[#f0f0f0]"
+      className="absolute right-3 top-1/2 -translate-y-1/2 text-tx3 transition-colors hover:text-tx1"
       aria-label={
         target === "password"
           ? "Afficher/masquer le mot de passe"
@@ -94,21 +94,21 @@ export default function InscriptionPage() {
     <div className="container-arsenal py-10 sm:py-14">
       <form
         onSubmit={submit}
-        className="mx-auto flex w-full max-w-[400px] flex-col gap-4 rounded-2xl border border-[#333] bg-[#141414] p-6 sm:p-8"
+        className="mx-auto flex w-full max-w-[400px] flex-col gap-4 rounded-2xl border border-line bg-s1 p-6 sm:p-8"
       >
         <div className="flex justify-center">
           <CoinA size={46} />
         </div>
         <div className="text-center">
           <h1 className="font-display text-[1.35rem] font-bold">Créer un compte</h1>
-          <p className="mt-1 text-[0.84rem] text-[#a0a0a0]">
+          <p className="mt-1 text-[0.84rem] text-tx2">
             Rejoignez Arsenal Tools et démarrez avec un bonus de bienvenue en A.
           </p>
         </div>
 
         {error && (
           <p
-            className="rounded-lg border border-[rgba(230,57,70,0.4)] bg-[rgba(230,57,70,0.1)] px-3 py-2 text-[0.8rem] text-[#fda4af]"
+            className="rounded-lg border border-[rgba(230,57,70,0.4)] bg-[rgba(230,57,70,0.1)] px-3 py-2 text-[0.8rem] text-dangertx"
             role="alert"
           >
             {error}
@@ -116,7 +116,7 @@ export default function InscriptionPage() {
         )}
 
         <div>
-          <label htmlFor="pseudo" className="mb-1.5 block text-[0.8rem] text-[#a0a0a0]">
+          <label htmlFor="pseudo" className="mb-1.5 block text-[0.8rem] text-tx2">
             Pseudo
           </label>
           <input
@@ -133,7 +133,7 @@ export default function InscriptionPage() {
         </div>
 
         <div>
-          <label htmlFor="email" className="mb-1.5 block text-[0.8rem] text-[#a0a0a0]">
+          <label htmlFor="email" className="mb-1.5 block text-[0.8rem] text-tx2">
             Email
           </label>
           <input
@@ -150,7 +150,7 @@ export default function InscriptionPage() {
         </div>
 
         <div>
-          <label htmlFor="new-password" className="mb-1.5 block text-[0.8rem] text-[#a0a0a0]">
+          <label htmlFor="new-password" className="mb-1.5 block text-[0.8rem] text-tx2">
             Mot de passe
           </label>
           <div className="relative">
@@ -170,7 +170,7 @@ export default function InscriptionPage() {
         </div>
 
         <div>
-          <label htmlFor="confirm-password" className="mb-1.5 block text-[0.8rem] text-[#a0a0a0]">
+          <label htmlFor="confirm-password" className="mb-1.5 block text-[0.8rem] text-tx2">
             Confirmer le mot de passe
           </label>
           <div className="relative">
@@ -194,11 +194,11 @@ export default function InscriptionPage() {
           Créer mon compte
         </button>
 
-        <p className="border-t border-dashed border-[#333] pt-3 text-center text-[0.8rem] text-[#a0a0a0]">
+        <p className="border-t border-dashed border-line pt-3 text-center text-[0.8rem] text-tx2">
           Déjà inscrit ?{" "}
           <Link
             href="/connexion"
-            className="text-[#f0808a] transition-colors hover:text-[#e63946] hover:underline"
+            className="text-pricetx transition-colors hover:text-brand hover:underline"
           >
             Se connecter
           </Link>

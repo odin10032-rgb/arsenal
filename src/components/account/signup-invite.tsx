@@ -122,7 +122,7 @@ export function SignupInvite() {
       aria-modal="false"
       aria-labelledby="signup-invite-title"
       aria-describedby="signup-invite-desc"
-      className="mt-4 rounded-[10px] border border-[#333] bg-[#141414] p-4"
+      className="mt-4 rounded-[10px] border border-line bg-s1 p-4"
     >
       <div className="flex flex-wrap items-start gap-x-3 gap-y-2">
         <div className="min-w-0 flex-1">
@@ -132,7 +132,7 @@ export function SignupInvite() {
           >
             Créez un compte gratuit pour garder vos achats
           </p>
-          <p id="signup-invite-desc" className="mt-1.5 text-[0.82rem] leading-relaxed text-[#a0a0a0]">
+          <p id="signup-invite-desc" className="mt-1.5 text-[0.82rem] leading-relaxed text-tx2">
             Votre compte vous donne accès à vos achats et à votre bibliothèque, le suivi de vos
             commandes, et vos données vous suivent d&apos;un appareil à l&apos;autre. C&apos;est
             gratuit.
@@ -143,7 +143,7 @@ export function SignupInvite() {
           type="button"
           onClick={dismiss}
           aria-label="Fermer l'invitation"
-          className="ml-auto inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[#666] transition-colors hover:text-[#a0a0a0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4fb3a1]"
+          className="ml-auto inline-flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-tx3 transition-colors hover:text-tx2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
         >
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
             <path d="M6 6l12 12M18 6 6 18" />
@@ -155,14 +155,14 @@ export function SignupInvite() {
         <Link
           href="/inscription"
           onClick={accept}
-          className="btn-arsenal btn-primary w-full sm:w-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4fb3a1]"
+          className="btn-arsenal btn-primary w-full sm:w-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
         >
           Créer un compte
         </Link>
         <button
           type="button"
           onClick={dismiss}
-          className="text-[0.8rem] text-[#666] underline-offset-2 transition-colors hover:text-[#a0a0a0] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4fb3a1]"
+          className="text-[0.8rem] text-tx3 underline-offset-2 transition-colors hover:text-tx2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal"
         >
           Plus tard
         </button>

@@ -87,12 +87,12 @@ export function AddToCart({ productId }: { productId: string }) {
       </button>
 
       {status === "added" && (
-        <Link href="/compte/panier" className="text-center text-[0.78rem] text-[#4fb3a1] hover:underline">
+        <Link href="/compte/panier" className="text-center text-[0.78rem] text-teal hover:underline">
           Voir mon panier
         </Link>
       )}
       {status === "error" && (
-        <p role="alert" className="text-[0.78rem] leading-relaxed text-[#fda4af]">
+        <p role="alert" className="text-[0.78rem] leading-relaxed text-dangertx">
           {error}
         </p>
       )}

@@ -64,29 +64,29 @@ function formatDate(ts: number): string {
 
 export function AffiliateStatusHistory({ entries }: { entries: StatusHistoryEntry[] }) {
   return (
-    <div className="mt-4 rounded-2xl border border-[#333] bg-[#141414] p-6">
+    <div className="mt-4 rounded-2xl border border-line bg-s1 p-6">
       <h2 className="font-display text-[1rem] font-bold">Historique de statut</h2>
-      <p className="mt-1 text-[0.78rem] text-[#666]">
+      <p className="mt-1 text-[0.78rem] text-tx3">
         Les changements de statut de votre compte affilié, du plus récent au plus ancien.
       </p>
 
       {entries.length === 0 ? (
-        <p className="mt-4 text-[0.84rem] text-[#666]">
+        <p className="mt-4 text-[0.84rem] text-tx3">
           Aucun changement de statut enregistré pour le moment.
         </p>
       ) : (
-        <ul className="mt-4 flex flex-col gap-3 border-t border-dashed border-[#333] pt-4">
+        <ul className="mt-4 flex flex-col gap-3 border-t border-dashed border-line pt-4">
           {entries.map((e) => {
             const reason = reasonLabel(e.reason);
             return (
               <li key={e.id} className="flex flex-col gap-1">
-                <span className="font-mono text-[0.7rem] uppercase tracking-[0.08em] text-[#666]">
+                <span className="font-mono text-[0.7rem] uppercase tracking-[0.08em] text-tx3">
                   {formatDate(e.createdAt)}
                 </span>
-                <span className="text-[0.86rem] text-[#f0f0f0]">
-                  {roleLabel(e.fromRole)} <span className="text-[#666]">→</span> {roleLabel(e.toRole)}
+                <span className="text-[0.86rem] text-tx1">
+                  {roleLabel(e.fromRole)} <span className="text-tx3">→</span> {roleLabel(e.toRole)}
                 </span>
-                {reason && <span className="text-[0.78rem] text-[#a0a0a0]">{reason}</span>}
+                {reason && <span className="text-[0.78rem] text-tx2">{reason}</span>}
               </li>
             );
           })}

@@ -58,7 +58,7 @@ export function AffiliateNotifications() {
       aria-label="Notifications"
     >
       <div className="flex items-start justify-between gap-3">
-        <h2 className="font-mono text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-[#f4a261]">
+        <h2 className="font-mono text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-warn">
           Informations ({items.length})
         </h2>
         <button
@@ -72,7 +72,7 @@ export function AffiliateNotifications() {
       </div>
       <ul className="mt-2.5 flex flex-col gap-2">
         {items.map((n) => (
-          <li key={n.id} className="text-[0.84rem] leading-relaxed text-[#d8d8d8]">
+          <li key={n.id} className="text-[0.84rem] leading-relaxed text-tx1">
             {n.message}
           </li>
         ))}

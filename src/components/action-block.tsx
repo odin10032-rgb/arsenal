@@ -55,12 +55,14 @@ function TerminalBlock({ product }: { product: Product }) {
   };
 
   return (
-    <div className="overflow-hidden rounded-[10px] border border-[#333] bg-[#0d0d0d]">
-      <div className="flex items-center gap-2 border-b border-[#333] bg-[#141414] px-3.5 py-2">
+    // Le terminal est volontairement SOMBRE dans les deux thèmes (convention
+    // des consoles) : couleurs littérales assumées, pas de jetons de thème.
+    <div className="overflow-hidden rounded-[10px] border border-[#2f2f2f] bg-[#101010]">
+      <div className="flex items-center gap-2 border-b border-[#2a2a2a] bg-[#161616] px-3.5 py-2">
         <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" />
         <span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" />
         <span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
-        <span className="ml-2 font-mono text-[0.68rem] tracking-wide text-[#666]">
+        <span className="ml-2 font-mono text-[0.68rem] tracking-wide text-[#8a8a8a]">
           bash — {slug}
         </span>
       </div>
@@ -70,8 +72,8 @@ function TerminalBlock({ product }: { product: Product }) {
           <span className="text-[#7fd4c4]">{command}</span>
         </p>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#333] bg-[rgba(255,255,255,0.02)] px-4 py-3">
-        <span className="inline-flex items-center rounded-full border border-dashed border-[#444] bg-[rgba(255,255,255,0.025)] px-2.5 py-1 font-mono text-[0.66rem] text-[#666]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#2a2a2a] bg-[#161616] px-4 py-3">
+        <span className="inline-flex items-center rounded-full border border-dashed border-[#3a3a3a] bg-[#1c1c1c] px-2.5 py-1 font-mono text-[0.66rem] text-[#8a8a8a]">
           {product.command ? "commande fournie par l'éditeur" : "commande auto-générée"}
         </span>
         <button type="button" onClick={onCopy} className="btn-arsenal btn-ghost btn-sm font-mono">
@@ -94,13 +96,13 @@ function TerminalBlock({ product }: { product: Product }) {
         </button>
       </div>
       {repoUrl && (
-        <div className="border-t border-[#333] px-4 py-3">
+        <div className="border-t border-line px-4 py-3">
           <a
             href={repoUrl}
             target="_blank"
             rel="noopener noreferrer"
             onClick={() => trackClick(product.id, "repo")}
-            className="inline-flex items-center gap-1.5 text-[0.8rem] font-semibold text-[#4fb3a1] hover:underline"
+            className="inline-flex items-center gap-1.5 text-[0.8rem] font-semibold text-teal hover:underline"
           >
             Ouvrir le dépôt source
             <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
@@ -155,12 +157,12 @@ function MobileBlock({ product }: { product: Product }) {
         Installer la PWA
       </button>
       {showHint && (
-        <div className="rounded-[10px] border border-[#333] bg-[#141414] p-4 text-left">
+        <div className="rounded-[10px] border border-line bg-s1 p-4 text-left">
           <p className="mb-2 text-[0.85rem] font-semibold">Installation depuis votre navigateur :</p>
-          <div className="flex flex-col gap-1.5 text-[0.84rem] leading-relaxed text-[#a0a0a0]">
+          <div className="flex flex-col gap-1.5 text-[0.84rem] leading-relaxed text-tx2">
             {INSTALL_HINTS.map((h) => (
               <p key={h.platform}>
-                <strong className="text-[#4fb3a1]">{h.platform}</strong> — {h.steps}
+                <strong className="text-teal">{h.platform}</strong> — {h.steps}
               </p>
             ))}
           </div>
@@ -198,7 +200,7 @@ export function ActionBlock({ product }: { product: Product }) {
           <path d="M5 12h14M12 5l7 7-7 7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </a>
-      <p className="font-mono text-[0.72rem] text-[#666]">
+      <p className="font-mono text-[0.72rem] text-tx3">
         {isFree
           ? "Accès direct, sans carte bancaire."
           : "Paiement sécurisé via Chariow — accès immédiat après validation."}

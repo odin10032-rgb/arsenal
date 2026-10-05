@@ -15,10 +15,10 @@ const FALLBACK_IMAGE =
   );
 
 const BADGE_CLASSES: Record<Badge, string> = {
-  gratuit: "text-[#56b8a8] border-[rgba(42,157,143,0.45)] bg-[rgba(42,157,143,0.1)]",
-  premium: "text-[#b79aec] border-[rgba(155,93,229,0.5)] bg-[rgba(155,93,229,0.14)]",
-  beta: "text-[#f4c886] border-[rgba(244,162,97,0.45)] bg-[rgba(244,162,97,0.1)]",
-  nouveau: "text-[#4fb3d8] border-[rgba(0,180,216,0.45)] bg-[rgba(0,180,216,0.1)]",
+  gratuit: "text-teal border-[rgba(42,157,143,0.45)] bg-[rgba(42,157,143,0.1)]",
+  premium: "text-bpremium border-[rgba(155,93,229,0.5)] bg-[rgba(155,93,229,0.14)]",
+  beta: "text-goldtx border-[rgba(244,162,97,0.45)] bg-[rgba(244,162,97,0.1)]",
+  nouveau: "text-bnew border-[rgba(0,180,216,0.45)] bg-[rgba(0,180,216,0.1)]",
 };
 
 export function BadgePill({ badge }: { badge: Badge }) {
@@ -36,10 +36,10 @@ export function ProductCard({ p }: { p: Product }) {
   return (
     <Link
       href={`/produit?id=${encodeURIComponent(p.id)}`}
-      className="group flex flex-col overflow-hidden rounded-2xl border border-[#333] bg-[#141414] transition-transform duration-200 hover:-translate-y-0.5 hover:border-[#444]"
+      className="group flex flex-col overflow-hidden rounded-2xl border border-line bg-s1 transition-transform duration-200 hover:-translate-y-0.5 hover:border-line2"
       aria-label={`Voir les détails de ${p.title}`}
     >
-      <div className="relative aspect-[16/10] overflow-hidden bg-[#1a1a1a]">
+      <div className="relative aspect-[16/10] overflow-hidden bg-s2">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={image || FALLBACK_IMAGE}
@@ -59,7 +59,7 @@ export function ProductCard({ p }: { p: Product }) {
             ))}
           </div>
         )}
-        <span className="absolute bottom-3 left-3 z-[2] rounded-md border border-[rgba(42,157,143,0.3)] bg-[rgba(8,8,8,0.8)] px-2 py-0.5 font-mono text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-[#4fb3a1]">
+        <span className="absolute bottom-3 left-3 z-[2] rounded-md border border-[rgba(42,157,143,0.3)] bg-[rgba(8,8,8,0.8)] px-2 py-0.5 font-mono text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-teal">
           {CATEGORIES[p.category]}
         </span>
       </div>
@@ -68,7 +68,7 @@ export function ProductCard({ p }: { p: Product }) {
         <div className="flex items-start justify-between gap-2">
           <h3 className="font-display text-[1.02rem] font-semibold leading-snug tracking-tight">{p.title}</h3>
           <span
-            className="inline-flex flex-shrink-0 items-center gap-1 rounded-full border border-[rgba(244,162,97,0.25)] bg-[rgba(244,162,97,0.08)] px-2 py-0.5 font-mono text-[0.66rem] font-semibold text-[#f4a261]"
+            className="inline-flex flex-shrink-0 items-center gap-1 rounded-full border border-[rgba(244,162,97,0.25)] bg-[rgba(244,162,97,0.08)] px-2 py-0.5 font-mono text-[0.66rem] font-semibold text-warn"
             title="Nombre de clics"
           >
             <svg viewBox="0 0 24 24" width="10" height="10" aria-hidden="true">
@@ -81,13 +81,13 @@ export function ProductCard({ p }: { p: Product }) {
           </span>
         </div>
 
-        <p className="line-clamp-2 text-[0.84rem] leading-relaxed text-[#a0a0a0]">
+        <p className="line-clamp-2 text-[0.84rem] leading-relaxed text-tx2">
           {p.shortDescription}
         </p>
 
-        <div className="mt-auto flex items-center justify-between gap-2 border-t border-[#333] pt-3">
-          <span className="font-mono text-[0.78rem] font-semibold text-[#f0808a]">{p.price}</span>
-          <span className="inline-flex items-center gap-1.5 text-[0.78rem] font-semibold text-[#4fb3a1] transition-all group-hover:gap-2.5 group-hover:text-[#2a9d8f]">
+        <div className="mt-auto flex items-center justify-between gap-2 border-t border-line pt-3">
+          <span className="font-mono text-[0.78rem] font-semibold text-pricetx">{p.price}</span>
+          <span className="inline-flex items-center gap-1.5 text-[0.78rem] font-semibold text-teal transition-all group-hover:gap-2.5 group-hover:text-ok">
             Détails
             <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
               <path d="M14 3h7v7M21 3 11 13M19 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h6" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />

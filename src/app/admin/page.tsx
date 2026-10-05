@@ -22,6 +22,20 @@ export default function AdminPage() {
     setBooted(true);
   }, []);
 
+  // L'admin est un TABLEAU DE BORD : toujours sombre, quel que soit le thème
+  // choisi pour le site public (spec refonte : le mode clair ne concerne que
+  // le site). On force data-theme="dark" pendant la visite, puis on restitue
+  // la préférence à la sortie.
+  useEffect(() => {
+    const root = document.documentElement;
+    const previous = root.getAttribute("data-theme");
+    root.setAttribute("data-theme", "dark");
+    return () => {
+      if (previous) root.setAttribute("data-theme", previous);
+      else root.removeAttribute("data-theme");
+    };
+  }, []);
+
   if (!booted) {
     return (
       <div className="flex min-h-dvh items-center justify-center">

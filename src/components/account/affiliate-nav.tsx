@@ -42,7 +42,7 @@ const TABS: NavItem[] = [
 export function AffiliateNav({ active }: { active: AffiliateNavTab }) {
   return (
     <nav
-      className="mt-5 flex gap-1 overflow-x-auto border-b border-[#333]"
+      className="mt-5 flex gap-1 overflow-x-auto border-b border-line"
       aria-label="Sections de l'espace affilié"
     >
       {TABS.map((t) => {
@@ -56,8 +56,8 @@ export function AffiliateNav({ active }: { active: AffiliateNavTab }) {
             title={t.external ? "Page de votre compte utilisateur" : undefined}
             className={`relative inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3.5 py-2.5 text-[0.84rem] font-semibold transition-colors ${
               isActive
-                ? "border-[#e63946] text-[#4fb3a1]"
-                : "border-transparent text-[#666] hover:text-[#a0a0a0]"
+                ? "border-brand text-teal"
+                : "border-transparent text-tx3 hover:text-tx2"
             }`}
           >
             {t.label}

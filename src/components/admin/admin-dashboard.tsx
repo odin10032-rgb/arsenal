@@ -12,6 +12,7 @@ import { CampaignsTab } from "./campaigns-tab";
 import { ChariowTab } from "./chariow-tab";
 import { MediaTab } from "./media-tab";
 import { ProductsTab } from "./products-tab";
+import { FeedTab } from "./feed-tab";
 import { ProgramTab } from "./program-tab";
 import { PurchasesTab } from "./purchases-tab";
 import { SettingsTab } from "./settings-tab";
@@ -22,7 +23,7 @@ import { clearAdminToken } from "@/lib/products";
 import { Product } from "@/lib/products";
 import { ToastHost } from "@/lib/toast";
 
-type Tab = "products" | "media" | "analytics" | "affiliates" | "users" | "program" | "purchases" | "tracking" | "campaigns" | "chariow" | "settings";
+type Tab = "products" | "feed" | "media" | "analytics" | "affiliates" | "users" | "program" | "purchases" | "tracking" | "campaigns" | "chariow" | "settings";
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   {
@@ -32,6 +33,15 @@ const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M12 2 3 7v10l9 5 9-5V7z" />
         <path d="M3 7l9 5 9-5M12 12v10" />
+      </svg>
+    ),
+  },
+  {
+    id: "feed",
+    label: "Feed",
+    icon: (
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <path d="M4 6h16M4 12h10M4 18h7" />
       </svg>
     ),
   },
@@ -261,6 +271,7 @@ export function AdminDashboard({
       <main className="flex-1">
         <div className="container-arsenal flex flex-col gap-5 py-6">
           {pane("products", <ProductsTab products={products} apiAvailable={apiAvailable} reload={reload} />)}
+          {pane("feed", <FeedTab products={products} apiAvailable={apiAvailable} reload={reload} />)}
           {pane("media", <MediaTab products={products} apiAvailable={apiAvailable} />)}
           {pane("analytics", <AnalyticsTab apiAvailable={apiAvailable} />)}
           {pane("affiliates", <AffiliatesTab apiAvailable={apiAvailable} products={products} />)}

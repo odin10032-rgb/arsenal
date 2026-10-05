@@ -163,7 +163,7 @@ export default function AffiliePage() {
   if (loading) {
     return (
       <div className="flex justify-center p-10">
-        <p className="font-mono text-[0.85rem] text-[#666]">Chargement de votre espace…</p>
+        <p className="font-mono text-[0.85rem] text-tx3">Chargement de votre espace…</p>
       </div>
     );
   }
@@ -181,7 +181,7 @@ export default function AffiliePage() {
       <div className="mx-auto w-full max-w-[560px]">
         <Link
           href="/compte"
-          className="inline-flex items-center gap-1.5 text-[0.78rem] text-[#666] transition-colors hover:text-[#f0f0f0]"
+          className="inline-flex items-center gap-1.5 text-[0.78rem] text-tx3 transition-colors hover:text-tx1"
         >
           <svg
             viewBox="0 0 24 24"
@@ -199,7 +199,7 @@ export default function AffiliePage() {
           Mon compte
         </Link>
         <h1 className="mt-3 font-display text-[1.35rem] font-bold">Espace Affilié</h1>
-        <p className="mt-1 text-[0.84rem] text-[#a0a0a0]">
+        <p className="mt-1 text-[0.84rem] text-tx2">
           Vos liens, vos performances et vos commissions.
         </p>
 
@@ -212,7 +212,7 @@ export default function AffiliePage() {
 
         {error && (
           <p
-            className="mt-5 rounded-lg border border-[rgba(230,57,70,0.4)] bg-[rgba(230,57,70,0.1)] px-3 py-2 text-[0.8rem] text-[#fda4af]"
+            className="mt-5 rounded-lg border border-[rgba(230,57,70,0.4)] bg-[rgba(230,57,70,0.1)] px-3 py-2 text-[0.8rem] text-dangertx"
             role="alert"
           >
             {error}
@@ -220,7 +220,7 @@ export default function AffiliePage() {
         )}
 
         {affLoading ? (
-          <p className="mt-8 font-mono text-[0.8rem] text-[#666]">
+          <p className="mt-8 font-mono text-[0.8rem] text-tx3">
             Chargement de votre espace affilié…
           </p>
         ) : !affiliate ? (
@@ -265,26 +265,26 @@ function ApplicationCard({
   onSubmit: (e: React.FormEvent) => void;
 }) {
   return (
-    <form onSubmit={onSubmit} className="mt-6 rounded-2xl border border-[#333] bg-[#141414] p-6 sm:p-8">
+    <form onSubmit={onSubmit} className="mt-6 rounded-2xl border border-line bg-s1 p-6 sm:p-8">
       <h2 className="font-display text-[1.05rem] font-bold">Devenir affilié</h2>
-      <p className="mt-2 text-[0.86rem] leading-relaxed text-[#a0a0a0]">
+      <p className="mt-2 text-[0.86rem] leading-relaxed text-tx2">
         Partagez les outils du catalogue avec votre audience : chaque vente réalisée avec votre lien
         vous rapporte une commission, plus une récompense en A lorsqu&apos;elle est prévue.
       </p>
 
-      <ul className="mt-5 flex flex-col gap-2.5 border-t border-dashed border-[#333] pt-5">
+      <ul className="mt-5 flex flex-col gap-2.5 border-t border-dashed border-line pt-5">
         {[
           "Un lien de suivi dédié pour chaque produit éligible.",
           "Clics, ventes et conversion suivis en temps réel.",
           "Commissions validées puis payées par l'équipe, en toute transparence.",
         ].map((line) => (
-          <li key={line} className="flex gap-2.5 text-[0.84rem] leading-relaxed text-[#a0a0a0]">
+          <li key={line} className="flex gap-2.5 text-[0.84rem] leading-relaxed text-tx2">
             <svg
               viewBox="0 0 24 24"
               width="14"
               height="14"
               aria-hidden="true"
-              className="mt-1 flex-shrink-0 text-[#4fb3a1]"
+              className="mt-1 flex-shrink-0 text-teal"
               fill="none"
               stroke="currentColor"
               strokeWidth="2.4"
@@ -298,9 +298,9 @@ function ApplicationCard({
         ))}
       </ul>
 
-      <div className="mt-6 border-t border-dashed border-[#333] pt-6">
-        <label htmlFor="note" className="mb-1.5 block text-[0.8rem] text-[#a0a0a0]">
-          Un mot sur votre audience <span className="text-[#666]">(optionnel)</span>
+      <div className="mt-6 border-t border-dashed border-line pt-6">
+        <label htmlFor="note" className="mb-1.5 block text-[0.8rem] text-tx2">
+          Un mot sur votre audience <span className="text-tx3">(optionnel)</span>
         </label>
         <textarea
           id="note"
@@ -315,12 +315,12 @@ function ApplicationCard({
           {busy && <span className="spin" />}
           Envoyer ma candidature
         </button>
-        <p className="mt-3 text-[0.74rem] leading-relaxed text-[#666]">
+        <p className="mt-3 text-[0.74rem] leading-relaxed text-tx3">
           Votre candidature est examinée par l&apos;équipe. Vos liens sont activés dès sa validation.
-          Le programme encadre un compte standard à <b className="text-[#a0a0a0]">3 liens actifs</b> et{" "}
-          <b className="text-[#a0a0a0]">20 ventes par lien</b> (un lien saturé est désactivé
+          Le programme encadre un compte standard à <b className="text-tx2">3 liens actifs</b> et{" "}
+          <b className="text-tx2">20 ventes par lien</b> (un lien saturé est désactivé
           automatiquement et libère sa place).{" "}
-          <Link href="/affiliation" className="text-[#4fb3a1] hover:underline">
+          <Link href="/affiliation" className="text-teal hover:underline">
             En savoir plus
           </Link>
         </p>
@@ -333,20 +333,20 @@ function ApplicationCard({
 
 function PendingCard({ affiliate }: { affiliate: Affiliate }) {
   return (
-    <div className="mt-6 rounded-2xl border border-[#333] bg-[#141414] p-6 sm:p-8">
-      <span className="inline-flex items-center gap-2 rounded-md border border-[rgba(244,162,97,0.4)] bg-[rgba(244,162,97,0.08)] px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-wide text-[#f4a261]">
+    <div className="mt-6 rounded-2xl border border-line bg-s1 p-6 sm:p-8">
+      <span className="inline-flex items-center gap-2 rounded-md border border-[rgba(244,162,97,0.4)] bg-[rgba(244,162,97,0.08)] px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-wide text-warn">
         <span className="h-1.5 w-1.5 rounded-full bg-current" />
         En attente de validation
       </span>
       <h2 className="mt-4 font-display text-[1.05rem] font-bold">Candidature reçue</h2>
-      <p className="mt-2 text-[0.86rem] leading-relaxed text-[#a0a0a0]">
+      <p className="mt-2 text-[0.86rem] leading-relaxed text-tx2">
         Votre dossier du {formatDate(affiliate.appliedAt)} est en cours d&apos;examen. Vous pourrez
         générer vos liens de suivi dès sa validation.
       </p>
       {affiliate.code && (
-        <p className="mt-4 flex flex-wrap items-center gap-2 border-t border-dashed border-[#333] pt-4 text-[0.8rem] text-[#666]">
+        <p className="mt-4 flex flex-wrap items-center gap-2 border-t border-dashed border-line pt-4 text-[0.8rem] text-tx3">
           Votre code affilié
-          <span className="rounded-md border border-[#333] bg-[#1a1a1a] px-2 py-0.5 font-mono text-[0.8rem] text-[#f0f0f0]">
+          <span className="rounded-md border border-line bg-s2 px-2 py-0.5 font-mono text-[0.8rem] text-tx1">
             {affiliate.code}
           </span>
         </p>
@@ -402,16 +402,16 @@ function ActiveView({
   return (
     <>
       {/* ── 1. Identité + statut ─────────────────────────────────────────── */}
-      <div className="mt-6 rounded-2xl border border-[#333] bg-[#141414] p-6 sm:p-8">
+      <div className="mt-6 rounded-2xl border border-line bg-s1 p-6 sm:p-8">
         <div className="flex items-center gap-4">
           <UserAvatar pseudo={pseudo} seed={userId} size={54} />
           <div className="min-w-0">
             <p className="truncate font-display text-[1.2rem] font-bold leading-tight">{pseudo}</p>
             <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="rounded-md border border-[rgba(42,157,143,0.45)] bg-[rgba(42,157,143,0.1)] px-2 py-0.5 text-[0.7rem] font-semibold uppercase tracking-wide text-[#7fd4cb]">
+              <span className="rounded-md border border-[rgba(42,157,143,0.45)] bg-[rgba(42,157,143,0.1)] px-2 py-0.5 text-[0.7rem] font-semibold uppercase tracking-wide text-teal2">
                 {affiliate.isSuper ? "Super affilié" : "Affilié"}
               </span>
-              <span className="text-[0.74rem] text-[#666]">
+              <span className="text-[0.74rem] text-tx3">
                 Affilié depuis le {formatDate(affiliate.activatedAt)}
               </span>
             </div>
@@ -419,9 +419,9 @@ function ActiveView({
         </div>
 
         {affiliate.code && (
-          <p className="mt-4 flex flex-wrap items-center gap-2 border-t border-dashed border-[#333] pt-4 text-[0.8rem] text-[#666]">
+          <p className="mt-4 flex flex-wrap items-center gap-2 border-t border-dashed border-line pt-4 text-[0.8rem] text-tx3">
             Code affilié
-            <span className="rounded-md border border-[#333] bg-[#1a1a1a] px-2 py-0.5 font-mono text-[0.8rem] text-[#f0f0f0]">
+            <span className="rounded-md border border-line bg-s2 px-2 py-0.5 font-mono text-[0.8rem] text-tx1">
               {affiliate.code}
             </span>
           </p>
@@ -466,13 +466,13 @@ function ActiveView({
         <button
           type="button"
           onClick={() => setConfirmWithdraw(true)}
-          className="text-[0.74rem] text-[#666] underline-offset-2 transition-colors hover:text-[#fda4af] hover:underline"
+          className="text-[0.74rem] text-tx3 underline-offset-2 transition-colors hover:text-dangertx hover:underline"
         >
           Quitter le programme
         </button>
       </div>
       {withdrawError && (
-        <p className="mt-2 text-center text-[0.78rem] text-[#e63946]">{withdrawError}</p>
+        <p className="mt-2 text-center text-[0.78rem] text-brand">{withdrawError}</p>
       )}
 
       {confirmWithdraw && (
@@ -526,13 +526,13 @@ function ProductAvailabilityRequest() {
   };
 
   return (
-    <form onSubmit={submit} className="mt-4 rounded-2xl border border-[#333] bg-[#141414] p-6">
+    <form onSubmit={submit} className="mt-4 rounded-2xl border border-line bg-s1 p-6">
       <h2 className="font-display text-[1rem] font-bold">Demander un produit</h2>
-      <p className="mt-1 text-[0.78rem] leading-relaxed text-[#666]">
+      <p className="mt-1 text-[0.78rem] leading-relaxed text-tx3">
         En tant que Super affilié, proposez un produit du catalogue à rendre éligible à
         l&apos;affiliation : l&apos;équipe validera son ouverture.
       </p>
-      <label htmlFor="req-product" className="mt-4 mb-1.5 block text-[0.78rem] text-[#a0a0a0]">
+      <label htmlFor="req-product" className="mt-4 mb-1.5 block text-[0.78rem] text-tx2">
         Identifiant du produit
       </label>
       <input
@@ -543,8 +543,8 @@ function ProductAvailabilityRequest() {
         placeholder="ex. arsenal-pro-annual"
         className="input-arsenal"
       />
-      <label htmlFor="req-note" className="mt-3 mb-1.5 block text-[0.78rem] text-[#a0a0a0]">
-        Motif <span className="text-[#666]">(optionnel)</span>
+      <label htmlFor="req-note" className="mt-3 mb-1.5 block text-[0.78rem] text-tx2">
+        Motif <span className="text-tx3">(optionnel)</span>
       </label>
       <textarea
         id="req-note"
@@ -555,8 +555,8 @@ function ProductAvailabilityRequest() {
         placeholder="Pourquoi ce produit mérite-t-il d'être ouvert à l'affiliation ?"
         className="input-arsenal min-h-[80px] resize-y"
       />
-      {error && <p className="mt-3 text-[0.8rem] text-[#e63946]">{error}</p>}
-      {message && <p className="mt-3 text-[0.8rem] text-[#4fb3a1]">{message}</p>}
+      {error && <p className="mt-3 text-[0.8rem] text-brand">{error}</p>}
+      {message && <p className="mt-3 text-[0.8rem] text-teal">{message}</p>}
       <button type="submit" disabled={busy} className="btn-arsenal btn-primary mt-4 w-full">
         {busy && <span className="spin" />}
         Envoyer la demande
@@ -599,14 +599,14 @@ function SuperAffiliateCard({
   };
 
   return (
-    <div className="mt-4 rounded-2xl border border-[#333] bg-[#141414] p-6">
+    <div className="mt-4 rounded-2xl border border-line bg-s1 p-6">
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-display text-[1rem] font-bold">Super Affiliate</h2>
-        <span className="rounded-md border border-[#333] bg-[#1a1a1a] px-2 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-[#a0a0a0]">
+        <span className="rounded-md border border-line bg-s2 px-2 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-tx2">
           {eligible ? "Éligible" : "En progression"}
         </span>
       </div>
-      <p className="mt-1 text-[0.78rem] text-[#666]">
+      <p className="mt-1 text-[0.78rem] text-tx3">
         Atteignez les critères, puis demandez votre promotion — elle est validée par
         l&apos;équipe Arsenal.
       </p>
@@ -616,15 +616,15 @@ function SuperAffiliateCard({
           { label: "Ventes", current: progressData.sales, goal: criteria.minSales },
           { label: "Clics", current: progressData.clicks, goal: criteria.minClicks },
         ].map((row) => (
-          <div key={row.label} className="rounded-xl border border-[#333] bg-[rgba(255,255,255,0.02)] p-3">
-            <p className="text-[0.68rem] uppercase tracking-wider text-[#666]">{row.label}</p>
-            <p className="mt-1 font-mono text-[1.05rem] font-bold tabular-nums text-[#f0f0f0]">
+          <div key={row.label} className="rounded-xl border border-line bg-panel p-3">
+            <p className="text-[0.68rem] uppercase tracking-wider text-tx3">{row.label}</p>
+            <p className="mt-1 font-mono text-[1.05rem] font-bold tabular-nums text-tx1">
               {fmt(row.current)}
-              <span className="text-[0.75rem] font-normal text-[#666]"> / {fmt(row.goal)}</span>
+              <span className="text-[0.75rem] font-normal text-tx3"> / {fmt(row.goal)}</span>
             </p>
-            <div className="mt-2 h-1 overflow-hidden rounded-full bg-[#222]">
+            <div className="mt-2 h-1 overflow-hidden rounded-full bg-s3">
               <div
-                className="h-full rounded-full bg-[#2a9d8f]"
+                className="h-full rounded-full bg-ok"
                 style={{ width: Math.min(100, Math.round((row.current / Math.max(1, row.goal)) * 100)) + "%" }}
               />
             </div>
@@ -632,9 +632,9 @@ function SuperAffiliateCard({
         ))}
       </div>
 
-      {message && <p className="mt-3 text-[0.8rem] text-[#e63946]">{message}</p>}
+      {message && <p className="mt-3 text-[0.8rem] text-brand">{message}</p>}
       {requested ? (
-        <p className="mt-4 rounded-lg border border-[rgba(244,162,97,0.4)] bg-[rgba(244,162,97,0.08)] px-3 py-2 text-[0.8rem] text-[#f4a261]">
+        <p className="mt-4 rounded-lg border border-[rgba(244,162,97,0.4)] bg-[rgba(244,162,97,0.08)] px-3 py-2 text-[0.8rem] text-warn">
           Demande envoyée — en attente de validation par l&apos;équipe Arsenal.
         </p>
       ) : (
@@ -648,7 +648,7 @@ function SuperAffiliateCard({
           Demander le statut Super Affiliate
         </button>
       )}
-      <p className="mt-2 text-center text-[0.7rem] text-[#666]">
+      <p className="mt-2 text-center text-[0.7rem] text-tx3">
         Les privilèges Super Affiliate seront débloqués après validation.
       </p>
     </div>
@@ -682,16 +682,16 @@ function CampaignsSection({
   };
 
   return (
-    <div className="mt-4 rounded-2xl border border-[#333] bg-[#141414] p-6">
+    <div className="mt-4 rounded-2xl border border-line bg-s1 p-6">
       <h2 className="font-display text-[1rem] font-bold">Campagnes</h2>
-      <p className="mt-1 text-[0.78rem] text-[#666]">
+      <p className="mt-1 text-[0.78rem] text-tx3">
         Des commissions et récompenses renforcées sur des produits sélectionnés.
       </p>
 
       {campaigns === null ? (
-        <p className="mt-4 font-mono text-[0.8rem] text-[#666]">Chargement…</p>
+        <p className="mt-4 font-mono text-[0.8rem] text-tx3">Chargement…</p>
       ) : campaigns.length === 0 ? (
-        <p className="mt-4 text-[0.84rem] text-[#666]">
+        <p className="mt-4 text-[0.84rem] text-tx3">
           Aucune campagne active pour le moment.
         </p>
       ) : (
@@ -701,22 +701,22 @@ function CampaignsSection({
             const goal = c.goalSales ?? 0;
             const pctDone = goal > 0 ? Math.min(100, Math.round((c.mySales / goal) * 100)) : 0;
             return (
-              <li key={c.id} className="rounded-xl border border-[#333] bg-[rgba(255,255,255,0.02)] p-4">
+              <li key={c.id} className="rounded-xl border border-line bg-panel p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-[0.9rem] font-semibold text-[#f0f0f0]">{c.name}</p>
-                    <p className="mt-0.5 truncate text-[0.74rem] text-[#666]">
+                    <p className="truncate text-[0.9rem] font-semibold text-tx1">{c.name}</p>
+                    <p className="mt-0.5 truncate text-[0.74rem] text-tx3">
                       {c.productName ?? "Produit Arsenal"}
                       {c.endsAt ? " · jusqu'au " + new Date(c.endsAt).toLocaleDateString("fr-FR") : ""}
                     </p>
                   </div>
                   {isJoined && (
-                    <span className="flex-shrink-0 rounded-md border border-[rgba(42,157,143,0.45)] bg-[rgba(42,157,143,0.1)] px-2 py-0.5 text-[0.66rem] font-semibold uppercase text-[#7fd4cb]">
+                    <span className="flex-shrink-0 rounded-md border border-[rgba(42,157,143,0.45)] bg-[rgba(42,157,143,0.1)] px-2 py-0.5 text-[0.66rem] font-semibold uppercase text-teal2">
                       Participant
                     </span>
                   )}
                 </div>
-                <p className="mt-2 text-[0.78rem] text-[#a0a0a0]">
+                <p className="mt-2 text-[0.78rem] text-tx2">
                   Commission{" "}
                   {c.commissionType === "percent"
                     ? (c.commissionValue ?? 0) + " %"
@@ -730,10 +730,10 @@ function CampaignsSection({
                 </p>
                 {goal > 0 && (
                   <div className="mt-2">
-                    <div className="h-1 overflow-hidden rounded-full bg-[#222]">
-                      <div className="h-full rounded-full bg-[#2a9d8f]" style={{ width: pctDone + "%" }} />
+                    <div className="h-1 overflow-hidden rounded-full bg-s3">
+                      <div className="h-full rounded-full bg-ok" style={{ width: pctDone + "%" }} />
                     </div>
-                    <p className="mt-1 font-mono text-[0.7rem] tabular-nums text-[#666]">
+                    <p className="mt-1 font-mono text-[0.7rem] tabular-nums text-tx3">
                       {fmt(c.mySales)} / {fmt(goal)} ventes
                     </p>
                   </div>
@@ -787,7 +787,7 @@ function StatTile({
   label,
   value,
   unit,
-  unitClass = "text-[#666]",
+  unitClass = "text-tx3",
   tone,
   hint,
 }: {
@@ -803,17 +803,17 @@ function StatTile({
       className={`flex flex-col gap-1 rounded-2xl border p-4 ${
         tone === "accent"
           ? "border-[rgba(42,157,143,0.35)] bg-[rgba(42,157,143,0.06)]"
-          : "border-[#333] bg-[#141414]"
+          : "border-line bg-s1"
       }`}
     >
-      <span className="font-mono text-[0.62rem] uppercase tracking-[0.1em] text-[#666]">
+      <span className="font-mono text-[0.62rem] uppercase tracking-[0.1em] text-tx3">
         {label}
       </span>
-      <span className="whitespace-nowrap font-mono text-[1.35rem] font-bold leading-tight tabular-nums text-[#f0f0f0]">
+      <span className="whitespace-nowrap font-mono text-[1.35rem] font-bold leading-tight tabular-nums text-tx1">
         {value}
         {unit && <span className={`ml-1.5 text-[0.8rem] font-semibold ${unitClass}`}>{unit}</span>}
       </span>
-      {hint && <span className="text-[0.68rem] text-[#666]">{hint}</span>}
+      {hint && <span className="text-[0.68rem] text-tx3">{hint}</span>}
     </div>
   );
 }
@@ -834,9 +834,9 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="mt-4 rounded-2xl border border-[#333] bg-[#141414] p-6">
+    <section className="mt-4 rounded-2xl border border-line bg-s1 p-6">
       <h2 className="font-display text-[1rem] font-bold">{title}</h2>
-      {hint && <p className="mt-1 text-[0.78rem] text-[#666]">{hint}</p>}
+      {hint && <p className="mt-1 text-[0.78rem] text-tx3">{hint}</p>}
       {children}
     </section>
   );
@@ -902,42 +902,42 @@ function WalletSection({ balanceA }: { balanceA: number }) {
     >
       <div className="mt-3 flex items-center gap-3">
         <CoinA size={30} />
-        <p className="whitespace-nowrap font-mono text-[1.7rem] font-bold leading-none tabular-nums text-[#f0f0f0]">
+        <p className="whitespace-nowrap font-mono text-[1.7rem] font-bold leading-none tabular-nums text-tx1">
           {fmt(balanceA)}
           <span className="ml-2 text-[1rem] text-gold">A</span>
         </p>
       </div>
 
-      <div className="mt-5 border-t border-dashed border-[#333] pt-4">
+      <div className="mt-5 border-t border-dashed border-line pt-4">
         <div className="flex items-baseline justify-between gap-3">
-          <p className="text-[0.74rem] font-semibold uppercase tracking-wider text-[#666]">
+          <p className="text-[0.74rem] font-semibold uppercase tracking-wider text-tx3">
             Dernières opérations
           </p>
-          <Link href="/compte/portefeuille" className="text-[0.78rem] text-[#4fb3a1] hover:underline">
+          <Link href="/compte/portefeuille" className="text-[0.78rem] text-teal hover:underline">
             Tout voir
           </Link>
         </div>
 
         {txs === null ? (
-          <p className="mt-3 font-mono text-[0.78rem] text-[#666]">Chargement…</p>
+          <p className="mt-3 font-mono text-[0.78rem] text-tx3">Chargement…</p>
         ) : txs.length === 0 ? (
-          <p className="mt-3 text-[0.82rem] text-[#666]">Aucune opération pour le moment.</p>
+          <p className="mt-3 text-[0.82rem] text-tx3">Aucune opération pour le moment.</p>
         ) : (
           <ul className="mt-1">
             {txs.map((t) => (
               <li
                 key={t.id}
-                className="flex items-center justify-between gap-3 border-b border-[#222] py-2.5 last:border-0"
+                className="flex items-center justify-between gap-3 border-b border-line py-2.5 last:border-0"
               >
                 <div className="min-w-0">
-                  <p className="truncate text-[0.84rem] text-[#f0f0f0]">{t.label}</p>
-                  <p className="mt-0.5 text-[0.7rem] text-[#666]">
+                  <p className="truncate text-[0.84rem] text-tx1">{t.label}</p>
+                  <p className="mt-0.5 text-[0.7rem] text-tx3">
                     {txTypeLabel(t.type)} · {txDate(t.createdAt)}
                   </p>
                 </div>
                 <span
                   className={`flex-shrink-0 font-mono text-[0.82rem] font-semibold tabular-nums ${
-                    t.delta >= 0 ? "text-[#2a9d8f]" : "text-[#e63946]"
+                    t.delta >= 0 ? "text-ok" : "text-brand"
                   }`}
                 >
                   {t.delta > 0 ? "+" : ""}
@@ -1009,17 +1009,17 @@ function RulesSection({ isSuper }: { isSuper: boolean }) {
       title="Règles et limites du programme"
       hint="Ce que le programme autorise — pour ne jamais découvrir une limite au moment où elle refuse une action."
     >
-      <dl className="mt-4 flex flex-col gap-2.5 border-t border-dashed border-[#333] pt-4">
+      <dl className="mt-4 flex flex-col gap-2.5 border-t border-dashed border-line pt-4">
         {rows.map((r) => (
           <div key={r.label} className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-            <dt className="text-[0.82rem] text-[#a0a0a0]">{r.label}</dt>
-            <dd className="font-mono text-[0.8rem] tabular-nums text-[#f0f0f0]">{r.value}</dd>
+            <dt className="text-[0.82rem] text-tx2">{r.label}</dt>
+            <dd className="font-mono text-[0.8rem] tabular-nums text-tx1">{r.value}</dd>
           </div>
         ))}
       </dl>
-      <p className="mt-4 text-[0.74rem] leading-relaxed text-[#666]">
+      <p className="mt-4 text-[0.74rem] leading-relaxed text-tx3">
         Les gains en <span className="text-gold">A</span> et les commissions en{" "}
-        <b className="text-[#a0a0a0]">FCFA</b> sont deux monnaies distinctes : elles ne se
+        <b className="text-tx2">FCFA</b> sont deux monnaies distinctes : elles ne se
         cumulent jamais et ne se convertissent pas.
       </p>
     </Section>
@@ -1030,22 +1030,22 @@ function RulesSection({ isSuper }: { isSuper: boolean }) {
 
 function SuspendedCard({ affiliate }: { affiliate: Affiliate }) {
   return (
-    <div className="mt-6 rounded-2xl border border-[rgba(230,57,70,0.45)] bg-[#141414] p-6 sm:p-8">
-      <span className="inline-flex items-center gap-2 rounded-md border border-[rgba(230,57,70,0.45)] bg-[rgba(230,57,70,0.1)] px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-wide text-[#fda4af]">
+    <div className="mt-6 rounded-2xl border border-[rgba(230,57,70,0.45)] bg-s1 p-6 sm:p-8">
+      <span className="inline-flex items-center gap-2 rounded-md border border-[rgba(230,57,70,0.45)] bg-[rgba(230,57,70,0.1)] px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-wide text-dangertx">
         <span className="h-1.5 w-1.5 rounded-full bg-current" />
         Compte suspendu
       </span>
       <h2 className="mt-4 font-display text-[1.05rem] font-bold">Affiliation suspendue</h2>
-      <p className="mt-2 text-[0.86rem] leading-relaxed text-[#a0a0a0]">
+      <p className="mt-2 text-[0.86rem] leading-relaxed text-tx2">
         Votre compte affilié{affiliate.code ? ` (${affiliate.code})` : ""} est actuellement suspendu :
         vos liens ne comptabilisent plus de clics ni de ventes, et vos produits ne sont plus
         accessibles depuis cet espace.
       </p>
-      <p className="mt-3 text-[0.86rem] leading-relaxed text-[#a0a0a0]">
+      <p className="mt-3 text-[0.86rem] leading-relaxed text-tx2">
         Vos commissions déjà acquises restent enregistrées. Contactez l&apos;équipe pour rétablir
         votre compte.
       </p>
-      <div className="mt-6 flex flex-col gap-3 border-t border-dashed border-[#333] pt-6">
+      <div className="mt-6 flex flex-col gap-3 border-t border-dashed border-line pt-6">
         <Link href="/compte" className="btn-arsenal btn-ghost w-full">
           Retour à mon compte
         </Link>
@@ -1058,18 +1058,18 @@ function SuspendedCard({ affiliate }: { affiliate: Affiliate }) {
 
 function RejectedCard({ affiliate }: { affiliate: Affiliate }) {
   return (
-    <div className="mt-6 rounded-2xl border border-[rgba(230,57,70,0.45)] bg-[#141414] p-6 sm:p-8">
-      <span className="inline-flex items-center gap-2 rounded-md border border-[rgba(230,57,70,0.45)] bg-[rgba(230,57,70,0.1)] px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-wide text-[#fda4af]">
+    <div className="mt-6 rounded-2xl border border-[rgba(230,57,70,0.45)] bg-s1 p-6 sm:p-8">
+      <span className="inline-flex items-center gap-2 rounded-md border border-[rgba(230,57,70,0.45)] bg-[rgba(230,57,70,0.1)] px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-wide text-dangertx">
         <span className="h-1.5 w-1.5 rounded-full bg-current" />
         Candidature refusée
       </span>
       <h2 className="mt-4 font-display text-[1.05rem] font-bold">Candidature non retenue</h2>
-      <p className="mt-2 text-[0.86rem] leading-relaxed text-[#a0a0a0]">
+      <p className="mt-2 text-[0.86rem] leading-relaxed text-tx2">
         Votre candidature du {formatDate(affiliate.appliedAt)} n&apos;a pas été retenue. Vous
         conservez votre compte utilisateur et votre solde A ; seul l&apos;accès au programme
         d&apos;affiliation est fermé.
       </p>
-      <div className="mt-6 flex flex-col gap-3 border-t border-dashed border-[#333] pt-6">
+      <div className="mt-6 flex flex-col gap-3 border-t border-dashed border-line pt-6">
         <Link href="/compte" className="btn-arsenal btn-ghost w-full">
           Retour à mon compte
         </Link>
@@ -1082,21 +1082,21 @@ function RejectedCard({ affiliate }: { affiliate: Affiliate }) {
 
 function WithdrawnCard({ affiliate }: { affiliate: Affiliate }) {
   return (
-    <div className="mt-6 rounded-2xl border border-[#333] bg-[#141414] p-6 sm:p-8">
-      <span className="inline-flex items-center gap-2 rounded-md border border-[#333] bg-[#1a1a1a] px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-wide text-[#a0a0a0]">
+    <div className="mt-6 rounded-2xl border border-line bg-s1 p-6 sm:p-8">
+      <span className="inline-flex items-center gap-2 rounded-md border border-line bg-s2 px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-wide text-tx2">
         <span className="h-1.5 w-1.5 rounded-full bg-current" />
         Retiré du programme
       </span>
       <h2 className="mt-4 font-display text-[1.05rem] font-bold">Vous avez quitté l&apos;affiliation</h2>
-      <p className="mt-2 text-[0.86rem] leading-relaxed text-[#a0a0a0]">
+      <p className="mt-2 text-[0.86rem] leading-relaxed text-tx2">
         Vous vous êtes retiré du programme d&apos;affiliation
         {affiliate.code ? ` (code ${affiliate.code})` : ""}. Vos liens sont désactivés. Vos
         commissions déjà acquises, votre solde A et votre adhésion sont conservés.
       </p>
-      <p className="mt-3 text-[0.86rem] leading-relaxed text-[#a0a0a0]">
+      <p className="mt-3 text-[0.86rem] leading-relaxed text-tx2">
         Vous souhaitez revenir ? Une nouvelle candidature est possible depuis cette page.
       </p>
-      <div className="mt-6 flex flex-col gap-3 border-t border-dashed border-[#333] pt-6">
+      <div className="mt-6 flex flex-col gap-3 border-t border-dashed border-line pt-6">
         <Link href="/compte" className="btn-arsenal btn-ghost w-full">
           Retour à mon compte
         </Link>

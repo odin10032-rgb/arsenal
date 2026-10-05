@@ -24,6 +24,7 @@ import { licenseVerifyRoutes, licenseUserRoutes, licenseAdminRoutes } from "./ro
 import { adminUserRoutes } from "./routes/admin-users";
 import { legalRoutes } from "./routes/legal";
 import { siteConfigRoutes } from "./routes/site-config";
+import { feedRoutes } from "./routes/feed";
 import { meTransferRoutes } from "./routes/me-transfers";
 import { cartRoutes } from "./routes/cart";
 import { adminProductRequestRoutes } from "./routes/admin-product-requests";
@@ -143,6 +144,7 @@ app.route("/", adminUserRoutes);
 app.route("/", legalRoutes);
 /** Affichage public (statistiques d'accueil pilotées depuis Paramètres → Affichage). */
 app.route("/", siteConfigRoutes);
+app.route("/", feedRoutes);
 // Vague 2 — mouvements d'argent et crédits A : routes monétaires bornées.
 app.use("/api/me/transfer", rateLimit({ limit: 20, windowMs: 60_000, label: "transfer" }));
 app.use("/api/me/share", rateLimit({ limit: 60, windowMs: 60_000, label: "share" }));
