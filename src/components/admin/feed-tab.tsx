@@ -11,7 +11,7 @@
  * Aucun contenu n'est inventé : tout ce qui s'affiche est saisi ici.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConfirmDialog } from "./confirm-dialog";
 import { fetchUploads, type MediaItem } from "@/lib/admin";
 import {
@@ -257,6 +257,53 @@ function ArticleEditor({
   const [library, setLibrary] = useState<MediaItem[]>([]);
   const [showLibrary, setShowLibrary] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Protection contre la fermeture accidentelle (spec « fermeture éditeur ») :
+  // rien ne se ferme sans un geste EXPLICITE et, si des modifications existent,
+  // sans un choix éclairé (continuer / enregistrer / quitter sans enregistrer).
+  const [exitOpen, setExitOpen] = useState(false);
+
+  // Valeurs de référence = état chargé à l'ouverture (jamais recalculé).
+  const initial = useRef(
+    article
+      ? {
+          title: article.title, slug: article.slug, excerpt: article.excerpt,
+          content: article.content, coverUrl: article.coverUrl ?? "",
+          category: article.category ?? "", videoUrl: article.videoUrl ?? "",
+          productId: article.productId ?? "",
+        }
+      : {
+          title: "", slug: "", excerpt: "", content: "", coverUrl: "",
+          category: "", videoUrl: "", productId: "",
+        }
+  );
+
+  const dirty =
+    title !== initial.current.title ||
+    slug !== initial.current.slug ||
+    excerpt !== initial.current.excerpt ||
+    content !== initial.current.content ||
+    coverUrl !== initial.current.coverUrl ||
+    category !== initial.current.category ||
+    videoUrl !== initial.current.videoUrl ||
+    productId !== initial.current.productId;
+
+  // Actualisation / fermeture d'onglet : mécanisme NATIF du navigateur quand du
+  // travail n'est pas enregistré (pas de fausse modale custom — spec §5).
+  useEffect(() => {
+    if (!dirty) return;
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [dirty]);
+
+  /** Fermeture demandée par l'utilisateur (✕, Annuler) — jamais par un clic extérieur. */
+  const requestClose = () => {
+    if (dirty) setExitOpen(true);
+    else onClose();
+  };
 
   // Couverture : la médiathèque existante évite de copier des URLs à la main.
   useEffect(() => {
@@ -308,10 +355,12 @@ function ArticleEditor({
   };
 
   return (
-    <div className="fixed inset-0 z-[150] bg-[rgba(5,5,5,0.7)]" onClick={onClose}>
+    // Clic extérieur INERTE (spec « fermeture éditeur » §1) : un article en
+    // cours de rédaction ne doit jamais disparaître parce qu'on a cliqué à
+    // côté. Seuls ✕, Annuler et les choix de sortie ferment l'éditeur.
+    <div className="fixed inset-0 z-[150] bg-[rgba(5,5,5,0.7)]">
       <aside
         className="absolute inset-y-0 right-0 flex w-full flex-col border-l border-[#444] bg-[#101010] md:w-[560px]"
-        onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-label={article ? "Modifier l'article" : "Nouvel article"}
@@ -322,7 +371,7 @@ function ArticleEditor({
           </h3>
           <button
             type="button"
-            onClick={onClose}
+            onClick={requestClose}
             className="ml-auto grid h-9 w-9 place-items-center rounded-full border border-[#333] bg-[#141414] text-[#a0a0a0] hover:border-[#444] hover:text-[#f0f0f0]"
             aria-label="Fermer"
           >
@@ -492,8 +541,56 @@ function ArticleEditor({
           </div>
         </div>
 
+        {/* Confirmation de sortie — 3 choix, rendus DANS l'éditeur (pas de
+            fermeture) ; « Enregistrer » sauvegarde réellement puis ferme. */}
+        {exitOpen && (
+          <div className="fixed inset-0 z-[160] flex items-center justify-center bg-[rgba(5,5,5,0.8)] p-5">
+            <div
+              className="w-full max-w-[460px] rounded-2xl border border-[#444] bg-[#141414] p-6 shadow-[0_20px_60px_rgba(0,0,0,0.6)]"
+              role="alertdialog"
+              aria-modal="true"
+              aria-label="Modifications non enregistrées"
+            >
+              <h3 className="font-display text-[1.05rem] font-bold">
+                ⚠️ Modifications non enregistrées
+              </h3>
+              <p className="mt-2 text-[0.86rem] leading-relaxed text-[#a0a0a0]">
+                Vous avez des modifications qui n&apos;ont pas encore été enregistrées.
+              </p>
+              <div className="mt-5 flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => setExitOpen(false)}
+                  className="btn-arsenal btn-ghost"
+                >
+                  Continuer l&apos;édition
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setExitOpen(false);
+                    void save();
+                  }}
+                  className="btn-arsenal btn-primary"
+                >
+                  {busy && <span className="spin" />}
+                  {article ? "Enregistrer et quitter" : "Enregistrer comme brouillon"}
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="btn-arsenal btn-danger"
+                >
+                  Quitter sans enregistrer
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-shrink-0 gap-3 border-t border-[#333] px-5 py-4">
-          <button type="button" onClick={onClose} className="btn-arsenal btn-ghost flex-1">
+          <button type="button" onClick={requestClose} className="btn-arsenal btn-ghost flex-1">
             Annuler
           </button>
           <button
