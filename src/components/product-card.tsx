@@ -1,11 +1,12 @@
 "use client";
 
 /**
- * Carte produit — réplique du design validé (2 badges max, heat clics, image lazy)
+ * Carte produit — visuel SANS filigrane (ni badge, ni catégorie : ils vivent
+ * sur la page produit), heat clics, image lazy.
  */
 
 import Link from "next/link";
-import { CATEGORIES, BADGE_LABELS, Badge, Product, safeUrl } from "@/lib/products";
+import { BADGE_LABELS, Badge, Product, safeUrl } from "@/lib/products";
 import { fmt } from "@/lib/format";
 
 const FALLBACK_IMAGE =
@@ -52,16 +53,10 @@ export function ProductCard({ p }: { p: Product }) {
             if (img.src !== FALLBACK_IMAGE) img.src = FALLBACK_IMAGE;
           }}
         />
-        {p.badges.length > 0 && (
-          <div className="absolute left-3 top-3 z-[2] flex flex-wrap gap-1.5">
-            {p.badges.slice(0, 2).map((b) => (
-              <BadgePill key={b} badge={b} />
-            ))}
-          </div>
-        )}
-        <span className="absolute bottom-3 left-3 z-[2] rounded-md border border-[rgba(42,157,143,0.3)] bg-[rgba(8,8,8,0.8)] px-2 py-0.5 font-mono text-[0.6rem] font-semibold uppercase tracking-[0.08em] text-teal">
-          {CATEGORIES[p.category]}
-        </span>
+        {/* Aucun filigrane sur le visuel (décision propriétaire du 05/10) :
+            ni badge de statut ni genre de produit sur les cartes — l'acheteur
+            voit ces informations sur la PAGE DU PRODUIT uniquement. Les filtres
+            du catalogue restent, eux, pleinement actifs. */}
       </div>
 
       <div className="flex flex-1 flex-col gap-2 p-4">
