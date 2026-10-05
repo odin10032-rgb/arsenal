@@ -77,9 +77,16 @@ const DICT: Record<Lang, Record<string, string>> = {
     theme_light: "Clair",
     theme_dark: "Sombre",
     // Accueil + catalogue + feed
-    home_hero_title: "L'arsenal des bâtisseurs du web",
+    // Hero (spec « hero direct » 05/10) : promesse en 3 temps — titre, deux
+    // « 3× » graphiques, sous-titre, CTA. Le « 3× » est rendu à part (élément
+    // graphique rouge) : la clé ne contient que le libellé.
+    home_hero_eyebrow: "Arsenal Tools",
+    home_hero_title: "Rentabilisez vos idées.",
+    home_promise_fast: "Plus vite",
+    home_promise_cheap: "Moins cher",
     home_hero_sub:
-      "SaaS, applications desktop, PWA mobiles, e-books et packs d'automations — triés par popularité réelle, testés par la communauté.",
+      "SaaS, applications, automatisations et ressources numériques pour transformer vos idées en quelque chose de concret.",
+    home_cta_explore: "Explorer l’arsenal",
     home_doors_title: "Deux portes, deux intentions",
     home_door_catalog_title: "Je cherche un outil",
     home_door_catalog_text: "Filtrez le catalogue par catégorie, badge, langue et popularité.",
@@ -137,9 +144,13 @@ const DICT: Record<Lang, Record<string, string>> = {
     theme_light: "Light",
     theme_dark: "Dark",
     // Home + catalog + feed
-    home_hero_title: "The arsenal for web builders",
+    home_hero_eyebrow: "Arsenal Tools",
+    home_hero_title: "Make your ideas profitable.",
+    home_promise_fast: "Faster",
+    home_promise_cheap: "Cheaper",
     home_hero_sub:
-      "SaaS, desktop apps, mobile PWAs, e-books and automation packs — sorted by real popularity, tested by the community.",
+      "SaaS, apps, automations and digital resources to turn your ideas into something concrete.",
+    home_cta_explore: "Explore the arsenal",
     home_doors_title: "Two doors, two intents",
     home_door_catalog_title: "I'm looking for a tool",
     home_door_catalog_text: "Filter the catalog by category, badge, language and popularity.",

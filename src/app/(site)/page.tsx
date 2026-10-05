@@ -86,15 +86,50 @@ export default function HomePage() {
 
   return (
     <>
-      {/* ---------- Hero ---------- */}
+      {/* ---------- Hero (spec « hero direct » 05/10) ----------
+          Hiérarchie voulue : ARSENAL TOOLS → Rentabilisez vos idées. → les deux
+          « 3× » (éléments graphiques rouges, plus grands que leur libellé) →
+          sous-titre → CTA. Composition verticale, mobile d'abord ; les stats
+          réelles du catalogue (pilotables en admin) restent, discrètes, APRÈS
+          le CTA — jamais en renfort artificiel de la promesse. */}
       <section className="py-8 md:py-12">
         <div className="container-arsenal">
-          <h1 className="max-w-[15ch] font-display text-[clamp(1.9rem,4.6vw,3.3rem)] font-bold leading-[1.12] tracking-tight">
+          <p className="font-mono text-[0.7rem] uppercase tracking-[0.2em] text-tx3">
+            {t("home_hero_eyebrow")}
+          </p>
+          <h1 className="mt-3 max-w-[18ch] font-display text-[clamp(1.9rem,4.6vw,3.3rem)] font-bold leading-[1.12] tracking-tight">
             {t("home_hero_title")}
           </h1>
-          <p className="mt-3 max-w-[56ch] leading-relaxed text-tx2">{t("home_hero_sub")}</p>
+
+          {/* Les deux promesses — le « 3× » est l'élément graphique (rouge de
+              l'identité, nettement plus grand que le libellé). */}
+          <div className="mt-6 flex flex-col gap-2 sm:gap-2.5" aria-label={t("home_hero_title")}>
+            <p className="flex items-baseline gap-2.5">
+              <span className="font-display text-[clamp(2.4rem,7vw,3.6rem)] font-bold leading-none tracking-tight text-brand">
+                3×
+              </span>
+              <span className="font-display text-[clamp(1.05rem,2.4vw,1.45rem)] font-bold uppercase tracking-[0.06em] text-tx1">
+                {t("home_promise_fast")}
+              </span>
+            </p>
+            <p className="flex items-baseline gap-2.5">
+              <span className="font-display text-[clamp(2.4rem,7vw,3.6rem)] font-bold leading-none tracking-tight text-brand">
+                3×
+              </span>
+              <span className="font-display text-[clamp(1.05rem,2.4vw,1.45rem)] font-bold uppercase tracking-[0.06em] text-tx1">
+                {t("home_promise_cheap")}
+              </span>
+            </p>
+          </div>
+
+          <p className="mt-5 max-w-[56ch] leading-relaxed text-tx2">{t("home_hero_sub")}</p>
+
+          <Link href="/catalogue/" className="btn-arsenal btn-primary mt-6">
+            {t("home_cta_explore")} <span aria-hidden="true">→</span>
+          </Link>
+
           {showStats !== false && (
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-8 flex flex-wrap gap-3">
               <HeroStat value={fmt(total)} label="outils au catalogue" />
               <HeroStat value={fmt(freeCount)} label="gratuits" />
               <HeroStat value={fmt(totalClicks)} label="clics cumulés" />
