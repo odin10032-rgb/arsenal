@@ -396,6 +396,12 @@ export const productRoutes: App = new Hono<{ Bindings: Env }>()
         type: "product_unavailable",
         message: `« ${updated.title} » a été marqué indisponible — les visiteurs de vos liens ne peuvent plus l'acheter.`,
       });
+    } else if (!wasAvailable && updated.unavailableAt == null) {
+      await notifyProductAffiliates(c.env.DB, {
+        productId: id,
+        type: "product_available",
+        message: `« ${updated.title} » est de nouveau disponible — vos liens reprennent effet.`,
+      });
     }
 
     return c.json({ ok: true, product: updated });
