@@ -30,8 +30,10 @@ import type { App, Env } from "../env";
  *   (jamais du client) et la dédup 24 h existante est la seule garde d'abus —
  *   un clic dédupliqué ne crédite rien. L'affilié doit être `active` et son
  *   utilisateur MEMBRE (monnaie A réservée aux membres) ;
- * - produit sans URL (100 % A) : le clic est compté et le visiteur atterrit sur la page
- *   produit du site (`/produit?id=…`, première origine valide de FRONT_ORIGINS) ;
+ * - PARCOURS : le clic redirige TOUJOURS vers la page produit du site
+ *   (`/produit/?id=…&ars=<jeton>`) — jamais directement vers le paiement —
+ *   pour que la découverte se fasse sur Arsenal et que le suivi/opportunité de
+ *   compte (popup) s'appliquent ;
  * - PONT DE TRACKING (vague 1) : un jeton OPAQUE et ANONYME est délivré au passage
  *   (jamais dérivé de l'IP ; `visitor_hash` = `sha256(ip+ua+jour)` reste la seule
  *   empreinte). Le jeton est ajouté à l'URL de destination en paramètre `ars` et
@@ -103,14 +105,19 @@ export const affiliateTrackRoutes: App = new Hono<{ Bindings: Env }>().post(
       return c.json({ ok: false, error: "Ce lien affilié n'est plus actif." }, 409);
     }
 
-    const url = (target.product.action_url || "").trim();
+    // PARCOURS ATTENDU (cahier des charges QA §3, corrigé le 04/10/2026) :
+    // lien affilié → PAGE PRODUIT d'Arsenal → découverte → puis achat.
+    // L'ancien comportement (rediriger vers `action_url` = tunnel Chariow ou
+    // site externe) faisait quitter Arsenal immédiatement : le jeton de suivi
+    // n'était jamais mémorisé, donc le pont de tracking et le parrainage étaient
+    // inopérants, et l'affilié perdait son attribution.
+    // La destination est donc TOUJOURS la page produit du site (format query :
+    // la query survit à la normalisation trailingSlash, contrairement au chemin).
     const origin = firstValidFrontOrigin(c.env.FRONT_ORIGINS);
-    const destination =
-      url || (origin ? `${origin}/produit?id=${encodeURIComponent(target.product.id)}` : "");
-    if (!destination) {
-      // Le produit existe mais aucune destination exploitable : rien de sûr à rediriger.
+    if (!origin) {
       return c.json({ ok: false, error: "Produit sans URL de destination." }, 409);
     }
+    const destination = `${origin}/produit/?id=${encodeURIComponent(target.product.id)}`;
 
     // Empreinte JOURNALIÈRE : dédup des clics (un même visiteur = 1 clic/jour).
     const visitorHash = visitorHashOf(

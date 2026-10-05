@@ -577,6 +577,26 @@ export const adminAffiliationRoutes: App = new Hono<{ Bindings: Env }>()
       if (commission && commission.state !== "cancelled") {
         statements.push(commissionStateStatement(db, commission, "cancelled", null, now));
       }
+      // Récompense A de la vente : si elle a déjà été créditée (vente confirmée
+      // d'un achat en A ou via webhook), elle est REPRISE — symétrique du
+      // remboursement d'achat (constat de l'audit : asymétrie).
+      // La clé d'idempotence de la récompense de vente est `sale:<saleRef>`.
+      if (sale.affiliate_id) {
+        statements.push(
+          db
+            .prepare(
+              `INSERT OR IGNORE INTO a_transactions
+                 (id, user_id, delta, type, label, ref_type, ref_id, idempotency_key, created_at)
+               SELECT a.user_id, -a.delta, 'adjustment',
+                      'Récompense reprise (vente rejetée)', 'sale', sale.id,
+                      'refund-reward-sale:' || sale.id, ?
+                 FROM a_transactions a
+                 JOIN affiliates af ON af.user_id = a.user_id
+                WHERE a.idempotency_key = 'sale:' || ? AND af.id = ?`
+            )
+            .bind(now, sale.sale_ref ?? sale.id, sale.affiliate_id)
+        );
+      }
     } else {
       statements.push(
         db

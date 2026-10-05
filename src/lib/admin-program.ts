@@ -177,12 +177,21 @@ export async function creditAdminUser(
   userId: string,
   amount: number,
   reason: string,
+  /**
+   * Clé d'idempotence générée par l'UI à l'ouverture de la confirmation :
+   * un renvoi réseau de la même tentative ne crée qu'UN ajustement.
+   */
+  idempotencyKey?: string,
 ): Promise<AdminCreditResult> {
   const res = await apiFetch<{ ok: boolean } & Partial<AdminCreditResult>>(
     `/api/admin/users/${encodeURIComponent(userId)}/credit`,
     {
       method: "POST",
-      body: { amount: Math.trunc(amount), reason: reason.trim() },
+      body: {
+        amount: Math.trunc(amount),
+        reason: reason.trim(),
+        ...(idempotencyKey ? { idempotencyKey } : {}),
+      },
       auth: true,
       timeoutMs: 8000,
     },

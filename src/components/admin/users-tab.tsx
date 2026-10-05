@@ -19,9 +19,11 @@ import {
   type AdminActivityEntry,
   type AdminActivityKind,
   type AdminUser,
+  setUserMembership,
   type AdminUserDetail,
 } from "@/lib/admin-users";
 import { fmt } from "@/lib/format";
+import { toast } from "@/lib/toast";
 
 const ROLE_LABELS: Record<string, string> = {
   user: "Utilisateur",
@@ -398,6 +400,29 @@ function UserDetailPanel({
   error: string;
   onClose: () => void;
 }) {
+  const [membershipBusy, setMembershipBusy] = useState(false);
+  /** Accorde/retire l'adhésion — la monnaie A est réservée aux membres. */
+  const toggleMembership = useCallback(
+    async (next: "member" | "none") => {
+      if (membershipBusy) return;
+      setMembershipBusy(true);
+      try {
+        await setUserMembership(user.id, next);
+        // Le détail affiché est déjà l'état à jour côté route : on reflète localement.
+        toast(
+          next === "member"
+            ? "Adhésion accordée — la monnaie A est accessible."
+            : "Adhésion retirée.",
+          "success",
+        );
+      } catch (err) {
+        toast(err instanceof Error ? err.message : "Bascule impossible.", "error");
+      } finally {
+        setMembershipBusy(false);
+      }
+    },
+    [membershipBusy, user.id],
+  );
   const roleStyle = roleBadgeStyle(detail?.user.role ?? user.role);
   const counters = detail
     ? [
@@ -458,6 +483,37 @@ function UserDetailPanel({
                 {fmt(detail.affiliate.clicks)} clics · {fmt(detail.affiliate.sales)} ventes confirmées
               </span>
             )}
+          </div>
+
+          {/* Adhésion — pilote l'accès à la monnaie A (migration 0008). */}
+          <div className="mb-3 flex items-center justify-between gap-3 rounded-[10px] border border-[#333] bg-[rgba(255,255,255,0.02)] px-3.5 py-2.5">
+            <div className="min-w-0">
+              <p className="text-[0.72rem] font-semibold uppercase tracking-wider text-[#666]">
+                Adhésion au programme
+              </p>
+              <p className="mt-0.5 text-[0.74rem] leading-relaxed text-[#a0a0a0]">
+                {detail.user.membership === "member"
+                  ? "Membre — la monnaie A est accessible."
+                  : "Non-membre — achat, transfert et récompenses refusés."}
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={membershipBusy}
+              onClick={() =>
+                void toggleMembership(
+                  detail.user.membership === "member" ? "none" : "member",
+                )
+              }
+              className={
+                detail.user.membership === "member"
+                  ? "btn-arsenal btn-ghost btn-sm flex-shrink-0"
+                  : "btn-arsenal btn-primary btn-sm flex-shrink-0"
+              }
+            >
+              {membershipBusy && <span className="spin" />}
+              {detail.user.membership === "member" ? "Retirer" : "Accorder"}
+            </button>
           </div>
 
           {/* Compteurs */}

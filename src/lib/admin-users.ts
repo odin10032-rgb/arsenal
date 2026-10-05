@@ -52,6 +52,8 @@ export interface AdminUserDetail {
     pseudo: string;
     email: string;
     role: string;
+    /** Adhésion au programme (migration 0008) — pilote l'accès à la monnaie A. */
+    membership: "member" | "none";
     balanceA: number;
     createdAt: number;
     updatedAt: number;
@@ -132,6 +134,7 @@ export async function fetchAdminUser(id: string): Promise<AdminUserDetail> {
   }>(`/api/admin/users/${encodeURIComponent(id)}`, { auth: true, timeoutMs: 6000 });
 
   const user = (res.user ?? {}) as Record<string, unknown>;
+  const membership = user.membership === "member" ? "member" : "none";
   const counts = (res.counts ?? {}) as Record<string, unknown>;
   const affiliateRaw = res.affiliate && typeof res.affiliate === "object"
     ? (res.affiliate as Record<string, unknown>)
@@ -143,7 +146,8 @@ export async function fetchAdminUser(id: string): Promise<AdminUserDetail> {
       id: adminStr(user.id),
       pseudo: adminStr(user.pseudo),
       email: adminStr(user.email),
-      role: adminStr(user.role) || "user",
+      membership,
+    role: adminStr(user.role) || "user",
       balanceA: adminNum(user.balanceA ?? user.balance_a),
       createdAt: adminNum(user.createdAt ?? user.created_at),
       updatedAt: adminNum(user.updatedAt ?? user.updated_at),
@@ -194,5 +198,22 @@ export async function fetchAdminUserActivity(
       label: adminStr(item.label),
       detail: item.detail ?? null,
     } satisfies AdminActivityEntry;
+  });
+}
+
+/**
+ * POST /api/admin/users/:id/membership — accorde/retire l'adhésion au
+ * programme. La monnaie A est réservée aux membres (migration 0008) : c'est
+ * le bouton qui manquait pour la rendre attribuable depuis l'admin.
+ */
+export async function setUserMembership(
+  id: string,
+  membership: "member" | "none"
+): Promise<void> {
+  await apiFetch(`/api/admin/users/${encodeURIComponent(id)}/membership`, {
+    method: "POST",
+    body: { membership },
+    auth: true,
+    timeoutMs: 6000,
   });
 }

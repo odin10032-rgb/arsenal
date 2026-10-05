@@ -143,6 +143,9 @@ app.route("/", adminUserRoutes);
 app.route("/", legalRoutes);
 /** Affichage public (statistiques d'accueil pilotées depuis Paramètres → Affichage). */
 app.route("/", siteConfigRoutes);
+// Vague 2 — mouvements d'argent et crédits A : routes monétaires bornées.
+app.use("/api/me/transfer", rateLimit({ limit: 20, windowMs: 60_000, label: "transfer" }));
+app.use("/api/me/share", rateLimit({ limit: 60, windowMs: 60_000, label: "share" }));
 /** Vague 2 — transferts de A entre membres + récompense de partage (Bearer requis). */
 app.route("/", meTransferRoutes);
 /** Vague 3 — panier (visiteurs ET comptes) : public, le porteur identifie le panier. */
@@ -151,6 +154,9 @@ app.route("/", cartRoutes);
 app.route("/", adminProductRequestRoutes);
 /** Vague 5 — administration du programme (réglages, transferts, abandons, ajustement A). */
 app.route("/", adminProgramRoutes);
+// PONT DE TRACKING — collecte des étapes : écritures publiques bornées (l'audit
+// a signalé l'absence de limite sur cette route).
+app.use("/api/track/step", rateLimit({ limit: 60, windowMs: 60_000, label: "track-step" }));
 /** PONT DE TRACKING — collecte des étapes de parcours (public, anonyme). */
 app.route("/", trackingRoutes);
 /** PONT DE TRACKING — écrans admin (parcours, conflits multi-liens, recrutements). */

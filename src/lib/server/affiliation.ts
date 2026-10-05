@@ -596,8 +596,15 @@ export async function readParticipatingCampaignIds(
   affiliateId: string
 ): Promise<string[]> {
   try {
+    // Seules les campagnes ACTIVES exemptent : une campagne terminée ne doit
+    // pas garder son produit hors plafond à vie (constat de l'audit).
     const { results = [] } = await db
-      .prepare("SELECT campaign_id FROM campaign_participants WHERE affiliate_id = ?")
+      .prepare(
+        `SELECT cp.campaign_id AS campaign_id
+           FROM campaign_participants cp
+           JOIN campaigns c ON c.id = cp.campaign_id
+          WHERE cp.affiliate_id = ? AND c.status = 'active'`
+      )
       .bind(affiliateId)
       .all<{ campaign_id: string }>();
     return (results || []).map((r) => r.campaign_id).filter(Boolean);
@@ -1116,8 +1123,12 @@ export async function computeAffiliateStats(
       .prepare("SELECT COUNT(*) AS n FROM sales WHERE affiliate_id = ? AND state = 'confirmed'")
       .bind(affiliate.id)
       .first<{ n: number }>(),
+    // « A gagnés » = TOUTES les récompenses (vente, partage, clic, recrutement).
+    // L'audit a constaté que `type = 'reward'` seul excluais partages et clics.
     db
-      .prepare("SELECT COALESCE(SUM(delta), 0) AS total FROM a_transactions WHERE user_id = ? AND type = 'reward'")
+      .prepare(
+        "SELECT COALESCE(SUM(delta), 0) AS total FROM a_transactions WHERE user_id = ? AND type IN ('reward', 'reward_share', 'reward_click')"
+      )
       .bind(affiliate.user_id)
       .first<{ total: number }>(),
     db
@@ -1176,7 +1187,7 @@ export async function affiliateStatsMap(
       .all<{ affiliate_id: string; n: number }>(),
     db
       .prepare(
-        `SELECT user_id, COALESCE(SUM(delta), 0) AS total FROM a_transactions WHERE type = 'reward' AND user_id IN (${userPlaceholders}) GROUP BY user_id`
+        `SELECT user_id, COALESCE(SUM(delta), 0) AS total FROM a_transactions WHERE type IN ('reward', 'reward_share', 'reward_click') AND user_id IN (${userPlaceholders}) GROUP BY user_id`
       )
       .bind(...userIds)
       .all<{ user_id: string; total: number }>(),

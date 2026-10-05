@@ -249,6 +249,10 @@ function withoutIntegrationFields(product: Product): PublicProduct {
   delete copy.chariow_discount_code;
   delete copy.priceA;
   delete copy.price_a;
+  // Fichier livrable : l'URL GitHub brute n'est JAMAIS publique (le téléchargement
+  // passe par la route vérifiée). L'audit vague 5 a constaté la fuite.
+  delete copy.productFileUrl;
+  delete copy.product_file_url;
   return copy as PublicProduct;
 }
 

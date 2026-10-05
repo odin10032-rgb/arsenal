@@ -1,6 +1,9 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
 import { isAdmin, unauthorized } from "../../src/lib/server/auth";
+import { securityEventStatement } from "../../src/lib/server/user-auth";
+import { sha256hex } from "../../src/lib/server/auth";
+import { normalizeMembership } from "../../src/lib/server/user-auth";
 import { ACTIVE_PURCHASE_STATUSES } from "../../src/lib/server/purchases";
 import type { App, Env } from "../env";
 
@@ -217,6 +220,57 @@ interface ActivityEntry {
 /* ------------------------------------ Routes ------------------------------------ */
 
 export const adminUserRoutes: App = new Hono<{ Bindings: Env }>()
+
+  /**
+   * POST /api/admin/users/:id/membership {membership: "member"|"none"} —
+   * accorde ou retire l'ADHESION au programme (migration 0008). C'est le
+   * bouton qui MANQUAIT : sans lui, la monnaie A etait inattribuable
+   * (aucune route, aucun UI, migration 0008b jamais ecrite).
+   * Journalise (action `admin_${string}`) dans le meme batch.
+   */
+  .post("/api/admin/users/:id/membership", async (c) => {
+    const denied = await requireAdmin(c);
+    if (denied) return denied;
+    const targetId = String(c.req.param("id") ?? "").trim();
+    if (!targetId) return notFound("Utilisateur introuvable.");
+    const db = c.env.DB;
+
+    let body: { membership?: unknown };
+    try {
+      body = (await c.req.json()) as typeof body;
+    } catch {
+      return Response.json({ ok: false, error: "JSON invalide." }, { status: 400 });
+    }
+    const value = body.membership === "member" ? "member" : body.membership === "none" ? "none" : null;
+    if (!value) {
+      return Response.json({ ok: false, error: 'Valeur invalide (attendu : "member" ou "none").' }, { status: 400 });
+    }
+
+    const target = await safeFirst<{ id: string; pseudo: string; membership: string | null }>(
+      db,
+      "SELECT id, pseudo, membership FROM users WHERE id = ?",
+      targetId
+    );
+    if (!target) return notFound("Utilisateur introuvable.");
+
+    const previous = normalizeMembership(target.membership);
+    if (previous === value) {
+      return c.json({ ok: true, membership: value, unchanged: true });
+    }
+
+    await db.batch([
+      db
+        .prepare("UPDATE users SET membership = ?, updated_at = ? WHERE id = ?")
+        .bind(value, Date.now(), targetId),
+      securityEventStatement(db, {
+        actor: "admin",
+        action: "admin_membership_set",
+        ipHash: sha256hex(c.req.header("cf-connecting-ip") || "unknown"),
+        meta: { userId: targetId, pseudo: target.pseudo, from: previous, to: value },
+      }),
+    ]);
+    return c.json({ ok: true, membership: value });
+  })
   /**
    * GET /api/admin/users?q=&limit= — liste des comptes.
    * `q` filtre pseudo OU email (LIKE échappé, insensible à la casse) ;

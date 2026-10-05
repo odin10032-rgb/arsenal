@@ -546,10 +546,21 @@ export async function listCommissionsAdmin(
 }
 
 /** Commissions payables d'un affilié, les plus anciennes d'abord (allocation des paiements). */
-export async function listPayableCommissions(db: D1Database, affiliateId: string): Promise<CommissionRow[]> {
+export async function listPayableCommissions(
+  db: D1Database,
+  affiliateId: string,
+  /** Devise du paiement : seules les commissions de LA MÊME devise sont soldees
+   *  (décision propriétaire — A et FCFA ne se cumulent ni ne se convertissent). */
+  currency?: string
+): Promise<CommissionRow[]> {
+  const cur = (currency ?? "").trim().toUpperCase();
   const { results = [] } = await db
-    .prepare("SELECT * FROM commissions WHERE affiliate_id = ? AND state = 'payable' ORDER BY created_at ASC, id ASC")
-    .bind(affiliateId)
+    .prepare(
+      `SELECT * FROM commissions
+        WHERE affiliate_id = ? AND state = 'payable'
+          AND UPPER(COALESCE(currency, 'FCFA')) = ?`,
+    )
+    .bind(affiliateId, cur || "FCFA")
     .all<CommissionRow>();
   return results || [];
 }
@@ -635,7 +646,8 @@ export async function recordPayment(
     paid_at: now,
   };
 
-  const payable = await listPayableCommissions(db, input.affiliateId);
+  // Aucune devise croisée : un paiement FCFA ne solde que des commissions FCFA.
+  const payable = await listPayableCommissions(db, input.affiliateId, payment.currency);
   const allocation = allocatePayment(payable, payment.amount);
   const byId = new Map(payable.map((c) => [c.id, c]));
 

@@ -58,7 +58,12 @@ async function readOwner(
   }
   const visitorToken = await readVisitorToken(c);
   if (!userId && !isValidVisitorToken(visitorToken)) return null;
-  return { userId, visitorToken: userId ? null : (visitorToken as string) };
+  // Fusion à la connexion : quand les DEUX porteurs sont présents (visiteur
+  // venu d'un lien qui se connecte), on transmet les deux — `resolveCart`
+  // fusionne alors le panier visiteur dans le panier du compte (voir
+  // src/lib/server/cart.ts). L'ancien code annulait le token visiteur, ce qui
+  // rendait la fusion morte (constat de l'audit).
+  return { userId, visitorToken: isValidVisitorToken(visitorToken) ? (visitorToken as string) : null };
 }
 
 /** Lecture de l'adhésion du porteur connecté (décide de l'exposition du prix A). */

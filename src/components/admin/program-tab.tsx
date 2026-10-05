@@ -481,9 +481,12 @@ function CreditSection({ apiAvailable }: { apiAvailable: boolean }) {
 
   const apply = async () => {
     if (!target || !ready || busy) return;
+    // Cle d'idempotence generee a l'OUVERTURE de la confirmation : un renvoi
+    // reseau de cette MEME tentative est reconnu par la route et ignore.
+    const idempotencyKey = crypto.randomUUID();
     setBusy(true);
     try {
-      const res = await creditAdminUser(target.id, Math.trunc(parsedAmount), reason.trim());
+      const res = await creditAdminUser(target.id, Math.trunc(parsedAmount), reason.trim(), idempotencyKey);
       toast(
         `${res.amount > 0 ? "Crédit" : "Débit"} de ${fmt(Math.abs(res.amount))} A appliqué à ${
           res.pseudo || target.pseudo
