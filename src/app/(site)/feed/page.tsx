@@ -219,7 +219,8 @@ function FeedPost({
                 onClick={() => void toggle()}
                 className="whitespace-nowrap text-[0.85rem] text-tx3 underline decoration-line underline-offset-4 transition-colors hover:text-tx1"
               >
-                {busy ? "…" : `… ${t("feed_read_more")}`}
+                {/* « … Lire plus » — toujours séparé du texte, petite taille */}
+                {busy ? "…" : ` … ${t("feed_read_more")}`}
               </button>
             )}
           </p>
