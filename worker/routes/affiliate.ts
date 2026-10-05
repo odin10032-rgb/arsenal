@@ -23,6 +23,10 @@ import {
 } from "../../src/lib/server/affiliation";
 import type { AffiliateLinkRow, AffiliateLimits } from "../../src/lib/server/affiliation";
 import { createProductRequest } from "../../src/lib/server/product-requests";
+import {
+  listUnreadNotifications,
+  markAllNotificationsRead,
+} from "../../src/lib/server/notifications";
 import { getActiveCampaign, resolveCommissionRule } from "../../src/lib/server/commissions";
 import {
   isEligible,
@@ -605,4 +609,26 @@ export const affiliateRoutes: AuthedApp = new Hono<AuthedEnv>()
       linkCode: outcome.link.code,
       productId: product.id,
     });
+  })
+  /**
+   * Cycle de vie (migration 0014) — notifications de l'affilié : changements
+   * d'éligibilité/disponibilité des produits qu'il référence, campagnes
+   * terminées. Aucun email (§37) — tout est lu ici, dans son espace.
+   * Accessible à tout affilié CONNECTÉ (même `pending` : il voit ce qui
+   * concerne ses futurs liens sans pouvoir en créer).
+   */
+  .get("/api/affiliate/me/notifications", requireAuth, async (c) => {
+    const { user } = c.get("authUser");
+    const affiliate = await getAffiliateByUserId(c.env.DB, user.id);
+    if (!affiliate) return c.json({ ok: true, notifications: [] });
+    const notifications = await listUnreadNotifications(c.env.DB, affiliate.id);
+    return c.json({ ok: true, notifications });
+  })
+  /** Marque TOUTES les notifications de l'affilié comme lues (idempotent). */
+  .post("/api/affiliate/me/notifications/read", requireAuth, async (c) => {
+    const { user } = c.get("authUser");
+    const affiliate = await getAffiliateByUserId(c.env.DB, user.id);
+    if (!affiliate) return c.json({ ok: true });
+    await markAllNotificationsRead(c.env.DB, affiliate.id);
+    return c.json({ ok: true });
   });

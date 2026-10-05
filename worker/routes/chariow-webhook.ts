@@ -120,6 +120,15 @@ export const chariowWebhookRoutes: App = new Hono<{ Bindings: Env }>().post(
     if (link) product = await getProductById(db, link.product_id);
     if (!product) product = await findProductByExternalRef(db, pulse.productId, pulse.productName);
 
+    // AUDIT cycle de vie (B3) : l'attribution par CODE affilié contournait la
+    // décision d'inéligibilité — un produit retiré du programme continuait de
+    // rapporter via les ventes Chariow externes. Le produit attribué doit être
+    // éligible ET non supprimé (la vente reste enregistrée, non attribuée).
+    if (affiliate && product) {
+      if (Number(product.affiliate_enabled ?? 0) !== 1) affiliate = null;
+      if (product.deleted_at != null) affiliate = null;
+    }
+
     // Le produit reste identifié par la référence Chariow brute si aucune
     // correspondance Arsenal n'existe (vente visible telle quelle côté admin).
     const productId = product?.id ?? pulse.productId ?? "";

@@ -48,13 +48,15 @@ function ProductBody() {
   const video = parseVideoUrl(product?.videoUrl);
 
   useEffect(() => {
-    if (product) {
+    // Cycle de vie : un produit SUPPRIMÉ ne compte plus d'ouverture (la page
+    // n'est qu'un message d'adieu pour les liens qui traînent encore).
+    if (product && product.deletedAt == null) {
       trackClick(product.id, "open");
       // Étape du parcours (vague 4) — best-effort, jamais bloquant.
       void trackStep("product_view");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [product?.id]);
+  }, [product?.id, product?.deletedAt]);
 
   if (!initialLoaded) {
     return <p className="container-arsenal py-24 text-center font-mono text-[#666]">Chargement…</p>;
@@ -73,6 +75,29 @@ function ProductBody() {
       </div>
     );
   }
+
+  // Cycle de vie (migration 0014, option A — suppression DOUCE) : le produit
+  // supprimé garde une page d'accueil explicite pour les liens existants
+  // (réseaux, affiliés) — jamais un « introuvable » sec qui laisse croire à une
+  // erreur. Les ACHETEURS conservent leur accès dans leur compte.
+  if (product.deletedAt != null) {
+    return (
+      <div className="container-arsenal flex flex-col items-center gap-3 py-24 text-center text-[#666]">
+        <h1 className="text-[1.3rem] font-semibold text-[#a0a0a0]">
+          Ce produit n&apos;est plus disponible
+        </h1>
+        <p className="max-w-[46ch] text-[0.9rem]">
+          « {product.title} » a été retiré du catalogue. Si vous l&apos;avez acheté, votre accès
+          reste disponible depuis votre compte.
+        </p>
+        <Link href="/" className="btn-arsenal btn-primary btn-sm mt-2">
+          Découvrir d&apos;autres produits
+        </Link>
+      </div>
+    );
+  }
+
+  const unavailable = product.unavailableAt != null;
 
   return (
     <article className="container-arsenal max-w-3xl pb-16 pt-8">
@@ -128,6 +153,15 @@ function ProductBody() {
         </p>
       </header>
 
+      {/* Cycle de vie : produit momentanément indisponible — bandeau explicite,
+          la fiche reste consultable (description, médias) mais l'achat est fermé. */}
+      {unavailable && (
+        <p className="mt-5 rounded-lg border border-[rgba(244,162,97,0.35)] bg-[rgba(244,162,97,0.08)] px-4 py-3 text-[0.86rem] leading-relaxed text-[#f4a261]">
+          Ce produit est momentanément indisponible. Revenez plus tard — les liens de cette page
+          restent valides.
+        </p>
+      )}
+
       {/* Description */}
       <section className="mt-8">
         <h2 className="mb-3 flex items-center gap-2.5 font-mono text-[0.72rem] font-semibold uppercase tracking-[0.14em] text-[#666]">
@@ -160,13 +194,22 @@ function ProductBody() {
           Accès · {CATEGORIES[product.category]}
           <span className="h-px flex-1 bg-[#333]" />
         </h2>
-        {/* Achat en A — au-dessus des canaux existants, qui restent intacts */}
-        {product.purchasable && (product.priceA ?? 0) > 0 && (
-          <div className="mb-3">
-            <BuyWithA product={product} />
-          </div>
+        {unavailable ? (
+          <p className="text-[0.88rem] text-[#666]">
+            L&apos;achat est temporairement fermé pour ce produit. Suivez son retour depuis le
+            catalogue.
+          </p>
+        ) : (
+          <>
+            {/* Achat en A — au-dessus des canaux existants, qui restent intacts */}
+            {product.purchasable && (product.priceA ?? 0) > 0 && (
+              <div className="mb-3">
+                <BuyWithA product={product} />
+              </div>
+            )}
+            <ActionBlock product={product} />
+          </>
         )}
-        <ActionBlock product={product} />
       </section>
     </article>
   );

@@ -39,6 +39,7 @@ import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { CoinA } from "@/components/account/coin-a";
 import { UserAvatar } from "@/components/account/user-avatar";
 import { AffiliateNav } from "@/components/account/affiliate-nav";
+import { AffiliateNotifications } from "@/components/account/affiliate-notifications";
 import { useUser } from "@/hooks/use-user";
 import { ApiError, apiFetch } from "@/lib/api";
 import { fmt } from "@/lib/format";
@@ -204,6 +205,10 @@ export default function AffiliePage() {
 
         {/* Navigation de l'espace (onglet « Vue d'ensemble » actif) */}
         <AffiliateNav active="overview" />
+
+        {/* Notifications du cycle de vie (produits retirés, campagnes…) — uniquement
+            pour un affilié existant : un visiteur sans profil n'a rien à lire. */}
+        {affiliate && <AffiliateNotifications />}
 
         {error && (
           <p

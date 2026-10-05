@@ -107,6 +107,18 @@ export function ProductsTab({
                     vidéo
                   </span>
                 )}
+                {/* Cycle de vie (migration 0014) : états visibles côté admin —
+                    un produit supprimé restant listé pour traçabilité. */}
+                {p.deletedAt != null && (
+                  <span className="rounded border border-[rgba(230,57,70,0.45)] bg-[rgba(230,57,70,0.1)] px-1.5 py-0.5 text-[#fda4af]">
+                    supprimé
+                  </span>
+                )}
+                {p.deletedAt == null && p.unavailableAt != null && (
+                  <span className="rounded border border-[rgba(244,162,97,0.45)] bg-[rgba(244,162,97,0.1)] px-1.5 py-0.5 text-[#f4a261]">
+                    indisponible
+                  </span>
+                )}
               </div>
             </div>
             <div className="text-right font-mono text-[0.7rem] text-[#666]">

@@ -7,6 +7,7 @@ import {
   catalogVersion,
 } from "../../src/lib/server/store";
 import { isAdmin, unauthorized } from "../../src/lib/server/auth";
+import { notifyProductAffiliates } from "../../src/lib/server/notifications";
 import { PRODUCT_LANGUAGE_CODES, type Product, type ProductLanguage } from "../../src/lib/server/types";
 import type { App, Env } from "../env";
 
@@ -325,6 +326,7 @@ export const productRoutes: App = new Hono<{ Bindings: Env }>()
     const products = await getProducts(c.env.DB);
     const index = products.findIndex((p) => p.id === id);
     if (index === -1) return c.json({ ok: false, error: "Produit introuvable." }, 404);
+    const previous = products[index];
 
     // Champs de vente en A : validés dans les bornes du contrat, PRÉSERVÉS quand
     // le corps ne les contient pas (constat C7), et invariants vérifiés.
@@ -353,6 +355,15 @@ export const productRoutes: App = new Hono<{ Bindings: Env }>()
       imageUrl: sanitizeUrl(body.imageUrl) || products[index].imageUrl,
       ...normalizeAffiliation(body),
       ...purchaseFields,
+      // Cycle de vie : disponibilité pilotée par la case « disponible » du
+      // formulaire admin. Absente du corps ⇒ état existant PRÉSERVÉ (même
+      // règle que les autres champs, constat C7).
+      unavailableAt:
+        body.available === undefined
+          ? previous.unavailableAt ?? null
+          : body.available === true
+            ? null
+            : previous.unavailableAt ?? Date.now(),
       // Langues (migration 0007) : absent du corps ⇒ langues existantes préservées.
       languages: languagesOf(body, products[index]),
       updatedAt: Date.now(),
@@ -365,6 +376,28 @@ export const productRoutes: App = new Hono<{ Bindings: Env }>()
 
     products[index] = updated;
     await saveProducts(c.env.DB, products);
+
+    // Cycle de vie (audit §B2) : informer les affiliés qui ont un lien sur ce
+    // produit quand sa disponibilité vis-à-vis de l'affiliation CHANGE.
+    const wasEnabled = products[index] && Boolean(previous.affiliateEnabled);
+    if (wasEnabled !== Boolean(updated.affiliateEnabled)) {
+      await notifyProductAffiliates(c.env.DB, {
+        productId: id,
+        type: updated.affiliateEnabled ? "product_reeligible" : "product_ineligible",
+        message: updated.affiliateEnabled
+          ? `« ${updated.title} » est de nouveau éligible à l'affiliation — vos liens reprennent effet.`
+          : `« ${updated.title} » a été retiré du programme d'affiliation — vos liens ne génèrent plus de commission.`,
+      });
+    }
+    const wasAvailable = previous.unavailableAt == null;
+    if (wasAvailable && updated.unavailableAt != null) {
+      await notifyProductAffiliates(c.env.DB, {
+        productId: id,
+        type: "product_unavailable",
+        message: `« ${updated.title} » a été marqué indisponible — les visiteurs de vos liens ne peuvent plus l'acheter.`,
+      });
+    }
+
     return c.json({ ok: true, product: updated });
   })
 
@@ -376,5 +409,12 @@ export const productRoutes: App = new Hono<{ Bindings: Env }>()
     if (!success) {
       return c.json({ ok: false, error: "Produit introuvable." }, 404);
     }
+    // Cycle de vie (audit §B4) : suppression douce ⇒ les affiliés ayant un lien
+    // sont prévenus dans leur espace (jamais d'email — §37).
+    await notifyProductAffiliates(c.env.DB, {
+      productId: id,
+      type: "product_deleted",
+      message: "Un produit sur lequel vous aviez un lien a été retiré du catalogue. Vos liens associés ne sont plus actifs.",
+    });
     return c.json({ ok: true, deleted: id });
   });

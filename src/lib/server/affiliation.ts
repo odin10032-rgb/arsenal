@@ -84,6 +84,10 @@ export interface AffiliateProductRow {
   commission_type: string | null;
   commission_value: number | null;
   reward_a: number | null;
+  /** Cycle de vie (migration 0014) : soft delete — le produit n'est plus disponible. */
+  deleted_at: number | null;
+  /** Cycle de vie (migration 0014) : vente temporairement fermée. */
+  unavailable_at: number | null;
 }
 
 export interface AffiliateStats {
@@ -388,14 +392,18 @@ export async function createAffiliate(
 /* ---------------------------------- Produits ---------------------------------- */
 
 const PRODUCT_AFFILIATE_COLUMNS =
-  "id, title, price, image_url, action_url, affiliate_enabled, commission_type, commission_value, reward_a";
+  // Cycle de vie (migration 0014) : SANS deleted_at/unavailable_at dans cette
+  // liste, les gardes `deleted_at != null` lisaient `undefined` et ne
+  // bloquaient JAMAIS le clic/attribution d'un produit retiré.
+  "id, title, price, image_url, action_url, affiliate_enabled, commission_type, commission_value, reward_a, deleted_at, unavailable_at";
 
 /** Produits éligibles à l'affiliation (`affiliate_enabled = 1`). */
 export async function listEligibleProducts(db: D1Database): Promise<AffiliateProductRow[]> {
   const { results = [] } = await db
     .prepare(
       `SELECT ${PRODUCT_AFFILIATE_COLUMNS} FROM products
-       WHERE affiliate_enabled = 1 ORDER BY created_at DESC, rowid DESC`
+       WHERE affiliate_enabled = 1 AND deleted_at IS NULL AND unavailable_at IS NULL
+       ORDER BY created_at DESC, rowid DESC`
     )
     .all<AffiliateProductRow>();
   return results || [];
@@ -598,14 +606,20 @@ export async function readParticipatingCampaignIds(
   try {
     // Seules les campagnes ACTIVES exemptent : une campagne terminée ne doit
     // pas garder son produit hors plafond à vie (constat de l'audit).
+    // Cycle de vie : une campagne dont `ends_at` est DÉPASSÉ n'est plus active
+    // même si son statut stocké est resté 'active' (transition paresseuse —
+    // aucune écriture sur les chemins de lecture).
+    const now = Date.now();
     const { results = [] } = await db
       .prepare(
         `SELECT cp.campaign_id AS campaign_id
            FROM campaign_participants cp
            JOIN campaigns c ON c.id = cp.campaign_id
-          WHERE cp.affiliate_id = ? AND c.status = 'active'`
+          WHERE cp.affiliate_id = ? AND c.status = 'active'
+            AND (c.starts_at IS NULL OR c.starts_at <= ?)
+            AND (c.ends_at IS NULL OR c.ends_at >= ?)`
       )
-      .bind(affiliateId)
+      .bind(affiliateId, now, now)
       .all<{ campaign_id: string }>();
     return (results || []).map((r) => r.campaign_id).filter(Boolean);
   } catch {
@@ -657,10 +671,17 @@ export async function countActiveLinks(db: D1Database, affiliateId: string): Pro
 
 /** Liens ACTIFS d'un affilié (sert la liste de choix en cas de plafond atteint). */
 export async function listActiveLinks(db: D1Database, affiliateId: string): Promise<AffiliateLinkRow[]> {
+  // Cycle de vie (migration 0014) : un lien dont le PRODUIT est supprimé ou
+  // indisponible est mort (le clic répond 409) — il ne consomme donc pas un
+  // emplacement du plafond et n'est pas proposé dans le choix de libération.
+  // Le lien lui-même est intact : si le produit revient, il revit tel quel.
   const { results = [] } = await db
     .prepare(
-      `SELECT * FROM affiliate_links WHERE affiliate_id = ? AND status = 'active'
-        ORDER BY created_at ASC, id ASC`
+      `SELECT al.* FROM affiliate_links al
+         JOIN products p ON p.id = al.product_id
+        WHERE al.affiliate_id = ? AND al.status = 'active'
+          AND p.deleted_at IS NULL AND p.unavailable_at IS NULL
+        ORDER BY al.created_at ASC, al.id ASC`
     )
     .bind(affiliateId)
     .all<AffiliateLinkRow>();
@@ -827,7 +848,11 @@ export async function resolveLinkTarget(
     getAffiliateById(db, link.affiliate_id),
     getProductById(db, link.product_id),
   ]);
-  if (!affiliate || !product) return null;
+  if (!affiliate) return null;
+  // Cycle de vie : un produit SOFT-DELETED existe encore — le lien est connu et
+  // doit donner un message exact (« n'est plus disponible »), pas « Lien inconnu ».
+  // Seul un produit totalement disparu (données anciennes) renvoie null.
+  if (!product) return null;
   return { link, affiliate, product };
 }
 

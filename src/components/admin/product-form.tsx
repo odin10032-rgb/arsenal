@@ -37,6 +37,9 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
   const [badges, setBadges] = useState<Badge[]>(product?.badges ?? []);
   // Langues disponibles (migration 0007) — codes de PRODUCT_LANGUAGES
   const [languages, setLanguages] = useState<string[]>(product?.languages ?? []);
+  // Cycle de vie (migration 0014) : produit momentanément indisponible (hors
+  // vente sans suppression) — la fiche reste accessible, l'achat fermé.
+  const [available, setAvailable] = useState(!(product?.unavailableAt != null));
   const [price, setPrice] = useState(product?.price ?? "");
   const [actionUrl, setActionUrl] = useState(product?.actionUrl ?? "");
   const [pwaUrl, setPwaUrl] = useState(product?.pwaUrl ?? "");
@@ -187,7 +190,7 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
       return;
     }
     setBusy(true);
-    const data: Partial<Product> = {
+    const data: Partial<Product> & { available: boolean } = {
       title: title.trim(),
       shortDescription: short.trim(),
       description: description.trim(),
@@ -217,6 +220,9 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
       fulfillmentMethod,
       // Livraison (Phase 2.7) — null = méthode existante (Chariow / manuelle)
       deliveryKind: deliveryKind === "none" ? null : deliveryKind,
+      // Cycle de vie — le serveur traduit en `unavailableAt` (jamais un champ
+      // client direct : l'horodatage est posé côté serveur).
+      available,
     };
     try {
       if (product) {
@@ -496,6 +502,24 @@ export function ProductForm({ product, onClose, onSaved }: Props) {
               )}
             </div>
           </Field>
+
+          {/* Cycle de vie (migration 0014) — disponibilité de vente */}
+          <div className="rounded-xl border border-[#333] bg-[rgba(255,255,255,0.02)] p-4">
+            <label className="flex cursor-pointer items-center justify-between gap-3">
+              <span className="text-[0.84rem] font-semibold">Produit disponible à la vente</span>
+              <input
+                type="checkbox"
+                checked={available}
+                onChange={(e) => setAvailable(e.target.checked)}
+                className="h-5 w-5 accent-[#e63946]"
+              />
+            </label>
+            <p className="mt-1 text-[0.72rem] text-[#666]">
+              Décochez pour fermer temporairement la vente : le produit quitte le catalogue, sa
+              fiche reste accessible avec « momentanément indisponible », et les affiliés ayant un
+              lien sont notifiés dans leur espace.
+            </p>
+          </div>
 
           {/* Affiliation (Phase 2) — commission et récompense A du produit */}
           <div className="rounded-xl border border-[#333] bg-[rgba(255,255,255,0.02)] p-4">

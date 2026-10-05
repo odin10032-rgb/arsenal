@@ -94,8 +94,18 @@ export const affiliateTrackRoutes: App = new Hono<{ Bindings: Env }>().post(
     if (target.affiliate.status === "suspended") {
       return c.json({ ok: false, error: "Affilié suspendu." }, 409);
     }
+    // Cycle de vie (migration 0014) : messages DISTINCTS selon l'état du produit,
+    // pour que ni l'affilié ni le visiteur ne soient dans le flou.
+    if (target.product.deleted_at != null) {
+      return c.json({ ok: false, error: "Ce produit n'est plus disponible." }, 409);
+    }
+    // Indisponibilité TEMPORAIRE : la vente est fermée, inutile d'envoyer du
+    // trafic — le produit pourra revenir (même lien, sans régénération).
+    if (target.product.unavailable_at != null) {
+      return c.json({ ok: false, error: "Ce produit est momentanément indisponible." }, 409);
+    }
     if (Number(target.product.affiliate_enabled ?? 0) !== 1) {
-      return c.json({ ok: false, error: "Produit non éligible à l'affiliation." }, 409);
+      return c.json({ ok: false, error: "Ce produit n'est plus éligible à l'affiliation." }, 409);
     }
     // Destination : URL du tunnel externe, sinon page produit du site (`/produit?id=…`,
     // format du catalogue) — repli pour un produit 100 % A, promouvable sans tunnel.

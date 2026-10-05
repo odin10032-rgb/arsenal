@@ -192,8 +192,22 @@ export interface PurchaseJson {
 const PRODUCT_PURCHASE_COLUMNS = `
   id, title, price, image_url, category, action_url, affiliate_enabled,
   commission_type, commission_value, reward_a,
-  purchasable, price_a, chariow_product_id, fulfillment_method
+  purchasable, price_a, chariow_product_id, fulfillment_method,
+  deleted_at, unavailable_at
 `;
+
+/**
+ * Cycle de vie (migration 0014) : un produit SUPPRIMÉ ou INDISPONIBLE n'est
+ * plus achetable en A, même si `purchasable = 1` (l'admin peut fermer la vente
+ * sans modifier le reste de la fiche). Message distinct pour chaque état.
+ */
+export function productLifecycleBlock(
+  product: Pick<PurchasableProductRow, "deleted_at" | "unavailable_at">
+): string | null {
+  if (product.deleted_at != null) return "Ce produit n'est plus disponible.";
+  if (product.unavailable_at != null) return "Ce produit est momentanément indisponible.";
+  return null;
+}
 
 export async function getProductForPurchase(
   db: D1Database,

@@ -58,6 +58,9 @@ function parseLanguages(raw: unknown): ProductLanguage[] | undefined {
 /* ------------------------------- Products ------------------------------- */
 
 export async function getProducts(db: D1Database): Promise<Product[]> {
+  // Cycle de vie (migration 0014) : les produits supprimés (soft delete) restent
+  // retournés avec `deletedAt` — la page produit affiche alors « n'est plus
+  // disponible » et le front filtre la grille du catalogue.
   const { results = [] } = await db
     .prepare("SELECT * FROM products ORDER BY created_at DESC, rowid DESC")
     .all<any>();
@@ -96,6 +99,9 @@ export async function getProducts(db: D1Database): Promise<Product[]> {
     deliveryKind: normalizeDeliveryKind(p.delivery_kind),
     /* --- Langues (migration 0007) --- */
     languages: parseLanguages(p.languages),
+    /* --- Cycle de vie (migration 0014) --- */
+    deletedAt: p.deleted_at != null ? Number(p.deleted_at) : undefined,
+    unavailableAt: p.unavailable_at != null ? Number(p.unavailable_at) : undefined,
   }));
 }
 
@@ -103,8 +109,8 @@ export async function saveProducts(db: D1Database, products: Product[]): Promise
   const batch = products.map(p =>
     db.prepare(`
       INSERT OR REPLACE INTO products
-      (id, title, short_description, description, category, action_type, badges, price, action_url, apk_url, pwa_url, command, video_url, image_url, clicks, created_at, updated_at, affiliate_enabled, commission_type, commission_value, reward_a, purchasable, price_a, chariow_product_id, fulfillment_method, chariow_discount_code, product_file_url, product_file_name, product_file_size, product_file_mime, delivery_kind, languages)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, title, short_description, description, category, action_type, badges, price, action_url, apk_url, pwa_url, command, video_url, image_url, clicks, created_at, updated_at, affiliate_enabled, commission_type, commission_value, reward_a, purchasable, price_a, chariow_product_id, fulfillment_method, chariow_discount_code, product_file_url, product_file_name, product_file_size, product_file_mime, delivery_kind, languages, deleted_at, unavailable_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       p.id, p.title, p.shortDescription, p.description, p.category,
       p.actionType, JSON.stringify(p.badges), p.price, p.actionUrl,
@@ -128,15 +134,29 @@ export async function saveProducts(db: D1Database, products: Product[]): Promise
       normalizeDeliveryKind(p.deliveryKind),
       // Langues (migration 0007) : même piège que ci-dessus — sans cette
       // colonne, l'INSERT OR REPLACE effacerait les langues déclarées.
-      p.languages?.length ? JSON.stringify(p.languages) : null
+      p.languages?.length ? JSON.stringify(p.languages) : null,
+      // Cycle de vie (migration 0014) : SANS ces deux colonnes, l'INSERT OR
+      // REPLACE ressusciterait un produit supprimé (la ligne est remplacée) et
+      // effacerait le marquage « indisponible ».
+      p.deletedAt ?? null,
+      p.unavailableAt ?? null
     )
   );
   await db.batch(batch);
 }
 
+/**
+ * SOFT DELETE (cycle de vie, migration 0014) : le produit est marqué
+ * `deleted_at` — la ligne SURVIT pour préserver l'historique (ventes,
+ * commissions, liens) et l'accès aux fichiers des acheteurs. L'ancien
+ * hard delete rendait inaccessibles les fichiers déjà payés.
+ */
 export async function deleteProduct(db: D1Database, id: string): Promise<boolean> {
-  const res = await db.prepare("DELETE FROM products WHERE id = ?").bind(id).run();
-  return res.success;
+  const res = await db
+    .prepare("UPDATE products SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL")
+    .bind(Date.now(), Date.now(), id)
+    .run();
+  return Number(res.meta?.changes ?? 0) > 0;
 }
 
 /* ------------------------ Fichier livrable du produit ------------------------ */

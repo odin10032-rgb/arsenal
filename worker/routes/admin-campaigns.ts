@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { isAdmin, unauthorized, sha256hex } from "../../src/lib/server/auth";
 import { securityEventStatement } from "../../src/lib/server/user-auth";
+import { notifyCampaignParticipants } from "../../src/lib/server/notifications";
 import {
   CAMPAIGN_STATUSES,
   campaignToJson,
@@ -227,9 +228,9 @@ export const adminCampaignRoutes: App = new Hono<{ Bindings: Env }>()
 
     const id = c.req.param("id");
     const existing = await c.env.DB
-      .prepare("SELECT id, status FROM campaigns WHERE id = ?")
+      .prepare("SELECT id, name, status FROM campaigns WHERE id = ?")
       .bind(id)
-      .first<{ id: string; status: string }>();
+      .first<{ id: string; name: string; status: string }>();
     if (!existing) return notFound("Campagne introuvable.");
     if (existing.status === status) return c.json({ ok: true, campaign: { id, status } });
 
@@ -242,6 +243,21 @@ export const adminCampaignRoutes: App = new Hono<{ Bindings: Env }>()
         meta: { campaignId: id, from: existing.status, to: status },
       }),
     ]);
+
+    // Cycle de vie (audit §B4) : les participants sont PRÉVENUS quand la
+    // campagne cesse d'être active — la commission de campagne et l'exemption
+    // de plafond tombent immédiatement avec le statut. Notification dans
+    // l'espace affilié uniquement (§37 : jamais d'email).
+    if (status !== "active" && existing.status === "active") {
+      await notifyCampaignParticipants(c.env.DB, {
+        campaignId: id,
+        type: status === "ended" ? "campaign_ended" : "campaign_paused",
+        message:
+          status === "ended"
+            ? `La campagne « ${existing.name} » est terminée — les ventes de ce produit repassent aux conditions standards.`
+            : `La campagne « ${existing.name} » a été mise en pause — ses conditions s'appliquent de nouveau dès sa réactivation.`,
+      });
+    }
     return c.json({ ok: true, campaign: { id, status } });
   })
   .delete("/api/admin/campaigns/:id", async (c) => {

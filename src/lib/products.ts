@@ -25,6 +25,9 @@ export interface Product {
   createdAt: number;
   updatedAt: number;
   /* --- Affiliation (Phase 2) --- */
+  /** Cycle de vie (migration 0014) — suppression douce / indisponibilité. */
+  deletedAt?: number | null;
+  unavailableAt?: number | null;
   affiliateEnabled?: boolean;
   commissionType?: "percent" | "fixed" | null;
   commissionValue?: number | null;

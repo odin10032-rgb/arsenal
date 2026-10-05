@@ -16,6 +16,11 @@ export interface Product {
   clicks: number;
   createdAt: number;
   updatedAt: number;
+  /* --- Cycle de vie (migration 0014) --- */
+  /** Horodatage de suppression DOUCE — le produit reste lisible (acheteurs, licences). */
+  deletedAt?: number | null;
+  /** Horodatage « indisponible » (retiré de la vente sans suppression). */
+  unavailableAt?: number | null;
   /* --- Affiliation (Phase 2) --- */
   affiliateEnabled?: boolean;
   commissionType?: "percent" | "fixed" | null;

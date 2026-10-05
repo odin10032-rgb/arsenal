@@ -684,3 +684,41 @@ export async function joinCampaign(campaignId: string): Promise<void> {
     timeoutMs: 6000,
   });
 }
+
+/* --------------------- Notifications (cycle de vie, 0014) --------------------- */
+
+/** Notification de l'espace affilié (changement d'éligibilité, campagne…). */
+export interface AffiliateNotification {
+  id: string;
+  /** product_ineligible | product_reeligible | product_unavailable | product_deleted | campaign_ended | campaign_paused */
+  type: string;
+  message: string;
+  createdAt: number;
+}
+
+/** GET /api/affiliate/me/notifications — notifications NON LUES de l'affilié. */
+export async function fetchNotifications(): Promise<AffiliateNotification[]> {
+  const res = await apiFetch<{ ok: boolean; notifications?: unknown[] }>(
+    "/api/affiliate/me/notifications",
+    { bearer: true, timeoutMs: 6000 }
+  );
+  return (res.notifications || []).map((raw) => {
+    const n = raw as Record<string, unknown>;
+    return {
+      id: typeof n.id === "string" ? n.id : "",
+      type: typeof n.type === "string" ? n.type : "",
+      message: typeof n.message === "string" ? n.message : "",
+      createdAt: typeof n.createdAt === "number" ? n.createdAt : 0,
+    };
+  }).filter((n) => n.id && n.message);
+}
+
+/** POST /api/affiliate/me/notifications/read — marque tout comme lu. */
+export async function markNotificationsRead(): Promise<void> {
+  await apiFetch("/api/affiliate/me/notifications/read", {
+    method: "POST",
+    body: {},
+    bearer: true,
+    timeoutMs: 6000,
+  });
+}

@@ -70,10 +70,20 @@ export default function CatalogPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const filtered = useMemo(() => filterProducts(products, filters), [products, filters]);
+  // Cycle de vie (migration 0014) : les produits SUPPRIMÉS (soft delete) et
+  // INDISPONIBLES ne figurent plus dans la grille publique — leurs pages
+  // dédiées restent accessibles par lien direct avec un état explicite.
+  const visibleProducts = useMemo(
+    () => products.filter((p) => p.deletedAt == null && p.unavailableAt == null),
+    [products]
+  );
+  const filtered = useMemo(
+    () => filterProducts(visibleProducts, filters),
+    [visibleProducts, filters]
+  );
 
-  const total = products.length;
-  const freeCount = products.filter((p) => p.badges.includes("gratuit")).length;
+  const total = visibleProducts.length;
+  const freeCount = visibleProducts.filter((p) => p.badges.includes("gratuit")).length;
   const totalClicks = products.reduce((sum, p) => sum + p.clicks, 0);
 
   // Rangée « Langue » affichée uniquement si au moins un produit en déclare (migration 0007)

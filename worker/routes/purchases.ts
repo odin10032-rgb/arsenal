@@ -14,6 +14,7 @@ import {
   isPurchasableProduct,
   isRetryablePurchaseStatus,
   listUserPurchases,
+  productLifecycleBlock,
   productPriceA,
   purchaseToJson,
   resolvePurchaseAttribution,
@@ -83,6 +84,10 @@ export const purchaseRoutes: AuthedApp = new Hono<AuthedEnv>()
     const db = c.env.DB;
     const product = await getProductForPurchase(db, productId);
     if (!product) return c.json({ ok: false, error: "Produit introuvable." }, 400);
+    // Cycle de vie : vérifié AVANT la garde « achetable » pour que le message
+    // soit exact (supprimé / indisponible ≠ « pas achetable avec des A »).
+    const lifecycleError = productLifecycleBlock(product);
+    if (lifecycleError) return c.json({ ok: false, error: lifecycleError }, 409);
     if (!isPurchasableProduct(product)) {
       return c.json({ ok: false, error: "Ce produit n'est pas achetable avec des A." }, 400);
     }
