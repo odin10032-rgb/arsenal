@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "beta-arsenal-api-staging",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-08-31",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "arsenal-db-staging",
+      "database_id": "6e8c1abd-64dd-4814-925c-0f7068da6133",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "vars": {
+    "FRONT_ORIGINS": "https://arsenal-tools.pages.dev,https://arsenal-v3-preview.pages.dev",
+    "GITHUB_REPO_OWNER": "odin10032-rgb",
+    "GITHUB_REPO_NAME": "arsenal-produits",
+    "GITHUB_BRANCH": "main",
+    "GITHUB_MEDIA_REPO_OWNER": "odin10032-rgb",
+    "GITHUB_MEDIA_REPO_NAME": "arsenal-data",
+    "GITHUB_MEDIA_BRANCH": "main"
+  },
+  "observability": {
+    "enabled": true
+  }
+}
