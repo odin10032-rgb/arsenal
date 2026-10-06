@@ -6,7 +6,8 @@
  */
 
 import Link from "next/link";
-import { BADGE_LABELS, Badge, Product, safeUrl } from "@/lib/products";
+import { Badge, Product, safeUrl } from "@/lib/products";
+import { useI18n } from "@/lib/i18n";
 import { fmt } from "@/lib/format";
 
 const FALLBACK_IMAGE =
@@ -23,11 +24,13 @@ const BADGE_CLASSES: Record<Badge, string> = {
 };
 
 export function BadgePill({ badge }: { badge: Badge }) {
+  // Nom du badge traduit (FR « Gratuit/Bêta », EN « Free/Beta »)
+  const { t } = useI18n();
   return (
     <span
       className={`inline-flex items-center rounded-md border px-2 py-0.5 font-mono text-[0.6rem] font-bold uppercase tracking-[0.09em] ${BADGE_CLASSES[badge]}`}
     >
-      {BADGE_LABELS[badge]}
+      {t(`badge_${badge}`)}
     </span>
   );
 }

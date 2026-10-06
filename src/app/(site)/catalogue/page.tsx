@@ -17,7 +17,6 @@ import { trackVisit } from "@/lib/track";
 import { fmt } from "@/lib/format";
 import {
   BADGES,
-  BADGE_LABELS,
   CATEGORIES,
   Category,
   DEFAULT_FILTERS,
@@ -204,7 +203,7 @@ export default function CatalogPage() {
                   }
                 }}
               >
-                {BADGE_LABELS[b]}
+                {t(`badge_${b}`)}
               </button>
             ))}
           </div>
@@ -231,7 +230,7 @@ export default function CatalogPage() {
             <span className="mr-1 font-mono text-[0.68rem] uppercase tracking-[0.1em] text-tx3">
               {t("catalog_lang_label")}
             </span>
-            {Object.entries(PRODUCT_LANGUAGES).map(([code, label]) => (
+            {Object.entries(PRODUCT_LANGUAGES).map(([code]) => (
               <button
                 key={code}
                 type="button"
@@ -260,7 +259,7 @@ export default function CatalogPage() {
                   }
                 }}
               >
-                {label}
+                {t(`lang_name_${code}`)}
               </button>
             ))}
           </div>

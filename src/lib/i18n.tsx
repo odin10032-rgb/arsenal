@@ -108,6 +108,18 @@ const DICT: Record<Lang, Record<string, string>> = {
     feed_related_product: "Produit présenté",
     feed_share: "Partager",
     feed_share_copied: "Lien copié.",
+    // Vague 2 — noms de badges et de langues (données d'affichage)
+    badge_gratuit: "Gratuit",
+    badge_premium: "Premium",
+    badge_beta: "Bêta",
+    badge_nouveau: "Nouveau",
+    lang_name_fr: "Français",
+    lang_name_en: "Anglais",
+    lang_name_es: "Espagnol",
+    lang_name_pt: "Portugais",
+    lang_name_ar: "Arabe",
+    lang_name_de: "Allemand",
+    lang_name_it: "Italien",
     // Vague 2 — contenu des pages
     // /affiliation — programme d'affiliation
     aff_eyebrow: "Programme d'affiliation",
@@ -380,6 +392,18 @@ const DICT: Record<Lang, Record<string, string>> = {
     feed_related_product: "Featured product",
     feed_share: "Share",
     feed_share_copied: "Link copied.",
+    // Vague 2 — badge and language display names
+    badge_gratuit: "Free",
+    badge_premium: "Premium",
+    badge_beta: "Beta",
+    badge_nouveau: "New",
+    lang_name_fr: "French",
+    lang_name_en: "English",
+    lang_name_es: "Spanish",
+    lang_name_pt: "Portuguese",
+    lang_name_ar: "Arabic",
+    lang_name_de: "German",
+    lang_name_it: "Italian",
     // Vague 2 — traductions EN des cles de contenu (suite de l'agent interrompu)
     auth_err_email: "Enter a valid email.",
     aff_cta_space: "Go to my affiliate space",

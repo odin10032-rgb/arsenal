@@ -144,7 +144,7 @@ function ProductBody() {
           {product.languages && product.languages.length > 0 && (
             <span>
               {t("prod_available_in")}{" "}
-              {product.languages.map((code) => PRODUCT_LANGUAGES[code] ?? code).join(" · ")}
+              {product.languages.map((code) => t(`lang_name_${code}`) || PRODUCT_LANGUAGES[code] || code).join(" · ")}
             </span>
           )}
         </p>
