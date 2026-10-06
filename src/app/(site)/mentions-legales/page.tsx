@@ -69,10 +69,11 @@ export default function MentionsLegalesPage() {
                 ]}
               />
               <LegalNote tone="todo">
-                [À COMPLÉTER] Si une adresse postale, un numéro d&apos;immatriculation, un
-                IFU ou toute autre mention d&apos;identification est légalement exigé pour
-                votre situation, ajoutez-le ici — ces informations n&apos;ont pas été
-                inventées.
+                [À COMPLÉTER — si nécessaire] Adresse postale de l&apos;exploitant, numéro
+                d&apos;immatriculation ou IFU : ces informations n&apos;ont pas été
+                fournies et ne sont pas inventées. Un site édité par une personne
+                physique n&apos;est pas toujours tenu de publier une adresse postale —
+                ajoutez-la ici uniquement si votre situation l&apos;exige.
               </LegalNote>
             </>
           ),
@@ -91,10 +92,20 @@ export default function MentionsLegalesPage() {
                 </a>
                 .
               </p>
-              <LegalNote tone="todo">
-                [À COMPLÉTER] Adresse postale de l&apos;hébergeur, si une mention
-                d&apos;adresse est exigée par la réglementation qui vous est applicable.
-              </LegalNote>
+              <LegalList
+                items={[
+                  <>Adresse : {LEGAL.host.address}</>,
+                  <>
+                    Localisation du service : {LEGAL.host.region}. Le réseau mondial de
+                    Cloudflare peut également traiter des données depuis d&apos;autres
+                    points de présence, pour la diffusion et la sécurité du site.
+                  </>,
+                ]}
+              />
+              <p className="text-[0.86rem] text-tx3">
+                Aucune adresse d&apos;un autre hébergeur ne s&apos;applique : le site
+                n&apos;est hébergé que chez Cloudflare.
+              </p>
             </>
           ),
         },

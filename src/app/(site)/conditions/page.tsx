@@ -6,7 +6,7 @@
  * propre version (Paramètres → Pages légales), elle remplace ce contenu.
  */
 
-import { LegalList, LegalNote, LegalPage } from "@/components/legal-page";
+import { LegalList, LegalPage } from "@/components/legal-page";
 import { LEGAL } from "@/lib/legal";
 import { useLegalOverride } from "@/lib/legal-override";
 
@@ -196,11 +196,13 @@ export default function ConditionsPage() {
                 de l&apos;utilisation du site ou de l&apos;indisponibilité temporaire d&apos;un
                 service tiers.
               </p>
-              <LegalNote tone="todo">
-                [À COMPLÉTER] Juridiction compétente et droit applicable, si vous
-                souhaitez les préciser explicitement — non renseigné à ce stade (aucune
-                valeur inventée).
-              </LegalNote>
+              <p>
+                Les présentes conditions sont régies par le{" "}
+                <strong className="text-tx1">droit béninois</strong>. En cas de litige, et
+                à défaut de résolution amiable, les juridictions compétentes sont celles
+                du <strong className="text-tx1">Bénin</strong>. Une solution amiable est
+                toujours recherchée en premier lieu : écrivez-nous avant toute action.
+              </p>
             </>
           ),
         },

@@ -9,7 +9,7 @@
  * explicite, jamais une règle inventée.
  */
 
-import { LegalList, LegalNote, LegalPage } from "@/components/legal-page";
+import { LegalList, LegalPage } from "@/components/legal-page";
 import { LEGAL } from "@/lib/legal";
 
 export default function ConditionsVentePage() {
@@ -136,13 +136,30 @@ export default function ConditionsVentePage() {
                 Les produits vendus sont des contenus numériques livrés immédiatement
                 après le paiement.
               </p>
-              <LegalNote tone="todo">
-                [À COMPLÉTER — politique de remboursement] Aucune règle de remboursement
-                n&apos;est définie à ce jour. Décidez la règle applicable (par exemple :
-                pas de remboursement après livraison du contenu numérique, ou conditions
-                précises d&apos;un remboursement) et remplacez ce bloc par la règle
-                choisie.
-              </LegalNote>
+              <p>
+                <strong className="text-tx1">
+                  Un remboursement est accordé uniquement en cas de défaillance technique
+                  du produit
+                </strong>{" "}
+                : fichier illisible ou corrompu, accès qui ne fonctionne pas malgré notre
+                assistance, ou produit livré non conforme à sa description.
+              </p>
+              <p>
+                Pour toute demande de remboursement — ou pour toute autre réclamation
+                relative à une commande ou à un produit — écrivez à{" "}
+                <a href={`mailto:${LEGAL.siteEmail}`} className="text-teal underline-offset-4 hover:underline">
+                  {LEGAL.siteEmail}
+                </a>{" "}
+                en précisant votre pseudo et le produit concerné. Chaque réclamation est
+                examinée ; lorsqu&apos;une défaillance technique est constatée, le
+                remboursement est effectué et l&apos;accès au produit est retiré.
+              </p>
+              <p className="text-[0.86rem] text-tx3">
+                Les demandes ne relevant pas d&apos;une défaillance technique (changement
+                d&apos;avis, produit non utilisé, etc.) peuvent également être adressées
+                à cette adresse : elles sont étudiées au cas par cas, sans garantie
+                d&apos;acceptation.
+              </p>
             </>
           ),
         },

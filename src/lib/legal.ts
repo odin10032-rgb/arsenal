@@ -22,8 +22,15 @@ export const LEGAL = {
   /** Hébergeur réellement utilisé (vérifié : Cloudflare Pages + Workers + D1). */
   host: {
     name: "Cloudflare, Inc.",
+    /** Adresse officielle publiée par Cloudflare (politique de confidentialité). */
+    address: "101 Townsend St, San Francisco, CA 94107, États-Unis",
     site: "https://www.cloudflare.com/",
-    /** TODO(éditeur) : adresse postale complète de Cloudflare si exigée localement. */
+    /**
+     * Localisation RÉELLE du backend (vérifiée via l'API Cloudflare le 06/10) :
+     * la base principale est servie par la région « WEUR » (Europe de l'Ouest),
+     * centre de données de Marseille (France).
+     */
+    region: "Europe de l'Ouest — centre de données de Marseille (France)",
   },
 } as const;
 
