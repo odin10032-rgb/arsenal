@@ -12,8 +12,10 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CoinA } from "@/components/account/coin-a";
 import { useUser } from "@/hooks/use-user";
+import { useI18n } from "@/lib/i18n";
 
 export default function ConnexionPage() {
+  const { t } = useI18n();
   const { user, loading, login } = useUser();
   const router = useRouter();
   const [identifiant, setIdentifiant] = useState("");
@@ -52,10 +54,8 @@ export default function ConnexionPage() {
           <CoinA size={46} />
         </div>
         <div className="text-center">
-          <h1 className="font-display text-[1.35rem] font-bold">Connexion</h1>
-          <p className="mt-1 text-[0.84rem] text-tx2">
-            Accédez à votre espace et à votre solde A.
-          </p>
+          <h1 className="font-display text-[1.35rem] font-bold">{t("auth_login_title")}</h1>
+          <p className="mt-1 text-[0.84rem] text-tx2">{t("auth_login_sub")}</p>
         </div>
 
         {error && (
@@ -69,7 +69,7 @@ export default function ConnexionPage() {
 
         <div>
           <label htmlFor="identifiant" className="mb-1.5 block text-[0.8rem] text-tx2">
-            Email ou pseudo
+            {t("auth_field_identifier")}
           </label>
           <input
             id="identifiant"
@@ -77,7 +77,7 @@ export default function ConnexionPage() {
             required
             value={identifiant}
             onChange={(e) => setIdentifiant(e.target.value)}
-            placeholder="florian ou florian@example.com"
+            placeholder={t("auth_placeholder_identifier")}
             autoComplete="username"
             className="input-arsenal"
           />
@@ -85,7 +85,7 @@ export default function ConnexionPage() {
 
         <div>
           <label htmlFor="password" className="mb-1.5 block text-[0.8rem] text-tx2">
-            Mot de passe
+            {t("auth_field_password")}
           </label>
           <div className="relative">
             <input
@@ -102,7 +102,7 @@ export default function ConnexionPage() {
               type="button"
               onClick={() => setShow((s) => !s)}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-tx3 transition-colors hover:text-tx1"
-              aria-label="Afficher/masquer le mot de passe"
+              aria-label={t("auth_show_password_aria")}
             >
               {show ? (
                 <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -124,16 +124,16 @@ export default function ConnexionPage() {
           className="btn-arsenal btn-primary"
         >
           {busy && <span className="spin" />}
-          Se connecter
+          {t("auth_login_submit")}
         </button>
 
         <p className="border-t border-dashed border-line pt-3 text-center text-[0.8rem] text-tx2">
-          Pas encore de compte ?{" "}
+          {t("auth_no_account")}{" "}
           <Link
             href="/inscription"
             className="text-pricetx transition-colors hover:text-brand hover:underline"
           >
-            Créer un compte
+            {t("auth_create_account_link")}
           </Link>
         </p>
       </form>

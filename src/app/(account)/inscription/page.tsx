@@ -12,11 +12,13 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CoinA } from "@/components/account/coin-a";
 import { useUser } from "@/hooks/use-user";
+import { useI18n } from "@/lib/i18n";
 
 const PSEUDO_RE = /^[a-zA-Z0-9_-]{3,24}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function InscriptionPage() {
+  const { t } = useI18n();
   const { user, loading, register } = useUser();
   const router = useRouter();
   const [pseudo, setPseudo] = useState("");
@@ -60,7 +62,7 @@ export default function InscriptionPage() {
       await register(pseudo, email, password);
       router.replace("/compte");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Inscription impossible.");
+      setError(err instanceof Error ? err.message : t("auth_register_error_generic"));
     } finally {
       setBusy(false);
     }
@@ -72,9 +74,7 @@ export default function InscriptionPage() {
       onClick={() => setShow((s) => !s)}
       className="absolute right-3 top-1/2 -translate-y-1/2 text-tx3 transition-colors hover:text-tx1"
       aria-label={
-        target === "password"
-          ? "Afficher/masquer le mot de passe"
-          : "Afficher/masquer la confirmation"
+        target === "password" ? t("auth_show_password_aria") : t("auth_confirm_show_aria")
       }
     >
       {show ? (
@@ -100,10 +100,8 @@ export default function InscriptionPage() {
           <CoinA size={46} />
         </div>
         <div className="text-center">
-          <h1 className="font-display text-[1.35rem] font-bold">Créer un compte</h1>
-          <p className="mt-1 text-[0.84rem] text-tx2">
-            Rejoignez Arsenal Tools et démarrez avec un bonus de bienvenue en A.
-          </p>
+          <h1 className="font-display text-[1.35rem] font-bold">{t("auth_register_title")}</h1>
+          <p className="mt-1 text-[0.84rem] text-tx2">{t("auth_register_sub")}</p>
         </div>
 
         {error && (
@@ -117,7 +115,7 @@ export default function InscriptionPage() {
 
         <div>
           <label htmlFor="pseudo" className="mb-1.5 block text-[0.8rem] text-tx2">
-            Pseudo
+            {t("auth_field_pseudo")}
           </label>
           <input
             id="pseudo"
@@ -125,7 +123,7 @@ export default function InscriptionPage() {
             required
             value={pseudo}
             onChange={(e) => setPseudo(e.target.value)}
-            placeholder="3 à 24 caractères — a-z, 0-9, - _"
+            placeholder={t("auth_placeholder_pseudo")}
             autoComplete="nickname"
             maxLength={24}
             className="input-arsenal"
@@ -134,7 +132,7 @@ export default function InscriptionPage() {
 
         <div>
           <label htmlFor="email" className="mb-1.5 block text-[0.8rem] text-tx2">
-            Email
+            {t("auth_field_email")}
           </label>
           <input
             id="email"
@@ -142,7 +140,7 @@ export default function InscriptionPage() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="vous@example.com"
+            placeholder={t("auth_placeholder_email")}
             autoComplete="email"
             maxLength={254}
             className="input-arsenal"
@@ -151,7 +149,7 @@ export default function InscriptionPage() {
 
         <div>
           <label htmlFor="new-password" className="mb-1.5 block text-[0.8rem] text-tx2">
-            Mot de passe
+            {t("auth_field_password")}
           </label>
           <div className="relative">
             <input
@@ -160,7 +158,7 @@ export default function InscriptionPage() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="8 caractères minimum"
+              placeholder={t("auth_placeholder_password_min")}
               autoComplete="new-password"
               minLength={8}
               className="input-arsenal pr-11"
@@ -171,7 +169,7 @@ export default function InscriptionPage() {
 
         <div>
           <label htmlFor="confirm-password" className="mb-1.5 block text-[0.8rem] text-tx2">
-            Confirmer le mot de passe
+            {t("auth_field_confirm")}
           </label>
           <div className="relative">
             <input
@@ -191,11 +189,11 @@ export default function InscriptionPage() {
 
         <button type="submit" disabled={busy} className="btn-arsenal btn-primary">
           {busy && <span className="spin" />}
-          Créer mon compte
+          {t("auth_register_submit")}
         </button>
 
         <p className="border-t border-dashed border-line pt-3 text-center text-[0.8rem] text-tx2">
-          Déjà inscrit ?{" "}
+          {t("auth_already_account")}{" "}
           <Link
             href="/connexion"
             className="text-pricetx transition-colors hover:text-brand hover:underline"

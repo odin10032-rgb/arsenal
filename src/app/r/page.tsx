@@ -19,16 +19,15 @@ import { Suspense, useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { trackAffiliateClick } from "@/lib/affiliate";
 import { storeAffiliateRef, storeTrackingToken } from "@/lib/purchases";
-
-const FALLBACK_MESSAGE = "Ce lien d'affiliation est introuvable ou n'est plus actif.";
+import { useI18n } from "@/lib/i18n";
 
 /** Message d'échec lisible : on relaie l'erreur du contrat, sinon un texte générique */
-function failureMessage(err: unknown): string {
+function failureMessage(err: unknown, fallback: string, tooMany: string): string {
   if (err instanceof ApiError) {
     if (err.status === 404 || err.status === 409) return err.message;
-    if (err.status === 429) return "Trop de tentatives — réessayez dans une minute.";
+    if (err.status === 429) return tooMany;
   }
-  return FALLBACK_MESSAGE;
+  return fallback;
 }
 
 /** Seules les URL http(s) sont suivies (aucune redirection pilotée par le serveur hors ce schéma) */
@@ -50,19 +49,21 @@ function Shell({ children }: { children: React.ReactNode }) {
 }
 
 function LoadingView() {
+  const { t } = useI18n();
   return (
     <>
       <div className="mt-6 flex justify-center">
         <span className="spin" />
       </div>
       <p className="mt-4 font-mono text-[0.8rem] text-tx3" role="status">
-        Redirection en cours…
+        {t("r_loading")}
       </p>
     </>
   );
 }
 
 function RedirectBody() {
+  const { t } = useI18n();
   const queryCode = useSearchParams().get("code") || "";
   // null = code pas encore déterminé (évite un faux « lien introuvable » au premier rendu)
   const [code, setCode] = useState<string | null>(null);
@@ -86,7 +87,7 @@ function RedirectBody() {
   useEffect(() => {
     if (code === null) return;
     if (!code) {
-      setMessage("Aucun code affilié dans cette adresse.");
+      setMessage(t("r_no_code"));
       return;
     }
     let cancelled = false;
@@ -102,13 +103,13 @@ function RedirectBody() {
         // jeton est absent/expiré : le mécanisme actuel continue de fonctionner.
         storeAffiliateRef(code);
         if (!isHttpUrl(url)) {
-          setMessage(FALLBACK_MESSAGE);
+          setMessage(t("r_link_inactive"));
           return;
         }
         window.location.replace(url.trim());
       } catch (err) {
         if (cancelled) return;
-        setMessage(failureMessage(err));
+        setMessage(failureMessage(err, t("r_link_inactive"), t("r_too_many_attempts")));
       }
     })();
     return () => {
@@ -119,10 +120,10 @@ function RedirectBody() {
   if (message) {
     return (
       <Shell>
-        <h1 className="mt-4 font-display text-[1.15rem] font-bold">Lien indisponible</h1>
+        <h1 className="mt-4 font-display text-[1.15rem] font-bold">{t("r_error_title")}</h1>
         <p className="mt-2 text-[0.85rem] leading-relaxed text-tx2">{message}</p>
         <Link href="/" className="btn-arsenal btn-ghost mt-6 w-full">
-          Aller au catalogue
+          {t("r_go_catalog")}
         </Link>
       </Shell>
     );

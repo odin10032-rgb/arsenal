@@ -121,7 +121,7 @@ export default function CatalogPage() {
       </section>
 
       {/* ---------- Filtres & tri ---------- */}
-      <section className="container-arsenal flex flex-col gap-3 pb-2" aria-label="Filtres et tri des produits">
+      <section className="container-arsenal flex flex-col gap-3 pb-2" aria-label={t("catalog_aria_filters")}>
         <div className="flex items-center gap-2">
           <div className="flex min-w-0 flex-1 items-center gap-2.5 rounded-xl border border-line bg-s1 px-3.5 py-2.5 text-tx3 transition-colors focus-within:border-[rgba(230,57,70,0.6)] focus-within:bg-s2">
             <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" className="flex-shrink-0">
@@ -133,8 +133,8 @@ export default function CatalogPage() {
               type="search"
               value={filters.q}
               onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))}
-              placeholder="Rechercher un outil, un e-book, un prompt…"
-              aria-label="Recherche globale instantanée"
+              placeholder={t("catalog_search_placeholder")}
+              aria-label={t("catalog_aria_search")}
               className="min-w-0 flex-1 border-none bg-transparent text-[0.92rem] text-tx1 outline-none placeholder:text-tx3"
             />
             {filters.q && (
@@ -142,7 +142,7 @@ export default function CatalogPage() {
                 type="button"
                 onClick={() => setFilters((f) => ({ ...f, q: "" }))}
                 className="grid h-5 w-5 flex-shrink-0 place-items-center rounded-full bg-s2 text-tx3 hover:text-brand"
-                aria-label="Effacer la recherche"
+                aria-label={t("catalog_aria_clear")}
               >
                 <svg viewBox="0 0 24 24" width="11" height="11" aria-hidden="true">
                   <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -156,7 +156,7 @@ export default function CatalogPage() {
         </div>
 
         {/* Catégories */}
-        <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filtrer par catégorie">
+        <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t("catalog_aria_category")}>
           {CATEGORY_FILTERS.map((cat) => (
             <FilterPill
               key={cat}
@@ -164,16 +164,16 @@ export default function CatalogPage() {
               active={filters.category === cat}
               onClick={() => setFilters((f) => ({ ...f, category: cat }))}
             >
-              {cat === "all" ? "Tous" : undefined}
+              {cat === "all" ? t("catalog_filter_all") : undefined}
             </FilterPill>
           ))}
         </div>
 
         {/* Badges + tri */}
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3">
-          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filtrer par badge">
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t("catalog_aria_badge")}>
             <span className="mr-1 font-mono text-[0.68rem] uppercase tracking-[0.1em] text-tx3">
-              Badges
+              {t("catalog_badges_label")}
             </span>
             {BADGES.map((b) => (
               <button
@@ -211,7 +211,7 @@ export default function CatalogPage() {
 
           <div className="flex items-center gap-2">
             <label htmlFor="sort-select" className="font-mono text-[0.68rem] uppercase tracking-[0.1em] text-tx3">
-              Tri
+              {t("catalog_sort_label")}
             </label>
             <select
               id="sort-select"
@@ -219,17 +219,17 @@ export default function CatalogPage() {
               onChange={(e) => setFilters((f) => ({ ...f, sort: e.target.value as SortMode }))}
               className="cursor-pointer rounded-md border border-line bg-s1 px-3 py-1.5 text-[0.85rem] text-tx1 hover:border-line2"
             >
-              <option value="popular">Plus populaires</option>
-              <option value="recent">Plus récents</option>
+              <option value="popular">{t("catalog_sort_popular")}</option>
+              <option value="recent">{t("catalog_sort_recent")}</option>
             </select>
           </div>
         </div>
 
         {/* Langues (migration 0007) — multi-sélection en ET, style des badges */}
         {hasLanguages && (
-          <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filtrer par langue">
+          <div className="flex flex-wrap items-center gap-2" role="group" aria-label={t("catalog_aria_language")}>
             <span className="mr-1 font-mono text-[0.68rem] uppercase tracking-[0.1em] text-tx3">
-              Langue
+              {t("catalog_lang_label")}
             </span>
             {Object.entries(PRODUCT_LANGUAGES).map(([code, label]) => (
               <button
@@ -271,17 +271,17 @@ export default function CatalogPage() {
           <p className="font-mono text-[0.8rem] text-tx3" aria-live="polite">
             {initialLoaded ? (
               filtered.length === 0 ? (
-                "Aucun résultat"
+                t("catalog_count_none")
               ) : (
                 <>
-                  <b className="font-semibold text-teal">{fmt(filtered.length)}</b> outil
-                  {filtered.length > 1 ? "s" : ""} affiché{filtered.length > 1 ? "s" : ""} sur{" "}
+                  <b className="font-semibold text-teal">{fmt(filtered.length)}</b>{" "}
+                  {filtered.length > 1 ? t("catalog_count_plural") : t("catalog_count_one")}{" "}
                   {fmt(total)}
-                  {source === "demo" && " — catalogue de démonstration chargé"}
+                  {source === "demo" && t("catalog_demo_source")}
                 </>
               )
             ) : (
-              "Chargement du catalogue…"
+              t("catalog_loading")
             )}
           </p>
           {filtersActive && (
@@ -294,7 +294,7 @@ export default function CatalogPage() {
                 <path d="M3 12a9 9 0 1 0 2.6-6.3L3 8" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 <path d="M3 3v5h5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
               </svg>
-              Réinitialiser les filtres
+              {t("catalog_reset")}
             </button>
           )}
         </div>
@@ -357,18 +357,17 @@ function FilterPill({
 }
 
 function EmptyState({ onReset }: { onReset: () => void }) {
+  const { t } = useI18n();
   return (
     <div className="flex flex-col items-center gap-3 px-6 py-16 text-center text-tx3">
       <svg viewBox="0 0 24 24" width="46" height="46" aria-hidden="true" className="mb-1 opacity-60">
         <circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" strokeWidth="1.6" opacity="0.5" />
         <path d="m20 20-3.5-3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" opacity="0.5" />
       </svg>
-      <h3 className="text-[1.15rem] font-semibold text-tx2">Aucun outil ne correspond</h3>
-      <p className="max-w-[40ch] text-[0.88rem]">
-        Essayez un autre mot-clé ou modifiez les filtres actifs.
-      </p>
+      <h3 className="text-[1.15rem] font-semibold text-tx2">{t("catalog_empty_title")}</h3>
+      <p className="max-w-[40ch] text-[0.88rem]">{t("catalog_empty_text")}</p>
       <button type="button" onClick={onReset} className="btn-arsenal btn-primary btn-sm mt-2">
-        Réinitialiser les filtres
+        {t("catalog_reset")}
       </button>
     </div>
   );

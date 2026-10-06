@@ -292,7 +292,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     auth_no_account: "Pas encore de compte ?",
     auth_create_account_link: "Créer un compte",
     auth_register_title: "Créer un compte",
-    auth_register_sub: "Rejoignez Arsenal Tools et démarrez avec un bonus de bienvenue en A.",
+    auth_register_sub: "Créez votre compte Arsenal Tools — achats, affiliation et suivi d'activité.",
     auth_register_error_generic: "Inscription impossible.",
     auth_err_pseudo:
       "Le pseudo doit contenir entre 3 et 24 caractères (lettres, chiffres, « - » ou « _ »).",
