@@ -296,7 +296,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     auth_login_sub: "Accédez à votre espace et à votre solde A.",
     auth_login_error_generic: "Connexion impossible.",
     auth_field_identifier: "Email ou pseudo",
-    auth_placeholder_identifier: "florian ou florian@example.com",
+    auth_placeholder_identifier: "nom ou nom@example.com",
     auth_field_password: "Mot de passe",
     auth_show_password_aria: "Afficher/masquer le mot de passe",
     auth_confirm_show_aria: "Afficher/masquer la confirmation",

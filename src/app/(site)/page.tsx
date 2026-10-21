@@ -3,7 +3,7 @@
 /**
  * Accueil (refonte 05/10) — point d'entrée GÉNÉRAL, volontairement court :
  *   hero + stats · deux portes (Catalogue / Feed) · produits populaires ·
- *   derniers articles · appel au programme d'affiliation (hors affiliés).
+ *   derniers articles.
  *
  * Le catalogue complet (recherche + filtres) vit sur /catalogue/ ; le Feed
  * (couche éditoriale) sur /feed/ — même niveau de navigation (spec §7).
@@ -14,7 +14,6 @@ import { useEffect, useMemo, useState } from "react";
 import { ProductCard } from "@/components/product-card";
 import { ArticleCard } from "@/components/article-card";
 import { useCatalog } from "@/hooks/use-catalog";
-import { useUser } from "@/hooks/use-user";
 import { apiFetch } from "@/lib/api";
 import { fetchFeed, type FeedArticleListItem } from "@/lib/feed";
 import { fmt } from "@/lib/format";
@@ -28,7 +27,6 @@ const LATEST_POSTS_COUNT = 3;
 
 export default function HomePage() {
   const { products, initialLoaded } = useCatalog();
-  const { user } = useUser();
   const { t } = useI18n();
   // Stats d'accueil pilotées depuis l'admin (Paramètres → Affichage). Défaut :
   // affichées — API injoignable ou drapeau indisponible ⇒ comportement historique.
@@ -235,34 +233,6 @@ export default function HomePage() {
             {articles.map((a) => (
               <ArticleCard key={a.slug} article={a} />
             ))}
-          </div>
-        </section>
-      )}
-
-      {/* ---------- Bloc de découverte : programme d'affiliation ---------- */}
-      {/*
-        Masqué dès que la session est AFFILIÉE (ou Super) : un affilié n'a plus
-        besoin qu'on lui vante le programme. Visible pour un visiteur ou un
-        simple utilisateur, qui sont les vraies cibles.
-      */}
-      {user?.role !== "affiliate" && user?.role !== "super_affiliate" && (
-        <section className="container-arsenal py-12">
-          <div className="flex flex-col items-start justify-between gap-4 rounded-2xl border border-line bg-s1 p-6 sm:flex-row sm:items-center sm:p-7">
-            <div className="min-w-0">
-              <h2 className="font-display text-[1.05rem] font-bold">
-                Gagnez des A en partageant les produits Arsenal
-              </h2>
-              <p className="mt-1.5 max-w-[60ch] text-[0.86rem] leading-relaxed text-tx2">
-                Rejoignez le programme d&apos;affiliation : partagez un lien de suivi et touchez une
-                récompense en A plus une commission à chaque vente.
-              </p>
-            </div>
-            <Link
-              href="/affiliation/"
-              className="btn-arsenal btn-ghost flex-shrink-0 whitespace-nowrap"
-            >
-              Découvrir le programme
-            </Link>
           </div>
         </section>
       )}

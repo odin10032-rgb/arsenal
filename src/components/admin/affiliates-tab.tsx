@@ -386,7 +386,7 @@ function ManualSaleCard({
             className="input-arsenal font-mono text-[0.8rem]"
             value={affiliateCode}
             onChange={(e) => setAffiliateCode(e.target.value)}
-            placeholder="FLORIAN-X7"
+            placeholder="NOM-X7"
           />
         </label>
 
