@@ -9,19 +9,14 @@ import { SiteDrawer } from "./site-drawer";
 import { useI18n } from "@/lib/i18n";
 
 /**
- * En-tête public (refonte 05/10) — navigation principale minimale :
- *   Logo · Accueil · Catalogue · Feed · [☰ Menu] · pill compte.
+ * En-tête public (refonte 21/10) — identité et compte uniquement :
+ *   Logo · pill compte · [☰ Menu].
  *
- * Le lien « Affilié » de l'ancien header a été rangé dans le menu (section
- * Compte) : l'en-tête ne montre que les trois portes du site + le compte.
- * Aucun lien vers l'admin : la porte n'est atteignable que par son URL directe.
+ * Les trois portes du site (Accueil, Catalogue, Feed) ont été déplacées dans
+ * la barre de navigation basse (`SiteBottomNav`) ; le header ne les duplique
+ * plus. Aucun lien vers l'admin : la porte n'est atteignable que par son URL
+ * directe.
  */
-
-const NAV_ITEMS = [
-  { href: "/", key: "nav_home", exact: true },
-  { href: "/catalogue/", key: "nav_catalog", exact: false },
-  { href: "/feed/", key: "nav_feed", exact: false },
-] as const;
 
 export function SiteHeader() {
   const { t } = useI18n();
@@ -49,29 +44,6 @@ export function SiteHeader() {
             </span>
           </Link>
 
-          {/* Navigation principale — desktop uniquement (mobile : rangée sous le logo) */}
-          <nav aria-label={t("nav_aria")} className="hidden items-center gap-1 md:flex">
-            {NAV_ITEMS.map((item) => {
-              const active = item.exact
-                ? pathname === "/"
-                : pathname.startsWith(item.href.replace(/\/$/, ""));
-              return (
-                <Link
-                  key={item.key}
-                  href={item.href}
-                  aria-current={active ? "page" : undefined}
-                  className={`rounded-lg px-3 py-1.5 text-[0.9rem] font-semibold transition-colors ${
-                    active
-                      ? "text-tx1 underline decoration-[#e63946] decoration-2 underline-offset-[6px]"
-                      : "text-tx2 hover:bg-panel hover:text-tx1"
-                  }`}
-                >
-                  {t(item.key)}
-                </Link>
-              );
-            })}
-          </nav>
-
           <div className="flex flex-shrink-0 items-center gap-1.5">
             <BalancePill />
             <button
@@ -94,32 +66,6 @@ export function SiteHeader() {
             </button>
           </div>
         </div>
-
-        {/* Navigation mobile — les trois portes, toujours visibles (spec §17) */}
-        <nav
-          aria-label={t("nav_aria")}
-          className="container-arsenal flex items-center gap-1 border-t border-line py-1.5 md:hidden"
-        >
-          {NAV_ITEMS.map((item) => {
-            const active = item.exact
-              ? pathname === "/"
-              : pathname.startsWith(item.href.replace(/\/$/, ""));
-            return (
-              <Link
-                key={item.key}
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                className={`flex-1 rounded-lg px-3 py-1.5 text-center text-[0.86rem] font-semibold transition-colors ${
-                  active
-                    ? "bg-panel text-tx1 underline decoration-[#e63946] decoration-2 underline-offset-4"
-                    : "text-tx2 hover:bg-panel hover:text-tx1"
-                }`}
-              >
-                {t(item.key)}
-              </Link>
-            );
-          })}
-        </nav>
       </header>
 
       <SiteDrawer open={menuOpen} onClose={() => setMenuOpen(false)} />

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { SiteBottomNav } from "@/components/site-bottom-nav";
 import { captureTrackingTokenFromUrl } from "@/lib/purchases";
 
 /**
@@ -25,10 +26,11 @@ export default function SiteLayout({
   }, []);
 
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="flex min-h-dvh flex-col pb-[calc(58px+env(safe-area-inset-bottom))]">
       <SiteHeader />
       <main className="flex-1">{children}</main>
       <SiteFooter />
+      <SiteBottomNav />
     </div>
   );
 }
