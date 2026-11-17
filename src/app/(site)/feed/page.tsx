@@ -33,6 +33,32 @@ import { useI18n } from "@/lib/i18n";
 import { trackStep } from "@/lib/purchases";
 import { parseVideoUrl } from "@/lib/video";
 
+/** Copie presse-papiers : API moderne, puis repli textarea (contexte non sécurisé) */
+async function copyText(text: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    /* repli ci-dessous */
+  }
+  try {
+    const el = document.createElement("textarea");
+    el.value = text;
+    el.setAttribute("readonly", "");
+    el.style.position = "fixed";
+    el.style.opacity = "0";
+    document.body.appendChild(el);
+    el.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(el);
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
 function FeedBody() {
   const { t } = useI18n();
   const [slug, setSlug] = useState("");
@@ -301,15 +327,21 @@ function ArticleView({ slug }: { slug: string }) {
 
   const share = async () => {
     const url = `${window.location.origin}/feed/?a=${encodeURIComponent(article.slug)}`;
-    try {
-      if (navigator.share) {
+    // Partage natif quand le navigateur le propose (mobile surtout). Un échec
+    // autre qu'une annulation (pas de cible système, permission refusée…)
+    // retombe sur la copie : le bouton ne doit jamais rester sans effet.
+    if (navigator.share) {
+      try {
         await navigator.share({ title: article.title, url });
         return;
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
       }
-      await navigator.clipboard.writeText(url);
+    }
+    if (await copyText(url)) {
       toast(t("feed_share_copied"), "success");
-    } catch {
-      /* partage annulé : silencieux */
+    } else {
+      toast(t("feed_share_failed"), "error");
     }
   };
 

@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteBottomNav } from "@/components/site-bottom-nav";
+import { ToastHost } from "@/lib/toast";
 import { captureTrackingTokenFromUrl } from "@/lib/purchases";
 
 /**
@@ -31,6 +32,9 @@ export default function SiteLayout({
       <main className="flex-1">{children}</main>
       <SiteFooter />
       <SiteBottomNav />
+      {/* Retour visuel des actions publiques (partage d'article…) — au-dessus
+          de la barre basse fixe. */}
+      <ToastHost raised />
     </div>
   );
 }

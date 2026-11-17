@@ -21,8 +21,11 @@ const KIND_STYLE: Record<ToastKind, { border: string; color: string; label: stri
   info: { border: "rgba(0,180,216,0.5)", color: "#4fb3d8", label: "i" },
 };
 
-/** À monter une fois (dashboard / pages) — rend les toasts en bas à droite */
-export function ToastHost() {
+/**
+ * À monter une fois (dashboard / pages) — rend les toasts en bas à droite.
+ * `raised` décale l'affichage au-dessus de la barre de navigation basse du site.
+ */
+export function ToastHost({ raised = false }: { raised?: boolean }) {
   const [current, setCurrent] = useState<{ message: string; kind: ToastKind } | null>(null);
 
   useEffect(() => {
@@ -41,7 +44,11 @@ export function ToastHost() {
   if (!current) return null;
   const style = KIND_STYLE[current.kind];
   return (
-    <div className="pointer-events-none fixed bottom-5 right-5 z-[200]">
+    <div
+      className={`pointer-events-none fixed right-5 z-[200] ${
+        raised ? "bottom-[calc(58px+env(safe-area-inset-bottom)+16px)]" : "bottom-5"
+      }`}
+    >
       <div
         className="pointer-events-auto flex items-center gap-2.5 rounded-xl border bg-[#141414] px-4 py-3 text-[0.85rem] font-medium shadow-[0_16px_40px_rgba(0,0,0,0.5)]"
         style={{ borderColor: style.border }}

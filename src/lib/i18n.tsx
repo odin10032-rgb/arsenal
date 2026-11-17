@@ -108,6 +108,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     feed_related_product: "Produit présenté",
     feed_share: "Partager",
     feed_share_copied: "Lien copié.",
+    feed_share_failed: "Copie impossible — le lien est dans la barre d'adresse.",
     // Vague 2 — noms de badges et de langues (données d'affichage)
     badge_gratuit: "Gratuit",
     badge_premium: "Premium",
@@ -392,6 +393,7 @@ const DICT: Record<Lang, Record<string, string>> = {
     feed_related_product: "Featured product",
     feed_share: "Share",
     feed_share_copied: "Link copied.",
+    feed_share_failed: "Couldn't copy the link — it's in the address bar.",
     // Vague 2 — badge and language display names
     badge_gratuit: "Free",
     badge_premium: "Premium",
